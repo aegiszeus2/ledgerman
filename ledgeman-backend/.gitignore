@@ -3,7 +3,6 @@ __pycache__/
 *.pyo
 .env
 ledgeman.db
-.superadmin_key
 *.zip
 venv/
 .venv/
