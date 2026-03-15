@@ -1153,6 +1153,16 @@ def superadmin_auth():
     return jsonify({'valid': True, 'message': 'Authenticated'}), 200
 
 
+@app.route('/api/superadmin/key', methods=['POST'])
+def superadmin_verify_key():
+    """Verify the super-admin key from request body. Frontend-friendly endpoint."""
+    data = request.get_json() or {}
+    key = data.get('key', '').strip()
+    if not key or key != _get_superadmin_key():
+        return jsonify({'valid': False, 'error': 'Invalid key'}), 401
+    return jsonify({'valid': True}), 200
+
+
 @app.route('/api/superadmin/stats', methods=['GET'])
 def superadmin_stats():
     """System-wide stats: company count, worker count, project count, etc."""
