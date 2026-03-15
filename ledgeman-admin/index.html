@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgerman Super Admin — LittleShield</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg:       #0a0a14;
+    --bg2:      #111120;
+    --bg3:      #1a1a2e;
+    --border:   rgba(255,255,255,.08);
+    --text:     #e8e8f0;
+    --text2:    #8888aa;
+    --primary:  #c9a84c;
+    --primary2: #e8c46a;
+    --success:  #2ecc71;
+    --warning:  #f39c12;
+    --danger:   #e74c3c;
+    --info:     #3498db;
+    --radius:   8px;
+    --shadow:   0 4px 24px rgba(0,0,0,.4);
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+/* ── Login ──────────────────────────────────────────────────────── */
+#loginScreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+.login-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+.login-logo {
+    margin-bottom: 8px;
+    line-height: 1;
+}
+.login-box h1 {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+.login-box .subtitle {
+    color: var(--text2);
+    font-size: .875rem;
+    margin-bottom: 28px;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+#app {
+    display: none;
+    flex-direction: column;
+    min-height: 100vh;
+}
+#app.visible { display: flex; }
+
+.top-bar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.top-bar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+.top-bar-brand .shield { font-size: 1.4rem; }
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+
+/* ── Nav ────────────────────────────────────────────────────────── */
+.main-nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 4px;
+    padding: 0 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.main-nav::-webkit-scrollbar { display: none; }
+.nav-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: .875rem;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+}
+.nav-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+}
+.nav-btn:hover:not(.active) { color: var(--text); }
+
+/* ── Main Content ───────────────────────────────────────────────── */
+.main-content {
+    flex: 1;
+    padding: 20px;
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+}
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+.card-subtitle {
+    font-size: .8rem;
+    color: var(--text2);
+    margin-top: 2px;
+}
+
+/* ── Stat Grid ──────────────────────────────────────────────────── */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+}
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
+}
+.stat-label {
+    font-size: .75rem;
+    color: var(--text2);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+/* ── Table ──────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+}
+thead th {
+    text-align: left;
+    padding: 8px 12px;
+    color: var(--text2);
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+    cursor: pointer;
+}
+tbody tr:hover { background: var(--bg3); }
+tbody td {
+    padding: 10px 12px;
+    vertical-align: middle;
+}
+tbody tr:last-child { border-bottom: none; }
+
+/* ── Badges ─────────────────────────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: .72rem;
+    font-weight: 600;
+}
+.badge-green  { background: rgba(46,204,113,.15); color: var(--success); }
+.badge-yellow { background: rgba(243,156,18,.15); color: var(--warning); }
+.badge-red    { background: rgba(231,76,60,.15); color: var(--danger); }
+.badge-blue   { background: rgba(52,152,219,.15); color: var(--info); }
+.badge-gold   { background: rgba(201,168,76,.15); color: var(--primary); }
+
+/* ── Forms ──────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+label { display: block; font-size: .8rem; color: var(--text2); margin-bottom: 5px; }
+input, select, textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: .9rem;
+    outline: none;
+    transition: border-color .2s;
+}
+input:focus, textarea:focus { border-color: var(--primary); }
+textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: none;
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 600;
+    transition: all .2s;
+    text-decoration: none;
+}
+.btn-primary   { background: var(--primary); color: #111; }
+.btn-primary:hover { background: var(--primary2); }
+.btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+.btn-danger    { background: rgba(231,76,60,.15); color: var(--danger); border: 1px solid rgba(231,76,60,.3); }
+.btn-danger:hover { background: rgba(231,76,60,.25); }
+.btn-success   { background: rgba(46,204,113,.15); color: var(--success); border: 1px solid rgba(46,204,113,.3); }
+.btn-sm { padding: 5px 10px; font-size: .8rem; }
+.btn-block { width: 100%; justify-content: center; padding: 12px; }
+
+/* ── Diagnostics ────────────────────────────────────────────────── */
+.diag-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    font-size: .875rem;
+}
+.diag-ok      { background: rgba(46,204,113,.08); border: 1px solid rgba(46,204,113,.2); }
+.diag-warning { background: rgba(243,156,18,.08); border: 1px solid rgba(243,156,18,.2); }
+.diag-error   { background: rgba(231,76,60,.08); border: 1px solid rgba(231,76,60,.2); }
+.diag-info    { background: rgba(52,152,219,.08); border: 1px solid rgba(52,152,219,.2); }
+.diag-icon { font-size: 1rem; line-height: 1; margin-top: 1px; }
+
+/* ── Score Ring ─────────────────────────────────────────────────── */
+.score-ring {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; font-weight: 700;
+    border: 4px solid;
+    margin: 0 auto 12px;
+}
+.score-good    { border-color: var(--success); color: var(--success); }
+.score-fair    { border-color: var(--warning); color: var(--warning); }
+.score-bad     { border-color: var(--danger); color: var(--danger); }
+
+/* ── Company Detail Panel ───────────────────────────────────────── */
+#detailPanel {
+    position: fixed;
+    top: 0; right: -100%;
+    width: min(480px, 100vw);
+    height: 100vh;
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    z-index: 200;
+    overflow-y: auto;
+    transition: right .3s;
+    padding: 24px;
+}
+#detailPanel.open { right: 0; }
+.detail-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 199;
+    display: none;
+}
+.detail-backdrop.active { display: block; }
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+#toast {
+    position: fixed;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 20px;
+    font-size: .875rem;
+    z-index: 9999;
+    opacity: 0;
+    transition: all .3s;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Misc ───────────────────────────────────────────────────────── */
+.text-muted { color: var(--text2); }
+.text-gold  { color: var(--primary); }
+.text-green { color: var(--success); }
+.text-red   { color: var(--danger); }
+.text-sm    { font-size: .8rem; }
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.mb-1 { margin-bottom: 8px; }
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.gap-8 { gap: 8px; }
+.search-box { position: relative; }
+.search-box input { padding-left: 32px; }
+.search-box::before { content: '🔍'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: .8rem; }
+hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.empty { text-align: center; padding: 40px; color: var(--text2); }
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .main-content { padding: 12px; }
+    .login-box { padding: 28px 20px; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    thead th:nth-child(n+5) { display: none; }
+    tbody td:nth-child(n+5) { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ──────────────────────────────────────────────────── -->
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="login-logo">
+            <img src="../ledgeman/LedgemanLogo.jpg" alt="Ledgerman" style="max-width:220px;width:100%;height:auto;border-radius:6px;margin-bottom:4px" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🛡️',style:'font-size:3rem'}))">
+        </div>
+        <h1>LittleShield</h1>
+        <p class="subtitle">Ledgerman Super Admin Console</p>
+        <form id="loginForm">
+            <div class="form-group" style="text-align:left">
+                <label>API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="Enter super-admin key" autocomplete="off" required>
+            </div>
+            <div id="loginError" style="display:none;color:var(--danger);font-size:.85rem;margin-bottom:12px;text-align:left"></div>
+            <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Access Console</button>
+        </form>
+        <p style="margin-top:16px;font-size:.75rem;color:var(--text2)">
+            Key location: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">ledgeman-backend/.superadmin_key</code>
+        </p>
+    </div>
+</div>
+
+<!-- ── MAIN APP ────────────────────────────────────────────────── -->
+<div id="app">
+    <div class="top-bar">
+        <div class="top-bar-brand">
+            <span class="shield">🛡️</span>
+            <span>LittleShield <span style="color:var(--text2);font-weight:400;font-size:.875rem">— Ledgerman Console</span></span>
+        </div>
+        <div class="top-bar-right">
+            <div class="status-dot" id="serverDot" title="Server status"></div>
+            <span class="text-sm text-muted" id="serverStatus">Connected</span>
+            <button class="btn btn-secondary btn-sm" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <nav class="main-nav">
+        <button class="nav-btn active" data-tab="overview">📊 Overview</button>
+        <button class="nav-btn" data-tab="companies">🏢 Companies</button>
+        <button class="nav-btn" data-tab="health">💚 Health</button>
+        <button class="nav-btn" data-tab="littleshield">🛡️ LittleShield</button>
+        <button class="nav-btn" data-tab="support">🎧 Support</button>
+    </nav>
+
+    <div class="main-content">
+        <!-- OVERVIEW -->
+        <div data-section="overview">
+            <div style="margin-bottom:20px">
+                <h2 style="font-size:1.25rem;margin-bottom:4px">System Overview</h2>
+                <p class="text-muted text-sm" id="overviewTimestamp">Loading…</p>
+            </div>
+            <div class="stat-grid" id="statGrid">
+                <div class="stat-card"><div class="stat-value" id="statCompanies">–</div><div class="stat-label">Companies</div></div>
+                <div class="stat-card"><div class="stat-value" id="statWorkers">–</div><div class="stat-label">Workers</div></div>
+                <div class="stat-card"><div class="stat-value" id="statProjects">–</div><div class="stat-label">Projects</div></div>
+                <div class="stat-card"><div class="stat-value" id="statSubmissions">–</div><div class="stat-label">Submissions</div></div>
+                <div class="stat-card"><div class="stat-value" id="statPhotos">–</div><div class="stat-label">Photos</div></div>
+                <div class="stat-card"><div class="stat-value" id="statDb">–</div><div class="stat-label">DB Size</div></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div><div class="card-title">Recent Companies</div><div class="card-subtitle">Last 5 registered</div></div>
+                    <button class="btn btn-secondary btn-sm" onclick="switchTab('companies')">View All</button>
+                </div>
+                <div id="recentCompanies"><div class="empty">Loading…</div></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">💰 Revenue Tracker</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+                    <div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--primary)" id="mrrValue">$0</div>
+                        <div class="text-sm text-muted">Monthly Revenue</div>
+                    </div>
+                    <div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--success)" id="arrValue">$0</div>
+                        <div class="text-sm text-muted">Annual Run Rate</div>
+                    </div>
+                    <div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--info)" id="planValue">$25/mo</div>
+                        <div class="text-sm text-muted">Per Company</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMPANIES -->
+        <div data-section="companies" style="display:none">
+            <div class="flex-between mb-1" style="margin-bottom:16px">
+                <h2 style="font-size:1.25rem">All Companies</h2>
+                <button class="btn btn-primary btn-sm" onclick="refreshCompanies()">↻ Refresh</button>
+            </div>
+            <div class="search-box" style="margin-bottom:12px">
+                <input type="text" id="companySearch" placeholder="Search by name or ID…" oninput="filterCompanies()">
+            </div>
+            <div class="card" style="padding:0">
+                <div class="table-wrap">
+                    <table id="companiesTable">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Workers</th>
+                                <th>Projects</th>
+                                <th>Last Active</th>
+                                <th>Plan</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companiesBody">
+                            <tr><td colspan="6" class="empty">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- HEALTH -->
+        <div data-section="health" style="display:none">
+            <div class="flex-between" style="margin-bottom:16px">
+                <h2 style="font-size:1.25rem">System Health</h2>
+                <button class="btn btn-primary btn-sm" onclick="loadHealth()">↻ Run Checks</button>
+            </div>
+            <div id="healthChecks"><div class="empty">Click Run Checks to start…</div></div>
+        </div>
+
+        <!-- LITTLESHIELD -->
+        <div data-section="littleshield" style="display:none">
+            <div style="margin-bottom:20px">
+                <h2 style="font-size:1.25rem;margin-bottom:4px">🛡️ LittleShield Diagnostics</h2>
+                <p class="text-muted text-sm">Automated diagnostic engine — select a company to analyse or run global checks.</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Company Diagnostics</div></div>
+                <div class="form-group">
+                    <label>Select Company</label>
+                    <select id="diagCompanySelect">
+                        <option value="">— select a company —</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="runDiagnostics()" id="diagBtn">
+                    🔍 Run Diagnostics
+                </button>
+                <div id="diagResults" style="margin-top:16px"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Global Ping</div></div>
+                <p class="text-sm text-muted" style="margin-bottom:12px">Check backend API response time and confirm all endpoints are reachable.</p>
+                <button class="btn btn-secondary" onclick="runGlobalPing()">📡 Ping All Endpoints</button>
+                <div id="pingResults" style="margin-top:12px"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Quick Actions</div></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+                    <button class="btn btn-secondary" onclick="loadHealth()">💚 Run Health Checks</button>
+                    <button class="btn btn-secondary" onclick="exportStats()">📥 Export Stats JSON</button>
+                    <button class="btn btn-secondary" onclick="copyApiKey()">🔑 Copy API Key</button>
+                    <button class="btn btn-secondary" onclick="loadAllDiagnostics()">🚀 Diagnose All Companies</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SUPPORT -->
+        <div data-section="support" style="display:none">
+            <div style="margin-bottom:20px">
+                <h2 style="font-size:1.25rem;margin-bottom:4px">Customer Support</h2>
+                <p class="text-muted text-sm">View company data, generate support links, and manage customers.</p>
+            </div>
+
+            <!-- ── INVITE COMPANY ──────────────────────────────── -->
+            <div class="card">
+                <div class="card-header"><div class="card-title">✉️ Invite Company</div></div>
+                <p class="text-sm text-muted" style="margin-bottom:14px">
+                    Enter a company email — we'll pull their logo, extract brand colors, and generate a branded sales pitch.
+                </p>
+                <div class="form-group">
+                    <label>Company Email</label>
+                    <input type="email" id="inviteEmail" placeholder="e.g. john@apexcontracting.com">
+                </div>
+                <div class="form-group">
+                    <label>Contact Name (optional)</label>
+                    <input type="text" id="inviteContactName" placeholder="e.g. John Smith">
+                </div>
+                <button class="btn btn-primary" onclick="generateInvite()" id="inviteBtn">🎨 Generate Branded Pitch</button>
+                <div id="invitePreview" style="margin-top:16px"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Onboard New Customer</div></div>
+                <p class="text-sm text-muted" style="margin-bottom:14px">
+                    Send a customer a link to set up their Ledgerman account. They will register at the app URL.
+                </p>
+                <div class="form-group">
+                    <label>App URL (Netlify)</label>
+                    <input type="text" id="appUrlInput" value="https://ledgerman.org" placeholder="https://your-app.netlify.app">
+                </div>
+                <div class="form-group">
+                    <label>Customer Company Name</label>
+                    <input type="text" id="newCustomerName" placeholder="e.g. Apex Contracting Inc.">
+                </div>
+                <button class="btn btn-primary" onclick="generateOnboardLink()">Generate Onboard Link</button>
+                <div id="onboardResult" style="margin-top:12px"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Support Resources</div></div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <a href="mailto:aegiszeus2@gmail.com" class="btn btn-secondary">📧 Email Support (aegiszeus2@gmail.com)</a>
+                    <button class="btn btn-secondary" onclick="switchTab('companies')">📋 View All Companies</button>
+                    <button class="btn btn-secondary" onclick="switchTab('littleshield')">🛡️ Run Diagnostics</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Pricing Reference</div></div>
+                <div style="background:var(--bg3);border-radius:var(--radius);padding:16px">
+                    <div class="flex-between" style="margin-bottom:8px">
+                        <span>Pro Plan</span><span class="text-gold" style="font-weight:700">$25/month per company</span>
+                    </div>
+                    <div class="text-sm text-muted">Unlimited workers · Unlimited projects · Full feature access · 1 GB storage</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── COMPANY DETAIL PANEL ────────────────────────────────── -->
+<div class="detail-backdrop" id="detailBackdrop" onclick="closeDetail()"></div>
+<div id="detailPanel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h3 id="detailTitle">Company Detail</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeDetail()">✕ Close</button>
+    </div>
+    <div id="detailContent"><div class="empty">Loading…</div></div>
+</div>
+
+<!-- ── TOAST ───────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+const API = 'https://ledgeman-backend.onrender.com';
+let _key = '';
+let _companies = [];
+let _stats = null;
+
+// ── Helpers ─────────────────────────────────────────────────
+function toast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.borderColor = type === 'error' ? 'var(--danger)' : type === 'success' ? 'var(--success)' : 'var(--border)';
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function apiFetch(path, options) {
+    options = options || {};
+    const headers = Object.assign({ 'Content-Type': 'application/json', 'X-Superadmin-Key': _key }, options.headers || {});
+    const res = await fetch(API + path, Object.assign({}, options, { headers }));
+    if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || 'HTTP ' + res.status);
+    }
+    return res.json();
+}
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-CA') + ' ' + d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
+}
+
+function timeAgo(iso) {
+    if (!iso) return '—';
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    return Math.floor(hrs / 24) + 'd ago';
+}
+
+// ── Login ────────────────────────────────────────────────────
+document.getElementById('loginForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const key = document.getElementById('apiKeyInput').value.trim();
+    const btn = document.getElementById('loginBtn');
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    try {
+        _key = key;
+        await apiFetch('/api/superadmin/auth', { method: 'POST' });
+        localStorage.setItem('ls_admin_key', key);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').classList.add('visible');
+        initDashboard();
+    } catch(err) {
+        _key = '';
+        btn.disabled = false; btn.textContent = 'Access Console';
+        errEl.textContent = err.message === 'Super-admin access denied' ? 'Invalid API key.' : 'Connection failed: ' + err.message;
+        errEl.style.display = 'block';
+    }
+};
+
+// Auto-login if key in localStorage
+window.addEventListener('load', function() {
+    const saved = localStorage.getItem('ls_admin_key');
+    if (saved) {
+        document.getElementById('apiKeyInput').value = saved;
+    }
+});
+
+document.getElementById('logoutBtn').onclick = function() {
+    _key = '';
+    localStorage.removeItem('ls_admin_key');
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('apiKeyInput').value = '';
+};
+
+// ── Tab Navigation ───────────────────────────────────────────
+function switchTab(tabName) {
+    document.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tabName);
+    });
+    document.querySelectorAll('[data-section]').forEach(s => {
+        s.style.display = s.dataset.section === tabName ? 'block' : 'none';
+    });
+    if (tabName === 'overview') loadOverview();
+    if (tabName === 'companies') loadCompanies();
+    if (tabName === 'health') loadHealth();
+    if (tabName === 'littleshield') loadLittleShield();
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+});
+
+// ── Init ─────────────────────────────────────────────────────
+async function initDashboard() {
+    loadOverview();
+    pingServer();
+    setInterval(pingServer, 30000); // ping every 30s
+}
+
+async function pingServer() {
+    try {
+        const res = await fetch(API + '/api/health');
+        const dot = document.getElementById('serverDot');
+        const lbl = document.getElementById('serverStatus');
+        if (res.ok) {
+            dot.style.background = 'var(--success)';
+            dot.style.boxShadow = '0 0 6px var(--success)';
+            lbl.textContent = 'Connected';
+        } else {
+            dot.style.background = 'var(--warning)';
+            lbl.textContent = 'Degraded';
+        }
+    } catch(e) {
+        const dot = document.getElementById('serverDot');
+        dot.style.background = 'var(--danger)';
+        dot.style.boxShadow = '0 0 6px var(--danger)';
+        document.getElementById('serverStatus').textContent = 'Offline';
+    }
+}
+
+// ── Overview ─────────────────────────────────────────────────
+async function loadOverview() {
+    try {
+        _stats = await apiFetch('/api/superadmin/stats');
+        document.getElementById('statCompanies').textContent  = _stats.companies;
+        document.getElementById('statWorkers').textContent    = _stats.workers;
+        document.getElementById('statProjects').textContent   = _stats.projects;
+        document.getElementById('statSubmissions').textContent = _stats.submissions;
+        document.getElementById('statPhotos').textContent     = _stats.photos;
+        document.getElementById('statDb').textContent         = _stats.dbSizeKb + ' KB';
+        document.getElementById('overviewTimestamp').textContent = 'Last updated: ' + formatDate(_stats.serverTime);
+
+        // Revenue
+        const mrr = _stats.companies * 25;
+        document.getElementById('mrrValue').textContent = '$' + mrr.toLocaleString();
+        document.getElementById('arrValue').textContent = '$' + (mrr * 12).toLocaleString();
+
+        // Recent companies
+        const companies = await apiFetch('/api/superadmin/companies');
+        _companies = companies;
+        populateDiagSelect(companies);
+        renderRecentCompanies(companies.slice(0, 5));
+    } catch(e) {
+        toast('Failed to load overview: ' + e.message, 'error');
+    }
+}
+
+function renderRecentCompanies(list) {
+    const el = document.getElementById('recentCompanies');
+    if (!list.length) { el.innerHTML = '<div class="empty">No companies yet.</div>'; return; }
+    el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Company</th><th>Workers</th><th>Last Active</th></tr></thead><tbody>' +
+        list.map(c => `<tr onclick="openDetail('${c.id}')">
+            <td><strong>${esc(c.name)}</strong><br><span class="text-sm text-muted">${c.id}</span></td>
+            <td>${c.workers}</td>
+            <td class="text-sm text-muted">${timeAgo(c.lastActivity)}</td>
+        </tr>`).join('') +
+        '</tbody></table></div>';
+}
+
+// ── Companies ────────────────────────────────────────────────
+async function loadCompanies() {
+    const tbody = document.getElementById('companiesBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+    try {
+        _companies = await apiFetch('/api/superadmin/companies');
+        renderCompaniesTable(_companies);
+        populateDiagSelect(_companies);
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty text-muted">Error: ' + esc(e.message) + '</td></tr>';
+    }
+}
+
+function refreshCompanies() { loadCompanies(); }
+
+function renderCompaniesTable(list) {
+    const tbody = document.getElementById('companiesBody');
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No companies registered yet.</td></tr>'; return; }
+    tbody.innerHTML = list.map(c => `
+        <tr onclick="openDetail('${c.id}')">
+            <td>
+                <strong>${esc(c.name)}</strong>
+                <br><span class="text-sm text-muted" style="font-family:monospace">${c.id}</span>
+            </td>
+            <td>${c.workers}</td>
+            <td>${c.projects}</td>
+            <td class="text-sm text-muted">${timeAgo(c.lastActivity)}</td>
+            <td><span class="badge badge-gold">${c.plan}</span></td>
+            <td onclick="event.stopPropagation()">
+                <button class="btn btn-secondary btn-sm" onclick="runDiagnosticsFor('${c.id}')">🛡️ Diag</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCompany('${c.id}','${esc(c.name)}')">🗑</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterCompanies() {
+    const q = document.getElementById('companySearch').value.toLowerCase();
+    const filtered = _companies.filter(c => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+    renderCompaniesTable(filtered);
+}
+
+// ── Company Detail ───────────────────────────────────────────
+async function openDetail(companyId) {
+    document.getElementById('detailContent').innerHTML = '<div class="empty">Loading…</div>';
+    document.getElementById('detailPanel').classList.add('open');
+    document.getElementById('detailBackdrop').classList.add('active');
+    try {
+        const d = await apiFetch('/api/superadmin/companies/' + companyId);
+        document.getElementById('detailTitle').textContent = d.name;
+        const s = d.stats;
+        document.getElementById('detailContent').innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+                <div class="stat-card"><div class="stat-value">${s.workers}</div><div class="stat-label">Workers</div></div>
+                <div class="stat-card"><div class="stat-value">${s.projects}</div><div class="stat-label">Projects</div></div>
+                <div class="stat-card"><div class="stat-value">${s.submissions}</div><div class="stat-label">Submissions</div></div>
+                <div class="stat-card"><div class="stat-value">${s.photos}</div><div class="stat-label">Photos</div></div>
+            </div>
+
+            <div class="card" style="margin-bottom:12px">
+                <div class="card-title mb-1">Company Info</div>
+                <div class="text-sm">
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Company ID</span><code style="font-size:.75rem">${d.id}</code></div>
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Email</span><span>${esc(d.settings.email || '—')}</span></div>
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Phone</span><span>${esc(d.settings.phone || '—')}</span></div>
+                    <div class="flex-between"><span class="text-muted">Registered</span><span>${formatDate(d.createdAt)}</span></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:12px">
+                <div class="card-title mb-1">Workers (${d.workers.length})</div>
+                ${d.workers.length ? d.workers.map(w => `
+                    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+                        <span style="font-size:1.2rem">${w.role === 'Approver' ? '✅' : '👷'}</span>
+                        <div style="flex:1">
+                            <div style="font-size:.875rem;font-weight:600">${esc(w.name)}</div>
+                            <div class="text-sm text-muted">${w.role} · ${w.status} ${w.two_fa_enabled ? '🔐' : ''}</div>
+                        </div>
+                        <span class="badge ${w.status === 'Active' ? 'badge-green' : 'badge-red'}">${w.status}</span>
+                    </div>
+                `).join('') : '<p class="text-muted text-sm">No workers yet.</p>'}
+            </div>
+
+            <div class="card" style="margin-bottom:12px">
+                <div class="card-title mb-1">Recent Activity</div>
+                ${d.auditLog.length ? d.auditLog.slice(0, 10).map(a => `
+                    <div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:.8rem">
+                        <span class="text-muted">${timeAgo(a.timestamp)}</span>
+                        — <strong>${esc(a.user)}</strong>: ${esc(a.action)}
+                        ${a.details ? '<span class="text-muted"> · ' + esc(a.details) + '</span>' : ''}
+                    </div>
+                `).join('') : '<p class="text-muted text-sm">No activity yet.</p>'}
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+                <button class="btn btn-secondary" onclick="runDiagnosticsFor('${d.id}')">🛡️ Run LittleShield Diagnostics</button>
+                <button class="btn btn-danger" onclick="deleteCompany('${d.id}','${esc(d.name)}')">🗑️ Delete Company & All Data</button>
+            </div>
+        `;
+    } catch(e) {
+        document.getElementById('detailContent').innerHTML = '<div class="empty">Error: ' + esc(e.message) + '</div>';
+    }
+}
+
+function closeDetail() {
+    document.getElementById('detailPanel').classList.remove('open');
+    document.getElementById('detailBackdrop').classList.remove('active');
+}
+
+async function deleteCompany(id, name) {
+    if (!confirm(`DELETE "${name}" and ALL its data?\n\nThis cannot be undone.`)) return;
+    try {
+        await apiFetch('/api/superadmin/companies/' + id, { method: 'DELETE' });
+        toast('Company deleted.', 'success');
+        closeDetail();
+        loadCompanies();
+        loadOverview();
+    } catch(e) {
+        toast('Delete failed: ' + e.message, 'error');
+    }
+}
+
+// ── Health ───────────────────────────────────────────────────
+async function loadHealth() {
+    const el = document.getElementById('healthChecks');
+    el.innerHTML = '<div class="empty">Running checks…</div>';
+    try {
+        const h = await apiFetch('/api/superadmin/health');
+        const icons = { ok: '✅', warning: '⚠️', error: '❌' };
+        const cls   = { ok: 'diag-ok', warning: 'diag-warning', error: 'diag-error' };
+        el.innerHTML = `
+            <div class="diag-item ${cls[h.status] || 'diag-ok'}" style="margin-bottom:16px">
+                <span class="diag-icon">${icons[h.status] || '✅'}</span>
+                <div><strong>Overall Status: ${h.status.toUpperCase()}</strong> — ${formatDate(h.timestamp)}</div>
+            </div>
+            ${h.checks.map(c => `
+                <div class="diag-item ${cls[c.status] || 'diag-info'}">
+                    <span class="diag-icon">${icons[c.status] || 'ℹ️'}</span>
+                    <div><strong>${esc(c.check)}</strong><div class="text-sm text-muted">${esc(c.detail)}</div></div>
+                </div>
+            `).join('')}
+        `;
+    } catch(e) {
+        el.innerHTML = '<div class="diag-item diag-error"><span class="diag-icon">❌</span><div>Health check failed: ' + esc(e.message) + '</div></div>';
+    }
+}
+
+// ── LittleShield ─────────────────────────────────────────────
+function loadLittleShield() {
+    // Already populated by nav click — just populate company select if needed
+    if (_companies.length) populateDiagSelect(_companies);
+}
+
+function populateDiagSelect(companies) {
+    const sel = document.getElementById('diagCompanySelect');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— select a company —</option>' +
+        companies.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    if (current) sel.value = current;
+}
+
+async function runDiagnostics() {
+    const id = document.getElementById('diagCompanySelect').value;
+    if (!id) { toast('Select a company first.', 'error'); return; }
+    await runDiagnosticsFor(id);
+}
+
+async function runDiagnosticsFor(companyId) {
+    // Switch to LittleShield tab
+    switchTab('littleshield');
+    const sel = document.getElementById('diagCompanySelect');
+    if (sel) sel.value = companyId;
+    const el = document.getElementById('diagResults');
+    el.innerHTML = '<div class="empty">Analysing…</div>';
+    const btn = document.getElementById('diagBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analysing…'; }
+    try {
+        const d = await apiFetch('/api/superadmin/diagnostics/' + companyId);
+        const scoreClass = d.score >= 80 ? 'score-good' : d.score >= 50 ? 'score-fair' : 'score-bad';
+        const statusLabel = { good: '✅ Good', fair: '⚠️ Fair', needs_attention: '❌ Needs Attention' };
+        const issueCls = { warning: 'diag-warning', info: 'diag-info', error: 'diag-error' };
+        const issueIcon = { warning: '⚠️', info: 'ℹ️', error: '❌' };
+        el.innerHTML = `
+            <div style="text-align:center;margin-bottom:16px">
+                <div class="score-ring ${scoreClass}">${d.score}</div>
+                <div style="font-weight:600">${statusLabel[d.status] || d.status}</div>
+                <div class="text-sm text-muted">${formatDate(d.checkedAt)}</div>
+            </div>
+            ${d.issues.length ? d.issues.map(i => `
+                <div class="diag-item ${issueCls[i.severity] || 'diag-info'}">
+                    <span class="diag-icon">${issueIcon[i.severity] || 'ℹ️'}</span>
+                    <div>${esc(i.message)}</div>
+                </div>
+            `).join('') : '<div class="diag-item diag-ok"><span class="diag-icon">✅</span><div>No issues found.</div></div>'}
+            ${d.recommendations.length ? `
+                <div style="margin-top:12px">
+                    <div class="text-sm text-muted" style="margin-bottom:8px"><strong>Recommendations:</strong></div>
+                    ${d.recommendations.map(r => `<div class="diag-item diag-info"><span class="diag-icon">💡</span><div>${esc(r)}</div></div>`).join('')}
+                </div>
+            ` : ''}
+        `;
+    } catch(e) {
+        el.innerHTML = '<div class="diag-item diag-error"><span class="diag-icon">❌</span><div>Diagnostics failed: ' + esc(e.message) + '</div></div>';
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Run Diagnostics'; }
+    }
+}
+
+async function loadAllDiagnostics() {
+    if (!_companies.length) { toast('Load companies first.', 'error'); return; }
+    switchTab('littleshield');
+    const el = document.getElementById('diagResults');
+    el.innerHTML = '<div class="empty">Running diagnostics on all ' + _companies.length + ' companies…</div>';
+    const results = [];
+    for (const c of _companies) {
+        try {
+            const d = await apiFetch('/api/superadmin/diagnostics/' + c.id);
+            results.push({ name: c.name, ...d });
+        } catch(e) { /* skip */ }
+    }
+    const scoreClass = s => s >= 80 ? 'badge-green' : s >= 50 ? 'badge-yellow' : 'badge-red';
+    el.innerHTML = '<div class="card-title mb-1">All Companies — Diagnostic Summary</div>' +
+        results.map(r => `
+            <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+                <div>
+                    <strong>${esc(r.name)}</strong>
+                    <div class="text-sm text-muted">${r.issues.length} issue(s)</div>
+                </div>
+                <span class="badge ${scoreClass(r.score)}">${r.score}/100</span>
+            </div>
+        `).join('');
+}
+
+async function runGlobalPing() {
+    const el = document.getElementById('pingResults');
+    const endpoints = [
+        { name: 'Health', path: '/api/health' },
+        { name: 'Superadmin Auth', path: '/api/superadmin/auth', method: 'POST' },
+        { name: 'Superadmin Stats', path: '/api/superadmin/stats' },
+    ];
+    el.innerHTML = '<div class="text-sm text-muted">Pinging…</div>';
+    const rows = await Promise.all(endpoints.map(async ep => {
+        const start = Date.now();
+        try {
+            const headers = { 'Content-Type': 'application/json', 'X-Superadmin-Key': _key };
+            const res = await fetch(API + ep.path, { method: ep.method || 'GET', headers });
+            const ms = Date.now() - start;
+            const ok = res.ok;
+            return `<div class="diag-item ${ok ? 'diag-ok' : 'diag-error'}">
+                <span class="diag-icon">${ok ? '✅' : '❌'}</span>
+                <div><strong>${esc(ep.name)}</strong> <span class="text-muted text-sm">${ms}ms · HTTP ${res.status}</span></div>
+            </div>`;
+        } catch(e) {
+            const ms = Date.now() - start;
+            return `<div class="diag-item diag-error"><span class="diag-icon">❌</span><div><strong>${esc(ep.name)}</strong> <span class="text-muted text-sm">${ms}ms · ${esc(e.message)}</span></div></div>`;
+        }
+    }));
+    el.innerHTML = rows.join('');
+}
+
+// ── Support ──────────────────────────────────────────────────
+function generateOnboardLink() {
+    const appUrl = document.getElementById('appUrlInput').value.trim();
+    const name = document.getElementById('newCustomerName').value.trim();
+    const el = document.getElementById('onboardResult');
+    if (!appUrl) { toast('Enter the app URL first.', 'error'); return; }
+    const msg = name
+        ? `Hi ${name},\n\nYour Ledgerman account is ready to set up!\n\nClick the link below to get started:\n${appUrl}\n\n1. Click "Get Started"\n2. Enter your company name: ${name}\n3. Choose an admin password\n4. You're in!\n\nQuestions? Reply to this email.\n\n— Ledgerman Support\naegiszeus2@gmail.com`
+        : `Welcome to Ledgerman!\n\nSet up your account at: ${appUrl}\n\n— Ledgerman Support`;
+    el.innerHTML = `
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:8px">
+            <div class="flex-between mb-1">
+                <span class="text-sm text-muted">Onboarding Message</span>
+                <button class="btn btn-secondary btn-sm" onclick="copyOnboard()">Copy</button>
+            </div>
+            <pre id="onboardMsg" style="font-size:.8rem;white-space:pre-wrap;font-family:inherit;color:var(--text)">${esc(msg)}</pre>
+        </div>
+    `;
+}
+
+function copyOnboard() {
+    const text = document.getElementById('onboardMsg').textContent;
+    navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard!', 'success')).catch(() => {});
+}
+
+// ── Quick actions ────────────────────────────────────────────
+async function exportStats() {
+    try {
+        const stats = await apiFetch('/api/superadmin/stats');
+        const companies = await apiFetch('/api/superadmin/companies');
+        const data = { exportDate: new Date().toISOString(), stats, companies };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'ledgeman-stats-' + new Date().toISOString().slice(0,10) + '.json';
+        a.click(); URL.revokeObjectURL(url);
+        toast('Stats exported.', 'success');
+    } catch(e) { toast('Export failed: ' + e.message, 'error'); }
+}
+
+async function copyApiKey() {
+    try {
+        const data = await fetch(API + '/api/superadmin/key').then(r => r.json());
+        await navigator.clipboard.writeText(data.key);
+        toast('API key copied!', 'success');
+    } catch(e) { toast('Could not copy key.', 'error'); }
+}
+
+// ── Invite Company ───────────────────────────────────────
+async function generateInvite() {
+    const email = document.getElementById('inviteEmail').value.trim();
+    const contactName = document.getElementById('inviteContactName').value.trim();
+    const el = document.getElementById('invitePreview');
+    const btn = document.getElementById('inviteBtn');
+    if (!email || !email.includes('@')) { toast('Enter a valid email.', 'error'); return; }
+
+    const domain = email.split('@')[1];
+    const companyName = domain.split('.')[0].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    btn.disabled = true; btn.textContent = '⏳ Extracting brand…';
+    el.innerHTML = '<div class="empty">Fetching logo & extracting colors…</div>';
+
+    try {
+        const logoUrl = 'https://logo.clearbit.com/' + domain;
+        const colors = await extractColorsFromLogo(logoUrl);
+        const primary = colors[0] || '#2563eb';
+        const secondary = colors[1] || '#1e40af';
+        const accent = colors[2] || '#f59e0b';
+        const displayName = contactName || companyName;
+        const greeting = contactName ? 'Hi ' + contactName + ',' : 'Hi there,';
+
+        const pitchHtml = buildPitchEmail(greeting, displayName, domain, logoUrl, primary, secondary, accent);
+        const pitchPlain = buildPitchPlain(greeting, displayName);
+
+        el.innerHTML = '<div style="margin-bottom:12px">' +
+            '<div class="flex-between mb-1">' +
+            '<span class="text-sm"><strong>Brand detected:</strong></span>' +
+            '<div style="display:flex;gap:4px;align-items:center">' +
+            '<span style="width:20px;height:20px;border-radius:4px;background:' + primary + ';display:inline-block;border:1px solid rgba(255,255,255,.2)" title="Primary"></span>' +
+            '<span style="width:20px;height:20px;border-radius:4px;background:' + secondary + ';display:inline-block;border:1px solid rgba(255,255,255,.2)" title="Secondary"></span>' +
+            '<span style="width:20px;height:20px;border-radius:4px;background:' + accent + ';display:inline-block;border:1px solid rgba(255,255,255,.2)" title="Accent"></span>' +
+            '<img src="' + logoUrl + '" alt="Logo" style="height:20px;margin-left:8px;border-radius:3px" onerror="this.style.display=\'none\'">' +
+            '</div></div></div>' +
+            '<div style="background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);max-height:400px;overflow-y:auto">' +
+            pitchHtml + '</div>' +
+            '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
+            '<button class="btn btn-primary" onclick="copyInviteHtml()">📋 Copy HTML</button>' +
+            '<button class="btn btn-secondary" onclick="copyInvitePlain()">📝 Copy Plain Text</button>' +
+            '<a class="btn btn-secondary" href="mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent('Streamline Your Workforce Management — Ledgerman') + '&body=' + encodeURIComponent(pitchPlain) + '" target="_blank">📧 Open in Email</a>' +
+            '</div>';
+
+        window._inviteHtml = pitchHtml;
+        window._invitePlain = pitchPlain;
+    } catch(e) {
+        el.innerHTML = '<div class="diag-item diag-error"><span class="diag-icon">❌</span><div>Failed: ' + esc(e.message) + '</div></div>';
+    } finally {
+        btn.disabled = false; btn.textContent = '🎨 Generate Branded Pitch';
+    }
+}
+
+function extractColorsFromLogo(logoUrl) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = function() {
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const size = 50;
+                canvas.width = size; canvas.height = size;
+                ctx.drawImage(img, 0, 0, size, size);
+                const data = ctx.getImageData(0, 0, size, size).data;
+                const buckets = {};
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+                    if (a < 128) continue;
+                    const brightness = (r + g + b) / 3;
+                    if (brightness > 240 || brightness < 15) continue;
+                    const qr = Math.round(r / 32) * 32;
+                    const qg = Math.round(g / 32) * 32;
+                    const qb = Math.round(b / 32) * 32;
+                    const key = qr + ',' + qg + ',' + qb;
+                    buckets[key] = (buckets[key] || 0) + 1;
+                }
+                const sorted = Object.entries(buckets).sort((a, b) => b[1] - a[1]);
+                const topColors = sorted.slice(0, 3).map(function(entry) {
+                    const parts = entry[0].split(',').map(Number);
+                    return '#' + parts.map(function(c) { return c.toString(16).padStart(2, '0'); }).join('');
+                });
+                if (topColors.length === 0) resolve(['#2563eb', '#1e40af', '#f59e0b']);
+                else if (topColors.length === 1) resolve([topColors[0], topColors[0], '#f59e0b']);
+                else if (topColors.length === 2) resolve([topColors[0], topColors[1], '#f59e0b']);
+                else resolve(topColors);
+            } catch(e) {
+                resolve(['#2563eb', '#1e40af', '#f59e0b']);
+            }
+        };
+        img.onerror = function() { resolve(['#2563eb', '#1e40af', '#f59e0b']); };
+        img.src = logoUrl;
+    });
+}
+
+function buildPitchEmail(greeting, displayName, domain, logoUrl, primary, secondary, accent) {
+    return '<div style="font-family:Segoe UI,system-ui,sans-serif;max-width:600px;margin:0 auto">' +
+        '<div style="background:linear-gradient(135deg,' + primary + ',' + secondary + ');padding:32px 24px;text-align:center">' +
+        '<img src="' + logoUrl + '" alt="Logo" style="height:48px;margin-bottom:16px;border-radius:6px;background:#fff;padding:6px" onerror="this.style.display=\'none\'">' +
+        '<h1 style="color:#fff;font-size:22px;margin:0;font-weight:700">Streamline Your Workforce</h1>' +
+        '<p style="color:rgba(255,255,255,.85);font-size:14px;margin:8px 0 0">Built for companies like yours</p>' +
+        '</div>' +
+        '<div style="padding:28px 24px;color:#333;font-size:15px;line-height:1.6">' +
+        '<p>' + greeting + '</p>' +
+        '<p>I came across <strong>' + esc(displayName || domain) + '</strong> and wanted to reach out — I think <strong>Ledgerman</strong> could save your team serious time and money.</p>' +
+        '<p><strong>What Ledgerman does:</strong></p>' +
+        '<ul style="padding-left:20px;margin:12px 0">' +
+        '<li><strong>Digital timesheets</strong> — workers clock in/out from their phone. No paper, no buddy punching.</li>' +
+        '<li><strong>Photo documentation</strong> — timestamped, GPS-tagged job site photos. Proof of work, instantly.</li>' +
+        '<li><strong>Real-time dashboard</strong> — see who\'s working where, right now. No chasing people.</li>' +
+        '<li><strong>One-click invoicing</strong> — generate professional invoices from approved timesheets.</li>' +
+        '<li><strong>Zero IT setup</strong> — works on any phone, any browser. 5-minute onboarding.</li>' +
+        '</ul>' +
+        '<p>Companies using Ledgerman cut admin time by <strong>10+ hours/week</strong> and eliminate timesheet disputes entirely.</p>' +
+        '<div style="text-align:center;margin:24px 0">' +
+        '<a href="https://ledgerman.org" style="display:inline-block;background:' + primary + ';color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px">Start Free Trial →</a>' +
+        '</div>' +
+        '<p style="font-size:14px;color:#666">No credit card required. Set up in under 5 minutes.</p>' +
+        '<p>Happy to jump on a quick call if you\'d like a walkthrough.</p>' +
+        '<p>Best,<br><strong>Lucas</strong><br><span style="color:#888;font-size:13px">Ledgerman · <a href="https://ledgerman.org" style="color:' + primary + '">ledgerman.org</a></span></p>' +
+        '</div>' +
+        '<div style="background:' + primary + '10;border-top:2px solid ' + primary + ';padding:16px 24px;text-align:center;font-size:12px;color:#888">' +
+        'Ledgerman — Workforce management, simplified. · <a href="https://ledgerman.org" style="color:' + primary + '">ledgerman.org</a>' +
+        '</div></div>';
+}
+
+function buildPitchPlain(greeting, displayName) {
+    return greeting + '\n\nI came across ' + (displayName || 'your company') + ' and wanted to reach out — I think Ledgerman could save your team serious time and money.\n\nWhat Ledgerman does:\n• Digital timesheets — workers clock in/out from their phone. No paper, no buddy punching.\n• Photo documentation — timestamped, GPS-tagged job site photos. Proof of work, instantly.\n• Real-time dashboard — see who\'s working where, right now. No chasing people.\n• One-click invoicing — generate professional invoices from approved timesheets.\n• Zero IT setup — works on any phone, any browser. 5-minute onboarding.\n\nCompanies using Ledgerman cut admin time by 10+ hours/week and eliminate timesheet disputes entirely.\n\nStart your free trial: https://ledgerman.org\nNo credit card required. Set up in under 5 minutes.\n\nHappy to jump on a quick call if you\'d like a walkthrough.\n\nBest,\nLucas\nLedgerman · ledgerman.org';
+}
+
+function copyInviteHtml() {
+    if (!window._inviteHtml) { toast('Generate a pitch first.', 'error'); return; }
+    try {
+        const blob = new Blob([window._inviteHtml], { type: 'text/html' });
+        const textBlob = new Blob([window._inviteHtml], { type: 'text/plain' });
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob })]).then(
+            function() { toast('HTML pitch copied!', 'success'); },
+            function() { navigator.clipboard.writeText(window._inviteHtml).then(function() { toast('Copied as text.', 'success'); }); }
+        );
+    } catch(e) { navigator.clipboard.writeText(window._inviteHtml).then(function() { toast('Copied.', 'success'); }); }
+}
+
+function copyInvitePlain() {
+    if (!window._invitePlain) { toast('Generate a pitch first.', 'error'); return; }
+    navigator.clipboard.writeText(window._invitePlain).then(function() { toast('Plain text pitch copied!', 'success'); }).catch(function() { toast('Copy failed.', 'error'); });
+}
+
+// ── Escape HTML ──────────────────────────────────────────────
+function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
