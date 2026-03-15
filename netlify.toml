@@ -15,7 +15,4 @@ status = 301
 
 # Production context (main branch)
 [context.production]
-environment = { HUGO_ENV = "production" }
-
-[context.production.environment]
-NODE_ENV = "production"
+environment = { HUGO_ENV = "production", NODE_ENV = "production" }
