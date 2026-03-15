@@ -4,6 +4,8 @@ __pycache__/
 .env
 ledgeman.db
 *.zip
+*.zip.enc
 venv/
 .venv/
 .superadmin_key
+audit.log

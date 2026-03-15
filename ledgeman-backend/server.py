@@ -30,6 +30,8 @@ app = Flask(__name__)
 # CORS — restrict to known frontend origins
 ALLOWED_ORIGINS = [
     'https://unrivaled-cassata-ee2ea9.netlify.app',
+    'https://ledgerman.org',
+    'https://www.ledgerman.org',
     'http://localhost:5001',
     'http://localhost:8080',
     'http://localhost:3000',
@@ -48,6 +50,34 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+# ── Security Headers ────────────────────────────────────────────────────────────
+
+@app.after_request
+def set_security_headers(response):
+    """Inject security headers on every response."""
+    # Content Security Policy: restrict loading of external resources
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+        "connect-src 'self' https://ledgeman-backend.onrender.com; "
+        "frame-ancestors 'none'"
+    )
+    # Prevent browsers from MIME-sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    # Enable XSS protection (legacy, but good defense-in-depth)
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Control referrer information
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Enable HSTS (if HTTPS)
+    if request.scheme == 'https':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
 # ── Password Hashing ──────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
@@ -64,6 +94,33 @@ def check_password(plain: str, stored: str) -> bool:
 def _migrate_password(db, company_id: str, new_hash: str):
     """Upgrade a plaintext password to bcrypt in the DB."""
     db.execute("UPDATE companies SET admin_password = ? WHERE id = ?", (new_hash, company_id))
+    db.commit()
+
+
+def hash_pin(plain: str) -> str:
+    """Hash a worker PIN with bcrypt."""
+    return bcrypt.hashpw(plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def check_pin(plain: str, stored_pin: str, stored_pin_hash: str = None) -> bool:
+    """
+    Check a worker PIN. Supports both plaintext (legacy) and bcrypt.
+    If plaintext matches and pin_hash is provided, caller should migrate to bcrypt.
+    Returns: (match: bool, should_migrate: bool)
+    """
+    # If we have a pin_hash, prefer that
+    if stored_pin_hash and stored_pin_hash.startswith('$2b$'):
+        return bcrypt.checkpw(plain.encode('utf-8'), stored_pin_hash.encode('utf-8')), False
+    # Fall back to plaintext comparison (legacy)
+    if plain == stored_pin:
+        return True, True  # matched plaintext, should migrate
+    return False, False
+
+
+def _migrate_worker_pin(db, worker_id: str, company_id: str, new_hash: str):
+    """Upgrade a plaintext worker PIN to bcrypt in the DB."""
+    db.execute("UPDATE workers SET pin_hash = ? WHERE id = ? AND company_id = ?",
+               (new_hash, worker_id, company_id))
     db.commit()
 
 # ── Input Sanitization ────────────────────────────────────────────────────────
@@ -91,6 +148,25 @@ def generate_id() -> str:
     ts = format(int(time.time() * 1000), 'x')
     rand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=9))
     return ts + rand
+
+
+# ── Audit logging ─────────────────────────────────────────────────────────────
+
+def log_audit(company_id: str, event_type: str, details: dict = None):
+    """Log authentication and access events to audit.log."""
+    timestamp = now_iso()
+    log_entry = {
+        'timestamp': timestamp,
+        'company_id': company_id,
+        'event_type': event_type,  # e.g., 'admin_login', 'worker_login', 'login_failed', 'pin_updated', etc.
+        'details': details or {},
+    }
+    audit_log_path = os.path.join(os.path.dirname(__file__), 'audit.log')
+    try:
+        with open(audit_log_path, 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception as e:
+        print(f"[AUDIT] Failed to write to audit.log: {e}")
 
 
 # ── Super-admin key ───────────────────────────────────────────────────────────
@@ -269,17 +345,41 @@ def auth_admin():
         })
         return jsonify({'token': token}), 200
 
-    # Check Approver worker PIN
-    approver = row_to_dict(
-        db.execute(
-            "SELECT * FROM workers WHERE company_id = ? AND role = 'Approver' "
-            "AND status = 'Active' AND pin = ?",
-            (body['companyId'], body['password'])
-        ).fetchone()
-    )
-    db.close()
+    # Check Approver worker PIN (also supports bcrypt + auto-migration)
+    approvers = db.execute(
+        "SELECT * FROM workers WHERE company_id = ? AND role = 'Approver' AND status = 'Active'",
+        (body['companyId'],)
+    ).fetchall()
+
+    approver = None
+    should_migrate_approver = False
+
+    for w in approvers:
+        w_dict = dict(w)
+        # Check bcrypt hash first (if exists)
+        if w_dict.get('pin_hash') and w_dict['pin_hash'].startswith('$2b$'):
+            if bcrypt.checkpw(body['password'].encode('utf-8'), w_dict['pin_hash'].encode('utf-8')):
+                approver = w_dict
+                break
+        # Fall back to plaintext PIN check (legacy)
+        elif body['password'] == w_dict['pin']:
+            approver = w_dict
+            should_migrate_approver = True
+            break
 
     if approver:
+        # Auto-migrate plaintext PIN to bcrypt
+        if should_migrate_approver:
+            try:
+                pin_hash = hash_pin(body['password'])
+                _migrate_worker_pin(db, approver['id'], body['companyId'], pin_hash)
+                approver['pin_hash'] = pin_hash
+                log_audit(body['companyId'], 'approver_pin_migrated', {'approver_id': approver['id']})
+            except Exception as e:
+                print(f"[PIN MIGRATION] Failed to migrate approver PIN: {e}")
+
+        db.close()
+        log_audit(body['companyId'], 'admin_login', {'approver_id': approver['id'], 'name': approver['name']})
         token = create_token({
             'companyId': approver['company_id'],
             'role':      'admin',
@@ -288,6 +388,8 @@ def auth_admin():
         })
         return jsonify({'token': token}), 200
 
+    db.close()
+    log_audit(body['companyId'], 'admin_login_failed', {'reason': 'invalid_password'})
     return jsonify({'error': 'Invalid password'}), 401
 
 
@@ -305,16 +407,48 @@ def auth_worker():
         return jsonify({'error': err}), 400
 
     db = get_db()
-    worker = row_to_dict(
-        db.execute(
-            "SELECT * FROM workers WHERE company_id = ? AND pin = ? AND status = 'Active'",
-            (body['companyId'], body['pin'])
-        ).fetchone()
-    )
-    db.close()
+    # Fetch all active workers to check both plaintext and bcrypt PINs
+    workers = db.execute(
+        "SELECT * FROM workers WHERE company_id = ? AND status = 'Active'",
+        (body['companyId'],)
+    ).fetchall()
+
+    worker = None
+    should_migrate = False
+
+    for w in workers:
+        w_dict = dict(w)
+        # Check bcrypt hash first (if exists)
+        if w_dict.get('pin_hash') and w_dict['pin_hash'].startswith('$2b$'):
+            if bcrypt.checkpw(body['pin'].encode('utf-8'), w_dict['pin_hash'].encode('utf-8')):
+                worker = w_dict
+                break
+        # Fall back to plaintext PIN check (legacy)
+        elif body['pin'] == w_dict['pin']:
+            worker = w_dict
+            should_migrate = True
+            break
 
     if not worker:
+        db.close()
+        # Log failed login attempt
+        log_audit(body['companyId'], 'worker_login_failed', {'reason': 'invalid_pin'})
         return jsonify({'error': 'Invalid PIN or worker not active'}), 401
+
+    # Auto-migrate plaintext PIN to bcrypt
+    if should_migrate:
+        try:
+            pin_hash = hash_pin(body['pin'])
+            _migrate_worker_pin(db, worker['id'], body['companyId'], pin_hash)
+            worker['pin_hash'] = pin_hash
+            log_audit(body['companyId'], 'worker_pin_migrated', {'worker_id': worker['id']})
+        except Exception as e:
+            print(f"[PIN MIGRATION] Failed to migrate worker PIN: {e}")
+
+    db.close()
+
+    # Log successful login
+    log_audit(body['companyId'], 'worker_login', {'worker_id': worker['id'], 'name': worker['name']})
 
     # If 2FA is enabled, do NOT issue a full token yet
     if worker.get('two_fa_enabled') and worker.get('totp_secret'):

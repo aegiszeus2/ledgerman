@@ -41,6 +41,7 @@ def init_db():
     # role: 'Worker' | 'Approver'
     # status: 'Active' | 'Inactive'
     # two_fa_enabled: 0 | 1
+    # pin_hash: bcrypt hash of PIN (auto-populated on first login after migration)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS workers (
             id              TEXT NOT NULL,
@@ -48,6 +49,7 @@ def init_db():
             name            TEXT NOT NULL,
             role            TEXT NOT NULL DEFAULT 'Worker',
             pin             TEXT NOT NULL,
+            pin_hash        TEXT DEFAULT '',
             email           TEXT DEFAULT '',
             status          TEXT NOT NULL DEFAULT 'Active',
             default_rate    REAL DEFAULT 0,
@@ -58,6 +60,12 @@ def init_db():
             FOREIGN KEY (company_id) REFERENCES companies(id)
         )
     """)
+
+    # ── Migration: add pin_hash column to existing databases ──────────────────
+    try:
+        cur.execute("ALTER TABLE workers ADD COLUMN pin_hash TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
     # ── entities ───────────────────────────────────────────────────────────────
     # Generic JSON store — one table for: projects, clients, subtasks, expenses,
