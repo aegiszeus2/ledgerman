@@ -1,0 +1,21 @@
+# Netlify configuration for Ledgerman
+# This file configures build settings and deployment behavior
+
+# Build settings
+[build]
+# For static site, no build command needed
+command = ""
+publish = "."
+
+# Redirect all trailing slashes to non-trailing
+[[redirects]]
+from = "/*/"
+to = "/:splat"
+status = 301
+
+# Production context (main branch)
+[context.production]
+environment = { HUGO_ENV = "production" }
+
+[context.production.environment]
+NODE_ENV = "production"
