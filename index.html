@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ledgerman — Construction Management</title>
+    <meta name="description" content="Ledgerman — Construction management and invoicing for contractors">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="css/worker.css">
+    <link rel="stylesheet" href="css/invoice-print.css">
+</head>
+<body>
+    <div id="app">
+        <div class="loading-screen">
+            <h2>Loading...</h2>
+        </div>
+    </div>
+
+    <!-- EmailJS SDK (email-based 2FA & password reset) -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <!-- API config — must load before data.js -->
+    <script src="config.js"></script>
+
+    <!-- Core Scripts (order matters) -->
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/totp.js"></script>
+    <script src="js/email-service.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/invite.js"></script>
+
+    <!-- Admin Modules -->
+    <script src="js/admin/dashboard.js"></script>
+    <script src="js/admin/settings.js"></script>
+    <script src="js/admin/clients.js"></script>
+    <script src="js/admin/projects.js"></script>
+    <script src="js/admin/expenses.js"></script>
+    <script src="js/admin/expenses-review.js"></script>
+    <script src="js/admin/vendors.js"></script>
+    <script src="js/admin/approvals.js"></script>
+    <script src="js/admin/invoices.js"></script>
+    <script src="js/admin/reports.js"></script>
+    <script src="js/admin/users.js"></script>
+    <script src="js/admin/photos.js"></script>
+    <script src="js/admin/help.js"></script>
+
+    <!-- Worker Modules -->
+    <script src="js/worker/home.js"></script>
+    <script src="js/worker/timeentry.js"></script>
+    <script src="js/worker/history.js"></script>
+    <script src="js/worker/help.js"></script>
+
+    <!-- App Controller (must be last) -->
+    <script src="js/app.js"></script>
+</body>
+</html>
