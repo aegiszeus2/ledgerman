@@ -1483,8 +1483,10 @@ def superadmin_diagnostics(company_id):
 #  STARTUP
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Always init DB — runs under both direct execution and gunicorn
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5001))
     print(f"[Ledgerman] Starting API server on http://0.0.0.0:{port}")
     app.run(host='0.0.0.0', port=port, debug=False)

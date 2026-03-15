@@ -6,3 +6,4 @@ ledgeman.db
 *.zip
 venv/
 .venv/
+.superadmin_key
