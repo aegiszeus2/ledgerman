@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ledgerman-frontend
+    env: static
+    buildCommand: ""
+    startCommand: ""
+    staticPublishPath: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+    customDomains:
+      - name: ledgerman.org
