@@ -1,9 +1,9 @@
-// Ledgeman — Data layer v2
+// Ledgerman — Data layer v2
 // API mode: in-memory cache hydrated from backend, async API writes, JWT auth
 // Legacy mode: falls back to localStorage/IndexedDB (no backend / offline)
 
 // ─── API Config ────────────────────────────────────────────────────────────
-const API_BASE = (window.LEDGEMAN_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgeman-backend.onrender.com'));
+const API_BASE = (window.LEDGERMAN_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgerman-backend.onrender.com'));
 
 // ─── In-Memory Cache ───────────────────────────────────────────────────────
 // null = not loaded; populated after syncFromServer()
@@ -159,11 +159,11 @@ async function syncFromServer() {
             setData(key, _cache[key]);
         });
         setData('settings', _cache.settings);
-        console.log('[Ledgeman] Synced from server. Workers:', _cache.workers.length,
+        console.log('[Ledgerman] Synced from server. Workers:', _cache.workers.length,
             'Projects:', _cache.projects.length, 'Submissions:', _cache.submissions.length);
         return _cache;
     } catch (e) {
-        console.warn('[Ledgeman] Sync failed — using localStorage fallback:', e.message);
+        console.warn('[Ledgerman] Sync failed — using localStorage fallback:', e.message);
         // Fall back to localStorage
         _cache = {
             workers:     getData('workers')     || [],

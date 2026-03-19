@@ -329,7 +329,7 @@ window.AdminSettings = {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'ledgeman-backup-' + Utils.today() + '.json';
+                a.download = 'ledgerman-backup-' + Utils.today() + '.json';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);

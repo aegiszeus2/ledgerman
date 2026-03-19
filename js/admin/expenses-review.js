@@ -461,7 +461,7 @@ window.AdminExpensesReview = {
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = url;
-        a.download = 'ledgeman-expenses-' + Utils.today() + '.csv';
+        a.download = 'ledgerman-expenses-' + Utils.today() + '.csv';
         a.click();
         URL.revokeObjectURL(url);
     },

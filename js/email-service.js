@@ -1,4 +1,4 @@
-// EmailJS Service for Ledgeman
+// EmailJS Service for Ledgerman
 // Handles: email-based 2FA codes, password reset links
 // Config stored in AppData settings: emailjs_serviceId, emailjs_templateId, emailjs_publicKey
 

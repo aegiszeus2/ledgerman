@@ -1,4 +1,4 @@
-// Ledgeman Analytics — Cookie Consent, Page Analytics, Friction Monitoring
+// Ledgerman Analytics — Cookie Consent, Page Analytics, Friction Monitoring
 // All data stored in localStorage under 'ledgeman_analytics'
 
 window.LedgemanAnalytics = {
