@@ -746,51 +746,57 @@
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="login-screen">
-                    <div class="login-card" style="max-width:500px">
-                        <div style="margin-bottom:12px">
-                            <img src="../LedgemanLogo.jpg" alt="Ledgerman" style="max-width:260px;width:100%;height:auto;border-radius:6px">
+                    <div class="login-card" style="max-width:500px;display:flex;flex-direction:column;height:100%">
+                        <div style="overflow-y:auto;flex:1;padding-bottom:20px">
+                            <div style="margin-bottom:12px">
+                                <img src="../LedgemanLogo.jpg" alt="Ledgerman" style="max-width:260px;width:100%;height:auto;border-radius:6px">
+                            </div>
+                            <p class="text-muted" style="margin-bottom:1.5rem">Automated Construction Intelligence — by PMs for PMs.</p>
+
+                            <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)">
+                                <button type="button" class="btn-tab-lg active" id="tabNew" style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--primary);margin-bottom:-2px;color:var(--primary);font-weight:600;cursor:pointer">New Company</button>
+                                <button type="button" class="btn-tab-lg" id="tabExisting" style="flex:1;padding:10px;background:none;border:none;color:var(--text2);cursor:pointer">Link Existing</button>
+                            </div>
+
+                            <!-- NEW COMPANY -->
+                            <form id="registerForm">
+                                <div class="form-group">
+                                    <label>Company Name</label>
+                                    <input type="text" class="form-control" id="regName" placeholder="e.g. Belfort Construction" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Admin Password</label>
+                                    <input type="password" class="form-control" id="regPw" placeholder="Choose a strong password" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Confirm Password</label>
+                                    <input type="password" class="form-control" id="regPw2" placeholder="Re-enter password" required>
+                                </div>
+                                <div class="form-error" id="regError" style="display:none"></div>
+                            </form>
+
+                            <!-- LINK EXISTING (hidden by default) -->
+                            <form id="linkForm" style="display:none">
+                                <p class="text-muted" style="font-size:.875rem;margin-bottom:16px">
+                                    Enter your Company ID to connect this device to an existing Ledgerman company.
+                                </p>
+                                <div class="form-group">
+                                    <label>Company ID</label>
+                                    <input type="text" class="form-control" id="linkId" placeholder="e.g. m8f3k2xyz" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Admin Password</label>
+                                    <input type="password" class="form-control" id="linkPw" placeholder="Admin password" required>
+                                </div>
+                                <div class="form-error" id="linkError" style="display:none"></div>
+                            </form>
                         </div>
-                        <p class="text-muted" style="margin-bottom:1.5rem">Automated Construction Intelligence — by PMs for PMs.</p>
 
-                        <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)">
-                            <button type="button" class="btn-tab-lg active" id="tabNew" style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--primary);margin-bottom:-2px;color:var(--primary);font-weight:600;cursor:pointer">New Company</button>
-                            <button type="button" class="btn-tab-lg" id="tabExisting" style="flex:1;padding:10px;background:none;border:none;color:var(--text2);cursor:pointer">Link Existing</button>
+                        <!-- FIXED FOOTER WITH BUTTONS -->
+                        <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;gap:8px;flex-direction:column">
+                            <button type="submit" class="btn btn-primary btn-block" id="regBtn" form="registerForm">Create Company</button>
+                            <button type="submit" class="btn btn-primary btn-block" id="linkBtn" form="linkForm" style="display:none">Link This Device</button>
                         </div>
-
-                        <!-- NEW COMPANY -->
-                        <form id="registerForm">
-                            <div class="form-group">
-                                <label>Company Name</label>
-                                <input type="text" class="form-control" id="regName" placeholder="e.g. Belfort Construction" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Admin Password</label>
-                                <input type="password" class="form-control" id="regPw" placeholder="Choose a strong password" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Confirm Password</label>
-                                <input type="password" class="form-control" id="regPw2" placeholder="Re-enter password" required>
-                            </div>
-                            <div class="form-error" id="regError" style="display:none"></div>
-                            <button type="submit" class="btn btn-primary btn-block" id="regBtn">Create Company</button>
-                        </form>
-
-                        <!-- LINK EXISTING (hidden by default) -->
-                        <form id="linkForm" style="display:none">
-                            <p class="text-muted" style="font-size:.875rem;margin-bottom:16px">
-                                Enter your Company ID to connect this device to an existing Ledgerman company.
-                            </p>
-                            <div class="form-group">
-                                <label>Company ID</label>
-                                <input type="text" class="form-control" id="linkId" placeholder="e.g. m8f3k2xyz" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Admin Password</label>
-                                <input type="password" class="form-control" id="linkPw" placeholder="Admin password" required>
-                            </div>
-                            <div class="form-error" id="linkError" style="display:none"></div>
-                            <button type="submit" class="btn btn-primary btn-block" id="linkBtn">Link This Device</button>
-                        </form>
                     </div>
                 </div>
             `;
@@ -811,12 +817,16 @@
             tabNew.onclick = () => {
                 document.getElementById('registerForm').style.display = 'block';
                 document.getElementById('linkForm').style.display = 'none';
+                document.getElementById('regBtn').style.display = 'block';
+                document.getElementById('linkBtn').style.display = 'none';
                 tabNew.style.cssText += ';color:var(--primary);font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px';
                 tabEx.style.cssText  += ';color:var(--text2);border-bottom:none;margin-bottom:0';
             };
             tabEx.onclick = () => {
                 document.getElementById('registerForm').style.display = 'none';
                 document.getElementById('linkForm').style.display = 'block';
+                document.getElementById('regBtn').style.display = 'none';
+                document.getElementById('linkBtn').style.display = 'block';
                 tabEx.style.cssText  += ';color:var(--primary);font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px';
                 tabNew.style.cssText += ';color:var(--text2);border-bottom:none;margin-bottom:0';
             };
