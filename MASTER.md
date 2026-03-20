@@ -1,8 +1,8 @@
 # Ledgerman — MASTER.md
 
-**Last Updated:** 2026-03-18 19:30 (DNS blocker identified)
-**Status:** Phase 2.3 COMPLETE — Render Static Sites live; DNS blocking app from marketing site
-**Next Milestone:** Fix GoDaddy DNS: ledgerman.org should point to marketing Static Site CNAME, not app backend
+**Last Updated:** 2026-03-20 18:00 (Mobile signup fix deployed, known issues documented)
+**Status:** Phase 2.3.1 LIVE — Mobile signup buttons now stay visible on all devices
+**Next Milestone:** Test signup with Laurence & Damiano on phones → monitor for issues
 
 ---
 
@@ -15,14 +15,14 @@
 - **App frontend (Render):** https://ledgerman-frontend.onrender.com ✅ (not public-facing, behind DNS)
 - **Marketing Static Site (Render):** https://ledgerman-marketing.onrender.com ✅ LIVE
 - **Belfort website (Render):** https://belfort-website.onrender.com ✅ LIVE
-- **Super Admin:** https://littleshield-admin.netlify.app (migrating to Render)
+- **Super Admin:** https://ledgerman-admin.onrender.com ✅ (Render Static Site)
 - **🔴 BLOCKER:** https://ledgerman.org → currently points to Flask login page (app backend) instead of marketing site
   - **Issue:** GoDaddy DNS A record pointing to Render IP (216.24.57.7) but routing to wrong service
   - **Solution:** Update GoDaddy CNAME to ledgerman-marketing.onrender.com
   - **Status:** Pending Lucas confirmation of exact Static Site URL
 
 **Tech Stack:**
-- Frontend: HTML/CSS/JS + Netlify auto-deploy
+- Frontend: HTML/CSS/JS + Render Static Site (auto-deploy from GitHub)
 - Backend: Flask/SQLite + Render (free tier, wakes on request ~30s)
 - Auth: JWT + TOTP 2FA (Google Authenticator)
 - Backups: Automated daily cron (2AM) + master backup file
@@ -66,7 +66,8 @@
 
 ✅ **Super Admin Console:**
 - Local: `~/Desktop/Project Organizer/ledgerman-admin/index.html`
-- Live: https://littleshield-admin.netlify.app
+- Live: https://ledgerman-admin.onrender.com
+- Manual company creation (POST /api/superadmin/companies)
 - Invite Company (Support tab) — generates branded sales pitch emails with Clearbit logo + Canvas brand colors
 - Copy HTML/plain text or open in email client directly
 
@@ -89,14 +90,14 @@
 
 ## Deployment Checklist
 
-- ✅ Frontend deployed to Netlify (auto-deploy from GitHub on push)
+- ✅ Frontend deployed to Render Static Site (auto-deploy from GitHub on push)
 - ✅ Backend deployed to Render (free tier, auto-wake on first request ~30s)
+- ✅ Super Admin deployed to Render Static Site (auto-deploy from GitHub on push)
 - ✅ API_BASE updated to https://ledgerman-backend.onrender.com
 - ✅ All endpoints verified (200 OK)
-- ✅ DNS configured: ledgerman.org → Netlify (A @ 75.2.60.5, CNAME www)
-- ✅ SSL auto-provisioning in progress (Netlify)
+- ✅ SSL auto-provisioning (Render)
 - ✅ All critical security patches deployed
-- ⏳ **NEXT:** Backend repo on GitHub (aegiszeus2@gmail.com) + redeploy from Render
+- ⏳ **NEXT:** DNS fix for ledgerman.org → Render static site
 
 ---
 
@@ -125,14 +126,17 @@
 - S3 for photo storage (bandwidth + durability)
 - Bcrypt password hashing (already done ✅)
 - Stripe billing integration (SaaS subscriptions)
-- Self-hosting (migrate from Netlify/Render to self-managed VPS — post-MVP)
+- Self-hosting (migrate from Render to self-managed VPS — post-MVP)
 
 ---
 
-## Known Issues & Tech Debt
+## Known Issues & Tech Debt (UPDATED 2026-03-20)
 
 | Issue | Status | Priority | Notes |
 |-------|--------|----------|-------|
+| **Super Admin API key exposed** | 🔴 URGENT | CRITICAL | Key visible in conversation 2026-03-20. Immediate rotation required. |
+| Signup "Load Failed" error | 🟡 INVESTIGATING | HIGH | Error occurs after submit on signup form. Frontend error handling suspected. Blocking Laurence/Damiano testing. |
+| Mobile signup buttons hidden (FIXED 2026-03-20 17:30) | ✅ DONE | N/A | Create Company button scrolled off-screen on mobile. Fixed with fixed footer layout. Deployed & verified live. |
 | Encrypted backups | TODO | Low | Phase 3; local backup not exposed |
 | Server-side rate limiting | ✅ DONE | N/A | flask_limiter active |
 | Bcrypt hashing | ✅ DONE | N/A | Passwords + PINs hashed |
@@ -143,10 +147,10 @@
 
 ## Deployment Instructions
 
-### Frontend Deployment (Netlify auto-deploy)
+### Frontend Deployment (Render auto-deploy)
 ```bash
 cd ~/Desktop/Project\ Organizer/Ledgerman/ledgerman
-git push origin main  # Triggers Netlify auto-deploy → ledgerman.org
+git push origin main  # Triggers Render auto-deploy → ledgerman-frontend.onrender.com
 ```
 
 ### Backend Deployment (Render)
@@ -186,13 +190,12 @@ cd ~/Desktop/Project\ Organizer
 │   │   ├── config.js           # API_BASE (change here if URL changes)
 │   │   ├── js/                 # App logic
 │   │   └── css/                # Styles
-│   └── netlify.toml            # Auto-deploy config
 ├── ledgerman-backend/            # Backend (Flask)
 │   ├── server.py               # Main Flask app
 │   ├── requirements.txt         # Dependencies
 │   └── render.yaml             # Render auto-deploy config
 ├── ledgerman-admin/              # Super Admin console
-│   └── index.html              # Local: file:///..., Live: littleshield-admin.netlify.app
+│   └── index.html              # Local: file:///..., Live: ledgerman-admin.onrender.com
 ├── ledgerman-backups/            # Automated backup storage
 │   ├── daily/                  # 30-day rotation
 │   ├── monthly/                # 12-month rotation
@@ -207,8 +210,8 @@ cd ~/Desktop/Project\ Organizer
 **Belfort Construction:**
 - First customers: Laurence (testing) + Damiano (live onboarding)
 - Platform: https://ledgerman.org
-- Super Admin invite: Support tab on https://littleshield-admin.netlify.app
-- Blockers: None remaining (security patches ✅, backend live ✅)
+- Super Admin console: https://ledgerman-admin.onrender.com
+- Blockers: DNS fix needed for ledgerman.org → Render marketing site
 
 **LittleShield:**
 - Ledgerman is a LittleShield project (family protection + money-making)
@@ -269,7 +272,8 @@ curl https://ledgerman-backend.onrender.com/api/health
 
 **Logs:**
 - Backend: Render logs (https://dashboard.render.com) → ledgerman-backend service
-- Frontend: Netlify logs (https://app.netlify.com) → unrivaled-cassata-ee2ea9
+- Frontend: Render logs (https://dashboard.render.com) → ledgerman-frontend service
+- Admin: Render logs (https://dashboard.render.com) → ledgerman-admin service
 
 ---
 
@@ -305,3 +309,4 @@ curl https://ledgerman-backend.onrender.com/api/health
 | 2026-03-15 | Phase 2.3 | LIVE | Backend live on Render, frontend auto-deploys, API 200 OK |
 | 2026-03-16 | Phase 2.3 | READY | Encrypted backups noted for Phase 3; ready for Belfort onboarding |
 | 2026-03-18 | Phase 2.4 | BLOCKER | All Render Static Sites deployed (marketing + Belfort), GitHub repos live, DNS misconfiguration identified |
+| 2026-03-20 | Phase 2.4+ | IN PROGRESS | Mobile signup buttons fixed (fixed footer), API verified HTTP 201, Super Admin key exposed (urgent rotation), "Load Failed" error under investigation |
