@@ -26,6 +26,12 @@
                 return;
             }
 
+            // Check for signup link (#signup)
+            if (hash === '#signup') {
+                this.showWelcome();
+                return;
+            }
+
             // Check first run
             if (AppData.isFirstRun()) {
                 this.showWelcome();
@@ -60,6 +66,11 @@
                             <div><h2>Admin Login</h2>
                             <p>Manage projects, invoices & team</p></div>
                         </div>
+                        <div class="login-option" id="createCompanyBtn" style="border:2px dashed var(--border);background:transparent;cursor:pointer;transition:all 0.2s">
+                            <div class="login-option-icon" style="font-size:1.8rem">➕</div>
+                            <div><h2>Create Company</h2>
+                            <p>Set up a new Ledgerman account</p></div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -73,6 +84,17 @@
 
             document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
+            document.getElementById('createCompanyBtn').onclick = () => this.showWelcome();
+
+            // Hover effect for create company
+            document.getElementById('createCompanyBtn').onmouseover = function() {
+                this.style.background = 'var(--bg2)';
+                this.style.borderColor = 'var(--primary)';
+            };
+            document.getElementById('createCompanyBtn').onmouseout = function() {
+                this.style.background = 'transparent';
+                this.style.borderColor = 'var(--border)';
+            };
         },
 
         showWorkerLogin() {
