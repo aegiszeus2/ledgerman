@@ -652,8 +652,12 @@
                 <div class="login-screen">
                     <div class="login-card">
                         <h2>Admin Login</h2>
-                        <p class="text-muted">Enter admin password</p>
+                        <p class="text-muted">Enter company name and password</p>
                         <form id="adminLoginForm">
+                            <div class="form-group">
+                                <input type="text" class="form-control" id="adminCompanyName"
+                                    placeholder="Company Name" required autocomplete="off">
+                            </div>
                             <div class="form-group">
                                 <input type="password" class="form-control" id="adminPassword"
                                     placeholder="Password" required autocomplete="off">
@@ -666,11 +670,12 @@
                     </div>
                 </div>
             `;
-            document.getElementById('adminPassword').focus();
+            document.getElementById('adminCompanyName').focus();
             document.getElementById('backToLogin').onclick = () => this.showLogin();
             document.getElementById('forgotPassword').onclick = () => this._showPasswordReset();
             document.getElementById('adminLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
+                const companyName = document.getElementById('adminCompanyName').value;
                 const pw = document.getElementById('adminPassword').value;
                 const errEl = document.getElementById('adminLoginError');
                 const btn = document.getElementById('adminLoginBtn');
@@ -687,7 +692,7 @@
                     // API mode — async login
                     btn.disabled = true; btn.textContent = 'Logging in…';
                     try {
-                        await AppData.apiLoginAdmin(pw);
+                        await AppData.apiLoginAdmin(companyName, pw);
                         await AppData.syncFromServer();
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         AppData.addAuditLog('Admin', 'Admin Login', '');

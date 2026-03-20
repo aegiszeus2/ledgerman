@@ -70,12 +70,10 @@ async function apiRegister(companyName, password) {
     return data;
 }
 
-async function apiLoginAdmin(password) {
-    const companyId = getCompanyId();
-    if (!companyId) throw new Error('No company registered on this device. Use "Existing Company" to link.');
+async function apiLoginAdmin(companyName, password) {
     const data = await _apiFetch('/api/auth/admin', {
         method: 'POST',
-        body: JSON.stringify({ companyId: companyId, password: password })
+        body: JSON.stringify({ companyName: companyName, password: password })
     });
     setJwt(data.token);
     return data;
