@@ -741,7 +741,7 @@ window.AdminProjects = {
                     '<div class="doc-header">' +
                         '<div>' +
                             '<div class="co-name">' + esc(companyName) + '</div>' +
-                            '<div class="co-tag">Powered by Ledgeman</div>' +
+                            '<div class="co-tag">Powered by Ledgerman</div>' +
                         '</div>' +
                         '<div class="doc-label">' +
                             '<h2>Site Photo Report</h2>' +

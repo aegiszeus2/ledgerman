@@ -388,7 +388,7 @@ window.AdminReports = {
 
     _downloadCsv(csvContent, reportType) {
         var today = new Date().toISOString().slice(0, 10);
-        var filename = 'ledgeman-' + reportType + '-' + today + '.csv';
+        var filename = 'ledgerman-' + reportType + '-' + today + '.csv';
         var blob = new Blob([csvContent], { type: 'text/csv' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');

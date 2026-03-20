@@ -1,0 +1,507 @@
+/* ============================================================
+   invoice-print.css — Print styles for invoice generation
+   Used for @media print and dedicated print views
+   ============================================================ */
+
+/* --- Print-specific resets --- */
+@media print {
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    font-size: 11pt;
+    line-height: 1.45;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide non-print elements */
+  .sidebar,
+  .admin-sidebar,
+  .admin-header,
+  .worker-header,
+  .worker-nav,
+  .worker-nav-desktop,
+  .modal-overlay,
+  .toast-container,
+  .toast,
+  .btn,
+  .filter-bar,
+  .page-header .btn,
+  .tabs,
+  .detail-panel,
+  .no-print,
+  nav,
+  button,
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  a {
+    text-decoration: none;
+  }
+
+  /* Remove margins from layout wrappers */
+  .app-container,
+  .admin-content,
+  .content-area,
+  .worker-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Page settings */
+  @page {
+    size: A4;
+    margin: 18mm 15mm 20mm 15mm;
+  }
+
+  /* Page break utilities */
+  .page-break-before {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .no-page-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Prevent breaking inside key elements */
+  table, tr, .card, .stat-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}
+
+/* --- Invoice Print Container --- */
+.invoice-print-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0;
+  background: #ffffff;
+  color: #1a1a2e;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+}
+
+/* --- Company Header --- */
+.invoice-print-container .invoice-company-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 3px solid #1a1a2e;
+}
+
+.invoice-print-container .company-logo {
+  max-height: 56px;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+.invoice-print-container .company-details {
+  flex: 1;
+}
+
+.invoice-print-container .company-name {
+  font-size: 18pt;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.invoice-print-container .company-address {
+  font-size: 8.5pt;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.invoice-print-container .invoice-title-block {
+  text-align: right;
+}
+
+.invoice-print-container .invoice-title {
+  font-size: 22pt;
+  font-weight: 800;
+  color: #1a1a2e;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.invoice-print-container .invoice-number-label {
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.invoice-print-container .invoice-number-value {
+  font-size: 12pt;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* --- Client / Project Info --- */
+.invoice-print-container .invoice-parties {
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 28px;
+}
+
+.invoice-print-container .invoice-party {
+  flex: 1;
+}
+
+.invoice-print-container .party-label {
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.invoice-print-container .party-name {
+  font-size: 11pt;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 2px;
+}
+
+.invoice-print-container .party-address {
+  font-size: 9pt;
+  color: #475569;
+  line-height: 1.5;
+}
+
+/* --- Invoice Metadata --- */
+.invoice-print-container .invoice-meta-grid {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 28px;
+  padding: 14px 20px;
+  background-color: #f8fafc;
+  border-radius: 4px;
+}
+
+.invoice-print-container .meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.invoice-print-container .meta-label {
+  font-size: 7.5pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.invoice-print-container .meta-value {
+  font-size: 10pt;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* --- Line Items Table --- */
+.invoice-print-container .line-items {
+  width: 100%;
+  margin-bottom: 24px;
+  border-collapse: collapse;
+}
+
+.invoice-print-container .line-items thead th {
+  background-color: #1a1a2e;
+  color: #ffffff;
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 12px;
+  text-align: left;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.invoice-print-container .line-items thead th:last-child {
+  text-align: right;
+}
+
+.invoice-print-container .line-items tbody td {
+  padding: 10px 12px;
+  font-size: 9pt;
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.invoice-print-container .line-items tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.invoice-print-container .line-items .item-description {
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.invoice-print-container .line-items .item-detail {
+  font-size: 8pt;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.invoice-print-container .line-items .col-qty,
+.invoice-print-container .line-items .col-rate,
+.invoice-print-container .line-items .col-amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* --- Totals Section --- */
+.invoice-print-container .invoice-totals-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 32px;
+}
+
+.invoice-print-container .totals-box {
+  width: 280px;
+}
+
+.invoice-print-container .totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 9.5pt;
+  color: #475569;
+}
+
+.invoice-print-container .totals-row .totals-label {
+  font-weight: 500;
+}
+
+.invoice-print-container .totals-row .totals-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+.invoice-print-container .totals-row.subtotal {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.invoice-print-container .totals-row.grand-total {
+  border-top: 2px solid #1a1a2e;
+  margin-top: 6px;
+  padding-top: 10px;
+  font-size: 13pt;
+  font-weight: 800;
+  color: #1a1a2e;
+}
+
+/* --- Notes --- */
+.invoice-print-container .invoice-notes {
+  margin-bottom: 28px;
+  padding: 16px 20px;
+  background-color: #f8fafc;
+  border-radius: 4px;
+  border-left: 3px solid #d97706;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.invoice-print-container .notes-title {
+  font-size: 8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.invoice-print-container .notes-text {
+  font-size: 9pt;
+  color: #475569;
+  line-height: 1.5;
+}
+
+/* --- Footer: Payment Info & Compliance --- */
+.invoice-print-container .invoice-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.invoice-print-container .payment-info {
+  margin-bottom: 20px;
+}
+
+.invoice-print-container .payment-title {
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+
+.invoice-print-container .payment-details {
+  display: flex;
+  gap: 32px;
+  font-size: 8.5pt;
+  color: #475569;
+}
+
+.invoice-print-container .payment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.invoice-print-container .payment-item-label {
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.invoice-print-container .payment-item-value {
+  font-weight: 600;
+  color: #334155;
+}
+
+.invoice-print-container .compliance-notes {
+  font-size: 7.5pt;
+  color: #94a3b8;
+  line-height: 1.6;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.invoice-print-container .compliance-notes p {
+  margin-bottom: 4px;
+}
+
+/* --- Thank You / Closing --- */
+.invoice-print-container .invoice-closing {
+  text-align: center;
+  margin-top: 32px;
+  padding-top: 16px;
+  font-size: 10pt;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* --- Multi-page: Category Sections --- */
+.invoice-print-container .category-section {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  margin-bottom: 20px;
+}
+
+.invoice-print-container .category-header {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #1a1a2e;
+  padding: 8px 0;
+  border-bottom: 1px solid #cbd5e1;
+  margin-bottom: 4px;
+}
+
+/* --- Signature Line --- */
+.invoice-print-container .signature-section {
+  display: flex;
+  justify-content: space-between;
+  gap: 60px;
+  margin-top: 48px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.invoice-print-container .signature-block {
+  flex: 1;
+}
+
+.invoice-print-container .signature-line {
+  border-bottom: 1px solid #1a1a2e;
+  margin-bottom: 6px;
+  height: 40px;
+}
+
+.invoice-print-container .signature-label {
+  font-size: 8pt;
+  color: #64748b;
+}
+
+/* --- Print-only overrides inside @media print --- */
+@media print {
+  .invoice-print-container {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+    border: none;
+  }
+
+  .invoice-print-container .invoice-company-header {
+    border-bottom-color: #000 !important;
+  }
+
+  .invoice-print-container .line-items thead th {
+    background-color: #1a1a2e !important;
+    color: #fff !important;
+  }
+
+  .invoice-print-container .line-items tbody tr:nth-child(even) {
+    background-color: #f0f0f0 !important;
+  }
+
+  .invoice-print-container .invoice-notes {
+    background-color: #f5f5f5 !important;
+    border-left-color: #999 !important;
+  }
+
+  .invoice-print-container .invoice-meta-grid {
+    background-color: #f5f5f5 !important;
+  }
+
+  .invoice-print-container .invoice-footer {
+    position: running(footer);
+  }
+}

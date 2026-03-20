@@ -60,6 +60,11 @@
                             <div><h2>Admin Login</h2>
                             <p>Manage projects, invoices & team</p></div>
                         </div>
+                        <div class="login-option" id="newCompanyBtn">
+                            <div class="login-option-icon">✨</div>
+                            <div><h2>New Company</h2>
+                            <p>Create your free account</p></div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -73,6 +78,7 @@
 
             document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
+            document.getElementById('newCompanyBtn').onclick = () => this.showWelcome();
         },
 
         showWorkerLogin() {

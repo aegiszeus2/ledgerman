@@ -1,4 +1,4 @@
-// Utility functions for Ledgeman
+// Utility functions for Ledgerman
 
 const Utils = {
     // Format currency (CAD)

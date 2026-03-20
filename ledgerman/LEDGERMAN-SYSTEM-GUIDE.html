@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgerman — System Guide & Org Chart</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --bg: #0a0a14; --bg2: #111120; --bg3: #1a1a2e;
+    --border: rgba(255,255,255,.09);
+    --text: #e8e8f0; --text2: #8888aa;
+    --gold: #c9a84c; --gold2: #e8c46a;
+    --green: #2ecc71; --blue: #3498db; --red: #e74c3c; --orange: #f39c12;
+    --radius: 10px;
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+a { color: var(--gold); }
+
+/* ── Layout ── */
+.page { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+h1 { font-size: 2rem; color: var(--gold); margin-bottom: 6px; }
+h2 { font-size: 1.3rem; color: var(--gold2); margin: 40px 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+h3 { font-size: 1.05rem; color: var(--text); margin: 20px 0 8px; }
+p  { color: var(--text2); margin-bottom: 10px; }
+ul, ol { color: var(--text2); padding-left: 22px; margin-bottom: 12px; }
+li { margin-bottom: 4px; }
+strong { color: var(--text); }
+code { background: var(--bg3); padding: 2px 7px; border-radius: 4px; font-size: .85em; color: var(--gold2); font-family: 'Courier New', monospace; }
+pre { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; font-size: .875rem; color: var(--text2); }
+.subtitle { color: var(--text2); font-size: 1rem; margin-bottom: 32px; }
+
+/* ── Cards ── */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.role-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.role-card .icon { font-size: 2rem; margin-bottom: 8px; }
+.role-card h3 { margin-top: 0; }
+
+/* ── Org Chart ── */
+.org-wrap { overflow-x: auto; padding: 10px 0 20px; }
+.org { display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+.org-node {
+    display: inline-flex; flex-direction: column; align-items: center;
+    background: var(--bg2); border: 2px solid var(--border);
+    border-radius: var(--radius); padding: 12px 20px;
+    min-width: 150px; text-align: center;
+    position: relative;
+}
+.org-node .node-icon { font-size: 1.4rem; margin-bottom: 4px; }
+.org-node .node-label { font-size: .85rem; font-weight: 700; color: var(--text); }
+.org-node .node-sub { font-size: .72rem; color: var(--text2); margin-top: 2px; }
+
+.org-node.gold  { border-color: var(--gold);  }
+.org-node.green { border-color: var(--green); }
+.org-node.blue  { border-color: var(--blue);  }
+.org-node.orange{ border-color: var(--orange);}
+
+.org-connector-v {
+    width: 2px; height: 28px;
+    background: var(--border);
+    margin: 0 auto;
+}
+.org-row { display: flex; gap: 20px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.org-col { display: flex; flex-direction: column; align-items: center; }
+.org-branch-bar {
+    height: 2px; background: var(--border);
+    width: 100%; max-width: 700px;
+    margin: 0 auto;
+}
+.org-branch-row {
+    display: flex; justify-content: space-around;
+    width: 100%; max-width: 700px;
+}
+.org-branch-col {
+    display: flex; flex-direction: column; align-items: center;
+}
+.org-branch-col .org-connector-v { height: 20px; }
+
+/* ── Arch Diagram ── */
+.arch { display: grid; grid-template-columns: 1fr 60px 1fr 60px 1fr; align-items: center; gap: 0; margin: 20px 0; }
+.arch-box {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; text-align: center;
+}
+.arch-box .arch-icon { font-size: 1.6rem; margin-bottom: 6px; }
+.arch-box .arch-label { font-size: .8rem; font-weight: 700; color: var(--text); }
+.arch-box .arch-sub { font-size: .72rem; color: var(--text2); margin-top: 2px; }
+.arch-arrow { text-align: center; color: var(--text2); font-size: 1.2rem; }
+
+/* ── Badges ── */
+.badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: .72rem; font-weight: 700; }
+.badge-gold   { background: rgba(201,168,76,.15); color: var(--gold); border: 1px solid rgba(201,168,76,.3); }
+.badge-green  { background: rgba(46,204,113,.12); color: var(--green); border: 1px solid rgba(46,204,113,.3); }
+.badge-blue   { background: rgba(52,152,219,.12); color: var(--blue); border: 1px solid rgba(52,152,219,.3); }
+.badge-orange { background: rgba(243,156,18,.12); color: var(--orange); border: 1px solid rgba(243,156,18,.3); }
+.badge-red    { background: rgba(231,76,60,.12); color: var(--red); border: 1px solid rgba(231,76,60,.3); }
+
+/* ── Steps ── */
+.steps { counter-reset: step; list-style: none; padding: 0; }
+.steps li {
+    counter-increment: step;
+    display: flex; gap: 14px; align-items: flex-start;
+    margin-bottom: 12px; color: var(--text2);
+}
+.steps li::before {
+    content: counter(step);
+    min-width: 26px; height: 26px;
+    background: var(--gold); color: #111;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: .8rem; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── Table ── */
+table { width: 100%; border-collapse: collapse; font-size: .875rem; margin-bottom: 16px; }
+th { text-align: left; padding: 8px 12px; color: var(--text2); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+td { padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--text2); vertical-align: top; }
+td:first-child { color: var(--text); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+
+/* ── Info box ── */
+.info { background: rgba(52,152,219,.08); border: 1px solid rgba(52,152,219,.25); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; color: var(--text2); font-size: .875rem; }
+.warn { background: rgba(243,156,18,.08); border: 1px solid rgba(243,156,18,.25); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; color: var(--text2); font-size: .875rem; }
+
+@media (max-width: 600px) {
+    .arch { grid-template-columns: 1fr; }
+    .arch-arrow { transform: rotate(90deg); }
+    .card-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ── HEADER ── -->
+<div style="text-align:center;margin-bottom:40px">
+    <div style="margin-bottom:16px">
+        <img src="./LedgemanLogo.jpg" alt="Ledgerman" style="max-width:320px;width:100%;height:auto;border-radius:8px">
+    </div>
+    <h1 style="display:none">Ledgerman</h1>
+    <p class="subtitle">System Guide, Organizational Chart &amp; Operating Instructions<br>
+    <em>Construction Management Software — by PMs for PMs</em></p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <span class="badge badge-gold">v2.0 — Phase 2 Backend</span>
+        <span class="badge badge-green">Last Updated: 2026-03-14</span>
+        <span class="badge badge-blue">$25/month per company</span>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>1. What Is Ledgerman?</h2>
+<p>Ledgerman is a <strong>multi-tenant SaaS construction management platform</strong>. Each customer company gets a fully isolated workspace where their admin manages projects, workers, and invoices — and workers clock in/out, submit time entries, photos, and expenses from any device.</p>
+
+<div class="card-grid">
+    <div class="role-card">
+        <div class="icon">👷</div>
+        <h3>Workers</h3>
+        <p>Clock in/out, submit time, log expenses, upload photos. PIN login with optional 2FA. Mobile-optimized.</p>
+    </div>
+    <div class="role-card">
+        <div class="icon">⚙️</div>
+        <h3>Admin / PM</h3>
+        <p>Manage projects, clients, workers, approve time entries, generate invoices, run reports.</p>
+    </div>
+    <div class="role-card">
+        <div class="icon">✅</div>
+        <h3>Approver</h3>
+        <p>Worker with elevated role. Can access the admin panel to approve/reject time submissions without full admin access.</p>
+    </div>
+    <div class="role-card">
+        <div class="icon">🛡️</div>
+        <h3>LittleShield (Lucas)</h3>
+        <p>Super-admin console. Manages all company subscriptions, runs automated diagnostics, supports customers.</p>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>2. Organizational Chart</h2>
+
+<div class="org-wrap">
+<div class="org">
+
+    <!-- Lucas / LittleShield -->
+    <div class="org-node gold">
+        <div class="node-icon">🛡️</div>
+        <div class="node-label">Lucas (LittleShield)</div>
+        <div class="node-sub">Product Owner &amp; Super Admin</div>
+    </div>
+    <div class="org-connector-v"></div>
+
+    <!-- Platform -->
+    <div class="org-node gold">
+        <div class="node-icon">🏗️</div>
+        <div class="node-label">Ledgerman Platform</div>
+        <div class="node-sub">SaaS — $25/month per company</div>
+    </div>
+    <div class="org-connector-v"></div>
+    <div class="org-branch-bar"></div>
+
+    <!-- Three companies -->
+    <div class="org-branch-row">
+        <div class="org-branch-col">
+            <div class="org-connector-v"></div>
+            <div class="org-node blue">
+                <div class="node-icon">🏢</div>
+                <div class="node-label">Company A</div>
+                <div class="node-sub">e.g. Belfort Construction</div>
+            </div>
+            <div class="org-connector-v"></div>
+            <div style="display:flex;gap:10px">
+                <div class="org-col">
+                    <div class="org-node green" style="min-width:110px">
+                        <div class="node-icon">⚙️</div>
+                        <div class="node-label">Admin</div>
+                        <div class="node-sub">Password login</div>
+                    </div>
+                    <div class="org-connector-v"></div>
+                    <div class="org-node" style="min-width:110px;border-color:var(--text2)">
+                        <div class="node-icon">✅</div>
+                        <div class="node-label">Approver</div>
+                        <div class="node-sub">PIN login</div>
+                    </div>
+                </div>
+                <div class="org-col">
+                    <div class="org-connector-v" style="height:8px"></div>
+                    <div class="org-node" style="min-width:110px;border-color:var(--text2)">
+                        <div class="node-icon">👷</div>
+                        <div class="node-label">Workers</div>
+                        <div class="node-sub">PIN + optional 2FA</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="org-branch-col">
+            <div class="org-connector-v"></div>
+            <div class="org-node blue">
+                <div class="node-icon">🏢</div>
+                <div class="node-label">Company B</div>
+                <div class="node-sub">e.g. Apex Contracting</div>
+            </div>
+            <div class="org-connector-v"></div>
+            <div style="display:flex;gap:10px">
+                <div class="org-col">
+                    <div class="org-node green" style="min-width:110px">
+                        <div class="node-icon">⚙️</div>
+                        <div class="node-label">Admin</div>
+                        <div class="node-sub">Password login</div>
+                    </div>
+                </div>
+                <div class="org-col">
+                    <div class="org-connector-v" style="height:8px"></div>
+                    <div class="org-node" style="min-width:110px;border-color:var(--text2)">
+                        <div class="node-icon">👷</div>
+                        <div class="node-label">Workers</div>
+                        <div class="node-sub">PIN + optional 2FA</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="org-branch-col">
+            <div class="org-connector-v"></div>
+            <div class="org-node blue">
+                <div class="node-icon">🏢</div>
+                <div class="node-label">Company C…</div>
+                <div class="node-sub">Fully isolated tenant</div>
+            </div>
+            <div class="org-connector-v"></div>
+            <div class="org-node" style="min-width:110px;border-style:dashed;border-color:var(--text2)">
+                <div class="node-icon">➕</div>
+                <div class="node-label">Add More</div>
+                <div class="node-sub">Unlimited companies</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<div class="info">
+    ℹ️ <strong>Multi-tenant isolation:</strong> Every company's data is completely separated in the database via <code>company_id</code>. Company A can never see Company B's workers, projects, or submissions.
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>3. System Architecture</h2>
+
+<div class="arch">
+    <div class="arch-box">
+        <div class="arch-icon">🌐</div>
+        <div class="arch-label">Frontend</div>
+        <div class="arch-sub">HTML / CSS / JS<br>Netlify (static)<br>port 8765 (local)</div>
+    </div>
+    <div class="arch-arrow">⟷</div>
+    <div class="arch-box">
+        <div class="arch-icon">⚙️</div>
+        <div class="arch-label">Backend API</div>
+        <div class="arch-sub">Python / Flask<br>JWT Auth<br>port 5001</div>
+    </div>
+    <div class="arch-arrow">⟷</div>
+    <div class="arch-box">
+        <div class="arch-icon">🗄️</div>
+        <div class="arch-label">Database</div>
+        <div class="arch-sub">SQLite<br>ledgerman.db<br>WAL mode</div>
+    </div>
+</div>
+
+<table>
+    <thead><tr><th>Layer</th><th>Technology</th><th>Location</th><th>Purpose</th></tr></thead>
+    <tbody>
+        <tr><td>Frontend App</td><td>HTML/CSS/JS (no framework)</td><td><code>ledgerman/app/</code></td><td>Admin panel + Worker portal — served from Netlify or local server</td></tr>
+        <tr><td>Marketing Site</td><td>HTML/CSS/JS</td><td><code>ledgerman-site/</code></td><td>Public-facing product page for new customers</td></tr>
+        <tr><td>Super Admin</td><td>HTML/CSS/JS</td><td><code>ledgerman-admin/</code></td><td>Lucas's private management console (LittleShield)</td></tr>
+        <tr><td>Backend API</td><td>Python 3, Flask, flask-cors, PyJWT</td><td><code>ledgerman-backend/</code></td><td>REST API — auth, data sync, multi-tenant isolation</td></tr>
+        <tr><td>Database</td><td>SQLite 3 (WAL mode)</td><td><code>ledgerman-backend/ledgerman.db</code></td><td>All company data — companies, workers, entities, photos</td></tr>
+    </tbody>
+</table>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>4. File Map</h2>
+
+<pre><code>~/Desktop/Project Organizer/
+│
+├── ledgerman/                          ← FRONTEND APP
+│   ├── START-LEDGERMAN.sh              ← Double-click to run locally (port 8765)
+│   └── app/
+│       ├── index.html                 ← App entry point
+│       ├── css/
+│       │   ├── main.css               ← Global styles + login screens
+│       │   ├── admin.css              ← Admin panel styles
+│       │   └── worker.css             ← Worker portal styles
+│       └── js/
+│           ├── data.js                ← ⭐ Data layer (API + cache + localStorage fallback)
+│           ├── app.js                 ← App controller (routing, login, session)
+│           ├── utils.js               ← Helpers (toast, session timer, tooltips)
+│           ├── totp.js                ← 2FA TOTP — pure WebCrypto, no dependencies
+│           ├── invite.js              ← Worker onboarding via invite link
+│           ├── admin/
+│           │   ├── dashboard.js       ← Overview stats
+│           │   ├── projects.js        ← Project management + detail
+│           │   ├── approvals.js       ← Time entry approval (Clock In/Out vs Manual badge)
+│           │   ├── users.js           ← Worker management + invite generation
+│           │   ├── clients.js         ← Client address book
+│           │   ├── invoices.js        ← Invoice creation + PDF print
+│           │   ├── expenses.js        ← Project expenses
+│           │   ├── expenses-review.js ← Review worker-submitted expenses
+│           │   ├── vendors.js         ← Vendor / subcontractor directory
+│           │   ├── photos.js          ← Job site photo log
+│           │   ├── reports.js         ← Cost, labour, invoice summaries
+│           │   ├── settings.js        ← Company info, password, backup/restore
+│           │   └── help.js            ← Built-in help manual
+│           └── worker/
+│               ├── home.js            ← Worker home screen (project list)
+│               ├── timeentry.js       ← Clock In/Out + Manual Entry
+│               ├── history.js         ← Worker's past submissions
+│               └── help.js            ← Worker help screen
+│
+├── ledgerman-backend/                  ← BACKEND API
+│   ├── server.py                      ← Flask REST API (port 5001) + super-admin routes
+│   ├── database.py                    ← SQLite schema + init_db()
+│   ├── auth.py                        ← JWT create/verify + @require_auth decorators
+│   ├── requirements.txt               ← pip install -r requirements.txt
+│   ├── start.sh                       ← ./start.sh to launch
+│   ├── ledgerman.db                    ← Live database (DO NOT DELETE)
+│   └── .superadmin_key                ← Lucas's private API key (DO NOT SHARE)
+│
+├── ledgerman-admin/
+│   └── index.html                     ← LittleShield Super Admin Console
+│
+├── ledgerman-site/
+│   └── index.html                     ← Marketing website
+│
+└── LEDGERMAN-FULL-BACKUP-2026-03-14.zip ← Latest backup</code></pre>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>5. How to Run Locally</h2>
+
+<h3>Start the Backend (required for multi-device sync)</h3>
+<pre><code>cd ~/Desktop/Project\ Organizer/ledgerman-backend
+pip3 install -r requirements.txt        # first time only
+python3 server.py                        # runs on http://localhost:5001</code></pre>
+
+<h3>Start the Frontend App</h3>
+<pre><code># Option A — double-click START-LEDGERMAN.sh
+# Opens in Firefox on http://localhost:8765
+
+# Option B — manual
+cd ~/Desktop/Project\ Organizer/ledgerman/app
+python3 -m http.server 8765</code></pre>
+
+<h3>Open the LittleShield Admin Console</h3>
+<p>Open <code>ledgerman-admin/index.html</code> directly in any browser. Enter the super-admin key from <code>ledgerman-backend/.superadmin_key</code>.</p>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>6. API Endpoints Reference</h2>
+
+<table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr></thead>
+    <tbody>
+        <tr><td>POST</td><td><code>/api/companies/register</code></td><td>Public</td><td>Register a new company → returns JWT + companyId</td></tr>
+        <tr><td>POST</td><td><code>/api/auth/admin</code></td><td>Public</td><td>Admin login with password → JWT</td></tr>
+        <tr><td>POST</td><td><code>/api/auth/worker</code></td><td>Public</td><td>Worker PIN login → JWT (or 2FA challenge)</td></tr>
+        <tr><td>POST</td><td><code>/api/auth/worker/verify2fa</code></td><td>Public</td><td>Complete 2FA verification → JWT</td></tr>
+        <tr><td>GET</td><td><code>/api/sync</code></td><td>JWT</td><td>Load all company data in one shot (called on every login)</td></tr>
+        <tr><td>GET/PUT</td><td><code>/api/settings</code></td><td>JWT</td><td>Get / save company settings</td></tr>
+        <tr><td>GET/POST</td><td><code>/api/workers</code></td><td>Admin JWT</td><td>List / create workers</td></tr>
+        <tr><td>PUT/DELETE</td><td><code>/api/workers/:id</code></td><td>Admin JWT</td><td>Update / delete worker</td></tr>
+        <tr><td>GET/POST</td><td><code>/api/projects</code></td><td>JWT</td><td>List / create projects</td></tr>
+        <tr><td>GET/POST</td><td><code>/api/submissions</code></td><td>JWT</td><td>List / create time submissions</td></tr>
+        <tr><td>GET/POST</td><td><code>/api/invoices</code></td><td>JWT</td><td>List / create invoices</td></tr>
+        <tr><td>POST</td><td><code>/api/photos</code></td><td>JWT</td><td>Upload photo (base64)</td></tr>
+        <tr><td>POST</td><td><code>/api/invites</code></td><td>Admin JWT</td><td>Create worker invite → returns server-issued token</td></tr>
+        <tr><td>GET</td><td><code>/api/invites/:token</code></td><td>Public</td><td>Validate invite link</td></tr>
+        <tr><td>PUT</td><td><code>/api/invites/:token/use</code></td><td>Public</td><td>Complete worker onboarding → JWT</td></tr>
+        <tr><td>POST</td><td><code>/api/audit</code></td><td>JWT</td><td>Add audit log entry</td></tr>
+        <tr><td>GET</td><td><code>/api/superadmin/stats</code></td><td>API Key</td><td>System-wide stats (Lucas only)</td></tr>
+        <tr><td>GET</td><td><code>/api/superadmin/companies</code></td><td>API Key</td><td>All companies + per-company stats</td></tr>
+        <tr><td>GET</td><td><code>/api/superadmin/diagnostics/:id</code></td><td>API Key</td><td>LittleShield automated diagnostics</td></tr>
+        <tr><td>GET</td><td><code>/api/superadmin/health</code></td><td>API Key</td><td>DB + disk + auth health checks</td></tr>
+    </tbody>
+</table>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>7. User Instructions by Role</h2>
+
+<!-- LUCAS -->
+<div class="card">
+    <h3>🛡️ Lucas — Product Owner (Super Admin)</h3>
+    <ol class="steps">
+        <li>Start the backend: <code>cd ledgerman-backend &amp;&amp; python3 server.py</code></li>
+        <li>Open <code>ledgerman-admin/index.html</code> in browser — enter key from <code>.superadmin_key</code></li>
+        <li>Use <strong>Overview</strong> tab to see all active companies and revenue</li>
+        <li>Use <strong>Companies</strong> tab to view any company's workers, activity, and detail</li>
+        <li>Use <strong>🛡️ LittleShield</strong> tab to run automated diagnostics on any customer — scores them 0–100 and flags issues</li>
+        <li>Use <strong>Support</strong> tab to generate onboarding messages for new customers</li>
+        <li>To onboard a new customer: send them the Netlify app URL — they self-register</li>
+        <li>To delete a company (cancelled subscription): click 🗑 in the Companies tab</li>
+    </ol>
+</div>
+
+<!-- ADMIN -->
+<div class="card">
+    <h3>⚙️ Company Admin / PM</h3>
+    <ol class="steps">
+        <li><strong>First time:</strong> Open the app URL → click "Get Started" → enter company name + admin password → saved</li>
+        <li><strong>Returning:</strong> Open URL → Admin Login → enter password</li>
+        <li>Go to <strong>Settings</strong> → complete company info (name, address, HST number, invoice prefix)</li>
+        <li>Go to <strong>Workers</strong> → Add workers → click <strong>Invite</strong> → share the link or QR code with each worker</li>
+        <li>Go to <strong>Projects</strong> → Create projects → assign clients, add subtasks</li>
+        <li>Workers submit time → go to <strong>Approvals</strong> → review and Approve or Reject</li>
+        <li>Go to <strong>Invoices</strong> → Create invoice from approved time → Print PDF for client</li>
+        <li>Go to <strong>Reports</strong> → view cost summaries, labour by worker, project totals</li>
+        <li><strong>Second device:</strong> Open app → "Get Started" → "Link Existing" tab → enter Company ID + password</li>
+    </ol>
+    <div class="warn" style="margin-top:12px;margin-bottom:0">
+        ⚠️ <strong>Company ID:</strong> Found in Settings. Share it with anyone who needs to access your company from another device using admin login.
+    </div>
+</div>
+
+<!-- WORKER -->
+<div class="card">
+    <h3>👷 Worker</h3>
+    <ol class="steps">
+        <li><strong>First time:</strong> Click the invite link sent by your admin (or scan QR code)</li>
+        <li>Choose a 4–6 digit PIN → optionally enable 2FA (scan QR with Google Authenticator / Authy)</li>
+        <li>Add your email when prompted → click Save &amp; Continue</li>
+        <li><strong>Returning:</strong> Open the app URL → Worker Login → enter your PIN</li>
+        <li>From Home screen → tap a project → choose <strong>Clock In / Clock Out</strong> or <strong>Manual Entry</strong></li>
+        <li><strong>Clock In:</strong> tap Clock In at start of shift → tap Clock Out at end → hours auto-rounded to nearest 15 min</li>
+        <li><strong>Manual Entry:</strong> enter start/end times and a description → Submit</li>
+        <li>To add an expense: go to the project → Expense tab → fill in amount, description, upload receipt photo</li>
+        <li>Check your <strong>History</strong> tab to see all past submissions and their approval status</li>
+    </ol>
+</div>
+
+<!-- APPROVER -->
+<div class="card">
+    <h3>✅ Approver (elevated Worker)</h3>
+    <ol class="steps">
+        <li>Login at Admin Login screen using your worker PIN (not password)</li>
+        <li>You have access to the <strong>Approvals</strong> section only</li>
+        <li>Review pending submissions — you can see whether time was clocked in/out (⏱) or manually entered (✏️)</li>
+        <li>Click <strong>Approve</strong> or <strong>Reject</strong> with a note</li>
+    </ol>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>8. Worker Invite Flow</h2>
+
+<div class="org-wrap">
+<div class="org">
+    <div class="org-node green"><div class="node-icon">⚙️</div><div class="node-label">Admin</div><div class="node-sub">Goes to Workers → clicks Invite</div></div>
+    <div class="org-connector-v"></div>
+    <div class="org-node"><div class="node-icon">🔗</div><div class="node-label">Invite Link Generated</div><div class="node-sub">Server issues one-time token (expires 7 days)</div></div>
+    <div class="org-connector-v"></div>
+    <div class="org-node"><div class="node-icon">📱</div><div class="node-label">Worker Opens Link</div><div class="node-sub">On any device / browser</div></div>
+    <div class="org-connector-v"></div>
+    <div class="org-node"><div class="node-icon">🔑</div><div class="node-label">Worker Sets PIN + Optional 2FA</div><div class="node-sub">Scans QR code with Google Authenticator or Authy</div></div>
+    <div class="org-connector-v"></div>
+    <div class="org-node green"><div class="node-icon">✅</div><div class="node-label">Auto Logged In</div><div class="node-sub">JWT issued — ready to work</div></div>
+</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>9. Data Flow — Multi-Device Sync</h2>
+
+<div class="card">
+<pre style="background:none;border:none;padding:0;margin:0"><code>  Device A (Admin)          Backend (Flask + SQLite)         Device B (Worker)
+  ─────────────────         ─────────────────────────         ─────────────────
+  1. Login (password)  →    POST /api/auth/admin
+                       ←    { token: "JWT..." }
+
+  2. Load data         →    GET /api/sync
+                       ←    { workers: [...], projects: [...], ... }
+                            (populates in-memory cache)
+
+  3. Create project    →    POST /api/projects { name, ... }
+                       ←    { id: "abc123", ... }
+                            (cache updated + localStorage backup)
+
+                                                    4. Worker login    →    POST /api/auth/worker
+                                                                       ←    { token: "JWT..." }
+
+                                                    5. Sync            →    GET /api/sync
+                                                                       ←    sees the new project ✓
+
+                                                    6. Submit time     →    POST /api/submissions
+                       ←    (badge on Approvals tab updates next sync)</code></pre>
+</div>
+
+<div class="info">ℹ️ The frontend cache updates instantly on writes (so the UI feels fast), then pushes to the API in the background. On login, a full sync always loads the latest server state.</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>10. Deployment</h2>
+
+<table>
+    <thead><tr><th>Component</th><th>Current Status</th><th>URL / Location</th></tr></thead>
+    <tbody>
+        <tr><td>Frontend App</td><td><span class="badge badge-green">Live</span></td><td><a href="https://unrivaled-cassata-ee2ea9.netlify.app">unrivaled-cassata-ee2ea9.netlify.app</a></td></tr>
+        <tr><td>Marketing Site</td><td><span class="badge badge-green">Live</span></td><td><a href="https://fascinating-hamster-ca5294.netlify.app">fascinating-hamster-ca5294.netlify.app</a></td></tr>
+        <tr><td>Backend API</td><td><span class="badge badge-green">Live</span></td><td><a href="https://ledgerman-backend.onrender.com">ledgerman-backend.onrender.com</a> — Render free tier</td></tr>
+        <tr><td>Database</td><td><span class="badge badge-green">Live</span></td><td>SQLite on Render persistent disk at <code>/data/ledgerman.db</code></td></tr>
+        <tr><td>LittleShield Console</td><td><span class="badge badge-blue">Local File</span></td><td><code>ledgerman-admin/index.html</code> — open in browser</td></tr>
+    </tbody>
+</table>
+
+<div class="card" style="border-color:var(--green);margin-top:16px">
+    <h3 style="color:var(--green);margin-top:0">✅ Phase 2.3 Complete — Backend Deployed (2026-03-14)</h3>
+    <ul style="margin-bottom:0">
+        <li><strong>Backend:</strong> <a href="https://ledgerman-backend.onrender.com">https://ledgerman-backend.onrender.com</a> — Flask API on Render</li>
+        <li><strong>GitHub repo:</strong> <a href="https://github.com/aegiszeus2/ledgerman-backend">github.com/aegiszeus2/ledgerman-backend</a> (private)</li>
+        <li><strong>API config:</strong> <code>ledgerman/app/config.js</code> — update <code>window.LEDGERMAN_API_URL</code> here if URL ever changes</li>
+        <li><strong>Frontend redeploy:</strong> <code>bash DEPLOY-FRONTEND.sh</code> — pushes to Netlify via API automatically</li>
+        <li><strong>Free tier note:</strong> Render free tier sleeps after 15 min idle — first request takes ~30s to wake up. Upgrade to $7/mo Render paid plan when paying customers arrive for always-on service.</li>
+        <li><strong>Superadmin key:</strong> Set as <code>SUPERADMIN_KEY</code> environment variable in Render dashboard — persists across deploys</li>
+    </ul>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>11. Security Notes</h2>
+
+<div class="card">
+    <table style="margin-bottom:0">
+        <thead><tr><th>Item</th><th>Current</th><th>Production Recommendation</th></tr></thead>
+        <tbody>
+            <tr><td>Admin passwords</td><td>Plain text in SQLite</td><td>Swap to bcrypt hashing</td></tr>
+            <tr><td>JWT secret</td><td>Dev default string</td><td>Set <code>JWT_SECRET</code> env var to random 64-char string</td></tr>
+            <tr><td>Super-admin key</td><td>Auto-generated, stored in <code>.superadmin_key</code></td><td>Add to <code>.gitignore</code> — never commit</td></tr>
+            <tr><td>CORS</td><td>All origins allowed</td><td>Lock to your Netlify domain</td></tr>
+            <tr><td>Database</td><td>SQLite (fine for &lt;50 companies)</td><td>Migrate to PostgreSQL for scale</td></tr>
+            <tr><td>Photos</td><td>Base64 in SQLite</td><td>Move to S3/Cloudflare R2 for large volumes</td></tr>
+            <tr><td>2FA</td><td>TOTP RFC 6238 — Google Authenticator compatible</td><td>✅ Production ready</td></tr>
+        </tbody>
+    </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>12. Key Credentials & Locations</h2>
+
+<div class="warn">⚠️ Keep this section private. Do not share this file publicly.</div>
+
+<div class="card">
+    <table style="margin-bottom:0">
+        <thead><tr><th>Item</th><th>Location</th><th>Notes</th></tr></thead>
+        <tbody>
+            <tr><td>Super-Admin Key</td><td><code>ledgerman-backend/.superadmin_key</code></td><td>Auto-generated on first run. Used to access LittleShield console.</td></tr>
+            <tr><td>JWT Secret</td><td><code>auth.py</code> → <code>JWT_SECRET</code> env var</td><td>Default: <code>ledgerman-dev-secret-change-in-production</code></td></tr>
+            <tr><td>Netlify Token</td><td>Memory only</td><td><code>nfc_a3UFrrhn9E7CKmwDZkjZDLkcv1j7DmxT6b4b</code></td></tr>
+            <tr><td>Netlify Account</td><td>—</td><td><code>lucastheofilou@gmail.com</code></td></tr>
+            <tr><td>Support Email</td><td>—</td><td><code>aegiszeus2@gmail.com</code></td></tr>
+            <tr><td>Pricing</td><td>—</td><td>$25/month per company</td></tr>
+            <tr><td>Live App URL</td><td>Netlify</td><td><code>https://unrivaled-cassata-ee2ea9.netlify.app</code></td></tr>
+            <tr><td>Marketing URL</td><td>Netlify</td><td><code>https://fascinating-hamster-ca5294.netlify.app</code></td></tr>
+        </tbody>
+    </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>13. Backup & Recovery</h2>
+
+<div class="card" style="border-color:var(--green);margin-bottom:20px">
+    <h3 style="color:var(--green);margin-top:0">⭐ MASTERBACKUP.zip — The One File You Need</h3>
+    <p><strong>Location:</strong> <code>~/Desktop/Project Organizer/ledgerman/MASTERBACKUP.zip</code></p>
+    <p>This is the single canonical backup of the entire Ledgerman system. It contains all source code, the live database, the super-admin key, all launch scripts, and documentation. <strong>To move, restore, or hand off Ledgerman — copy only this file.</strong></p>
+    <ul>
+        <li>Auto-overwritten every night at <strong>2:00 AM</strong> by cron (always fresh)</li>
+        <li>~200KB — small enough to email, USB, or cloud-share instantly</li>
+        <li>To restore: unzip → <code>bash ledgerman-backend/SETUP.sh</code> → <code>./START-ALL.sh</code></li>
+    </ul>
+</div>
+
+<h3>Automated Backup System</h3>
+<ul>
+    <li><strong>Daily backups:</strong> <code>ledgerman-backups/daily/</code> — timestamped zips, 30-day retention (auto-pruned)</li>
+    <li><strong>Monthly backups:</strong> <code>ledgerman-backups/monthly/</code> — one per month, 12-month retention</li>
+    <li><strong>Log:</strong> <code>ledgerman-backups/backup.log</code> — every run recorded with size + file count</li>
+    <li><strong>Cron schedule:</strong> <code>0 2 * * *</code> — runs daily at 2AM automatically</li>
+    <li><strong>Manual trigger:</strong> <code>bash LEDGERMAN-BACKUP.sh</code> from Project Organizer folder</li>
+</ul>
+
+<h3>What's Included in Every Backup</h3>
+<ul>
+    <li><code>ledgerman-backend/ledgerman.db</code> — live database (all company data)</li>
+    <li><code>ledgerman-backend/.superadmin_key</code> — LittleShield access key</li>
+    <li><code>ledgerman-backend/server.py</code>, <code>database.py</code>, <code>auth.py</code>, <code>requirements.txt</code></li>
+    <li><code>ledgerman/app/</code> — full frontend source</li>
+    <li><code>ledgerman/LEDGERMAN-SYSTEM-GUIDE.html</code> — this document</li>
+    <li><code>ledgerman-admin/index.html</code> — LittleShield console</li>
+    <li><code>START-ALL.sh</code>, <code>START-ALL.bat</code>, <code>README-NEW-MACHINE.txt</code></li>
+</ul>
+
+<h3>Restore Procedure (New Machine)</h3>
+<ol class="steps">
+    <li>Copy <code>MASTERBACKUP.zip</code> to the new machine's Desktop</li>
+    <li>Unzip it — this recreates the full <code>Project Organizer/</code> folder structure</li>
+    <li>Run <code>bash ledgerman-backend/SETUP.sh</code> — installs Python dependencies, restores DB</li>
+    <li>Run <code>./START-ALL.sh</code> — backend starts on port 5001, frontend on 8765</li>
+    <li>Open <code>http://localhost:8765</code> — all data is live immediately (database was in the backup)</li>
+    <li>See <code>README-NEW-MACHINE.txt</code> for full platform-specific instructions</li>
+</ol>
+
+
+<!-- ── FOOTER ── -->
+<div style="text-align:center;margin-top:60px;padding-top:24px;border-top:1px solid var(--border)">
+    <p style="color:var(--text2);font-size:.85rem">
+        Ledgerman Construction Management — by PMs for PMs<br>
+        Built by LittleShield · <a href="mailto:aegiszeus2@gmail.com">aegiszeus2@gmail.com</a> · $25/month per company<br>
+        <em>This document: <code>ledgerman/LEDGERMAN-SYSTEM-GUIDE.html</code></em>
+    </p>
+</div>
+
+</div>
+</body>
+</html>

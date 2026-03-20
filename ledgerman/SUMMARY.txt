@@ -1,0 +1,73 @@
+LEDGERMAN — PROJECT SUMMARY
+===========================
+Last updated: 2026-03-14
+
+PURPOSE
+-------
+Multi-tenant SaaS construction management platform.
+Started as Belfort's invoicing tool — now a standalone product.
+Target: small contractors who can't afford Procore ($375+/mo).
+Price: $25/month per company.
+
+STATUS
+------
+ACTIVE — Phase 2 complete. Backend live locally, cloud deployment next.
+
+STACK
+-----
+Frontend:  Pure HTML/CSS/JS, in-memory cache, localStorage fallback, IndexedDB photos
+Backend:   Python 3 / Flask REST API, SQLite, JWT auth, TOTP 2FA
+Deploy:    Netlify (frontend) — backend needs cloud hosting (Render/PythonAnywhere)
+
+KEY LOCATIONS
+-------------
+Frontend:   ~/Desktop/Project Organizer/ledgerman/app/
+Backend:    ~/Desktop/Project Organizer/ledgerman-backend/
+Admin:      ~/Desktop/Project Organizer/ledgerman-admin/index.html  (LittleShield)
+Marketing:  ~/Desktop/Project Organizer/ledgerman-site/index.html
+Backups:    ~/Desktop/Project Organizer/ledgerman-backups/  (auto daily at 2AM)
+Portable:   ~/Desktop/Project Organizer/LEDGERMAN-PORTABLE-2026-03-14.zip
+System doc: ~/Desktop/Project Organizer/ledgerman/LEDGERMAN-SYSTEM-GUIDE.html
+
+LIVE URLS
+---------
+App:            https://unrivaled-cassata-ee2ea9.netlify.app
+Marketing site: https://fascinating-hamster-ca5294.netlify.app
+Backend:        http://localhost:5001 (local only — deploy to cloud = next step)
+
+HOW TO RUN
+----------
+cd ~/Desktop/Project Organizer
+./START-ALL.sh       → starts backend (5001) + frontend (8765)
+
+MODULES BUILT
+-------------
+Admin:  Dashboard, Projects, Approvals, Invoices, Expenses,
+        Vendors, Clients, Workers (invite + 2FA), Photos, Reports, Settings, Help
+Worker: Home, Clock In/Out, Manual Time Entry, History, Help
+
+KEY FEATURES COMPLETE
+---------------------
+- Multi-tenant isolation (company_id scoped, server-enforced)
+- JWT authentication (admin + worker + approver roles)
+- Worker invite system (server-issued one-time tokens, 7-day expiry)
+- 2FA / TOTP (Google Authenticator / Authy, verified server-side)
+- Clock In / Clock Out (auto-rounds to nearest 15 min, method badge on approvals)
+- Email collection on first worker login
+- LittleShield super admin console (diagnostics, company management)
+- Automated daily backups (cron 2AM, 30-day retention)
+- Portable zip (full transfer including live database)
+- System guide + org chart (LEDGERMAN-SYSTEM-GUIDE.html)
+
+SUPER ADMIN KEY
+---------------
+File: ~/Desktop/Project Organizer/ledgerman-backend/.superadmin_key
+Used to access LittleShield console at ledgerman-admin/index.html
+
+NEXT STEPS
+----------
+1. Deploy backend to Render or PythonAnywhere (cloud hosting)
+2. Update API_BASE in data.js to cloud URL
+3. Redeploy frontend to Netlify → true multi-device sync goes live
+4. Onboard Belfort (Laurence + Damino) on live backend
+5. Phase 3: AI features (auto-invoice, cost forecasting)

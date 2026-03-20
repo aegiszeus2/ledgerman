@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a2744">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Daily Site Report — Ledgerman</title>
+  <style>
+    /* ── Variables ──────────────────────────────────── */
+    :root {
+      --navy:   #1a2744;
+      --navy2:  #253460;
+      --green:  #28a745;
+      --green2: #218838;
+      --red:    #dc3545;
+      --gray:   #6c757d;
+      --light:  #f8f9fa;
+      --border: #dee2e6;
+      --white:  #ffffff;
+      --text:   #212529;
+      --shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+
+    /* ── Reset ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--white);
+      color: var(--text);
+      font-size: 17px;
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+    }
+
+    /* ── Screens ────────────────────────────────────── */
+    #app { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+      background: var(--white);
+      opacity: 0; pointer-events: none;
+      transform: translateX(30px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .screen.active {
+      opacity: 1; pointer-events: all;
+      transform: translateX(0);
+    }
+    .screen.slide-out {
+      opacity: 0; pointer-events: none;
+      transform: translateX(-30px);
+    }
+
+    /* ── Header bar ─────────────────────────────────── */
+    .header {
+      background: var(--navy);
+      color: var(--white);
+      padding: 16px 20px 14px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+    .header p  { font-size: 14px; opacity: 0.8; margin-top: 2px; }
+    .header-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .back-btn {
+      background: none; border: none; color: var(--white);
+      font-size: 24px; cursor: pointer; padding: 4px 8px 4px 0;
+      min-width: 44px; min-height: 44px;
+      display: flex; align-items: center;
+    }
+
+    /* ── PIN Screen ─────────────────────────────────── */
+    #screen-pin .header { text-align: center; padding: 24px 20px 20px; }
+    #screen-pin .header h1 { font-size: 22px; }
+
+    .pin-display {
+      display: flex; justify-content: center; gap: 14px;
+      padding: 28px 20px 20px;
+    }
+    .pin-dot {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--border);
+      border: 2px solid var(--navy);
+      transition: background 0.15s;
+    }
+    .pin-dot.filled { background: var(--navy); }
+
+    .pin-error {
+      text-align: center; color: var(--red);
+      font-size: 15px; min-height: 22px;
+      padding: 0 20px 8px;
+    }
+
+    .pin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      padding: 8px 32px 32px;
+      max-width: 360px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .pin-btn {
+      background: var(--white);
+      border: 2px solid var(--navy);
+      border-radius: 50%;
+      aspect-ratio: 1;
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--navy);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s, color 0.1s;
+      min-height: 72px;
+      -webkit-user-select: none; user-select: none;
+    }
+    .pin-btn:active, .pin-btn.pressed {
+      background: var(--navy); color: var(--white);
+    }
+    .pin-btn.empty {
+      border-color: transparent; pointer-events: none;
+    }
+    .pin-btn.del-btn { font-size: 22px; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%       { transform: translateX(-8px); }
+      40%       { transform: translateX(8px); }
+      60%       { transform: translateX(-6px); }
+      80%       { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.4s ease; }
+
+    /* ── Role Screen ────────────────────────────────── */
+    #screen-role .content {
+      padding: 24px 20px;
+      display: flex; flex-direction: column; gap: 14px;
+      max-width: 480px; margin: 0 auto; width: 100%;
+    }
+    .greeting { font-size: 22px; font-weight: 700; color: var(--navy); }
+    .subtext  { font-size: 17px; color: var(--gray); margin-top: 4px; }
+
+    .role-card {
+      display: flex; align-items: center; gap: 16px;
+      padding: 18px 20px;
+      border: 2.5px solid var(--border);
+      border-radius: 14px;
+      cursor: pointer;
+      background: var(--white);
+      transition: border-color 0.15s, background 0.15s;
+      min-height: 72px;
+    }
+    .role-card.selected {
+      border-color: var(--navy);
+      background: #f0f4ff;
+    }
+    .role-card .emoji { font-size: 32px; flex-shrink: 0; }
+    .role-card .label { font-size: 18px; font-weight: 600; color: var(--navy); }
+    .role-card .check {
+      margin-left: auto; font-size: 22px;
+      color: var(--navy); opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .role-card.selected .check { opacity: 1; }
+
+    .start-btn {
+      background: var(--green);
+      color: var(--white);
+      border: none; border-radius: 14px;
+      font-size: 19px; font-weight: 700;
+      padding: 18px;
+      cursor: pointer;
+      width: 100%; min-height: 60px;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    .start-btn:disabled { background: var(--gray); cursor: default; }
+    .start-btn:active:not(:disabled) { background: var(--green2); }
+
+    /* ── Interview Screen ───────────────────────────── */
+    #screen-interview {
+      display: flex; flex-direction: column;
+    }
+    .progress-bar-wrap {
+      background: var(--navy);
+      padding: 10px 16px 12px;
+      flex-shrink: 0;
+    }
+    .progress-text {
+      color: rgba(255,255,255,0.8);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .progress-track {
+      background: rgba(255,255,255,0.25);
+      border-radius: 4px; height: 4px;
+    }
+    .progress-fill {
+      background: var(--white);
+      border-radius: 4px; height: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 16px 8px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .bubble-row {
+      display: flex;
+      gap: 8px;
+    }
+    .bubble-row.ai   { justify-content: flex-start; }
+    .bubble-row.user { justify-content: flex-end; }
+
+    .bubble {
+      max-width: 78%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 16px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .bubble.ai {
+      background: var(--navy);
+      color: var(--white);
+      border-bottom-left-radius: 4px;
+    }
+    .bubble.user {
+      background: var(--light);
+      color: var(--text);
+      border: 1.5px solid var(--border);
+      border-bottom-right-radius: 4px;
+    }
+    .bubble.typing {
+      background: var(--navy);
+      color: rgba(255,255,255,0.7);
+      font-style: italic;
+    }
+
+    /* Chips */
+    .chips-row {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      padding: 4px 0 8px;
+    }
+    .chip {
+      background: var(--white);
+      border: 2px solid var(--navy);
+      color: var(--navy);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 40px;
+      display: flex; align-items: center;
+      transition: background 0.1s, color 0.1s;
+    }
+    .chip:active { background: var(--navy); color: var(--white); }
+
+    /* Clock in/out special buttons */
+    .clock-row {
+      display: flex; gap: 12px; width: 100%;
+    }
+    .clock-btn {
+      flex: 1; padding: 16px;
+      border-radius: 12px; border: none;
+      font-size: 17px; font-weight: 700;
+      cursor: pointer; min-height: 60px;
+    }
+    .clock-btn.in  { background: var(--green); color: var(--white); }
+    .clock-btn.out { background: var(--navy); color: var(--white); }
+
+    /* Input area */
+    .input-area {
+      background: var(--white);
+      border-top: 1.5px solid var(--border);
+      padding: 10px 14px 12px;
+      flex-shrink: 0;
+    }
+    .mic-row {
+      display: flex; justify-content: center; margin-bottom: 10px;
+    }
+    .mic-btn {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: none;
+      background: var(--green);
+      color: var(--white);
+      font-size: 30px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 3px 12px rgba(40,167,69,0.4);
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      flex-shrink: 0;
+    }
+    .mic-btn.recording {
+      background: var(--red);
+      box-shadow: 0 3px 16px rgba(220,53,69,0.5);
+      animation: pulse 1.2s ease infinite;
+    }
+    .mic-btn:active { transform: scale(0.93); }
+    .mic-label {
+      text-align: center; font-size: 12px; color: var(--gray);
+      margin-top: 4px; margin-bottom: 6px;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 3px 16px rgba(220,53,69,0.5); }
+      50%       { box-shadow: 0 3px 24px rgba(220,53,69,0.8); }
+    }
+
+    .text-row {
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    .text-input {
+      flex: 1;
+      border: 1.5px solid var(--border);
+      border-radius: 22px;
+      padding: 11px 16px;
+      font-size: 16px;
+      color: var(--text);
+      background: var(--white);
+      outline: none;
+      resize: none;
+      min-height: 46px;
+      max-height: 120px;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+    .text-input:focus { border-color: var(--navy); }
+    .send-btn {
+      width: 46px; height: 46px;
+      border-radius: 50%; border: none;
+      background: var(--navy); color: var(--white);
+      font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.1s;
+    }
+    .send-btn:disabled { background: var(--border); color: var(--gray); cursor: default; }
+    .send-btn:active:not(:disabled) { background: var(--navy2); }
+
+    /* ── Summary Screen ─────────────────────────────── */
+    #screen-summary .content {
+      padding: 20px 20px 32px;
+      max-width: 480px; margin: 0 auto; width: 100%;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .summary-title {
+      font-size: 20px; font-weight: 700; color: var(--navy);
+    }
+    .summary-card {
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .summary-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-section:last-child { border-bottom: none; }
+    .summary-label {
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--gray); margin-bottom: 4px;
+    }
+    .summary-value {
+      font-size: 16px; color: var(--text); line-height: 1.4;
+    }
+    .summary-value.none { color: var(--gray); font-style: italic; }
+
+    .save-btn {
+      background: var(--green);
+      color: var(--white);
+      border: none; border-radius: 14px;
+      font-size: 19px; font-weight: 700;
+      padding: 18px;
+      cursor: pointer;
+      width: 100%; min-height: 60px;
+      transition: background 0.15s;
+    }
+    .save-btn:active { background: var(--green2); }
+
+    .edit-btn {
+      background: var(--white);
+      color: var(--navy);
+      border: 2px solid var(--navy);
+      border-radius: 14px;
+      font-size: 17px; font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      width: 100%; min-height: 52px;
+      transition: background 0.1s;
+    }
+    .edit-btn:active { background: var(--light); }
+
+    /* ── Done Screen ────────────────────────────────── */
+    #screen-done .content {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 24px;
+      text-align: center;
+      gap: 20px;
+    }
+    .done-check {
+      width: 96px; height: 96px;
+      background: var(--green);
+      border-radius: 50%;
+      font-size: 52px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--white);
+      box-shadow: 0 4px 20px rgba(40,167,69,0.35);
+      animation: popIn 0.4s ease;
+    }
+    @keyframes popIn {
+      0%   { transform: scale(0.5); opacity: 0; }
+      70%  { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .done-title {
+      font-size: 24px; font-weight: 700; color: var(--navy);
+    }
+    .done-sub {
+      font-size: 16px; color: var(--gray);
+      line-height: 1.5;
+    }
+    .done-actions {
+      display: flex; flex-direction: column; gap: 12px;
+      width: 100%; max-width: 300px;
+    }
+    .another-btn {
+      background: var(--navy); color: var(--white);
+      border: none; border-radius: 12px;
+      font-size: 17px; font-weight: 600;
+      padding: 16px; cursor: pointer; min-height: 56px;
+    }
+    .done-btn {
+      background: var(--white); color: var(--navy);
+      border: 2px solid var(--navy); border-radius: 12px;
+      font-size: 17px; font-weight: 600;
+      padding: 16px; cursor: pointer; min-height: 56px;
+    }
+
+    /* ── Utilities ──────────────────────────────────── */
+    .hidden { display: none !important; }
+    .spacer { flex: 1; }
+
+    /* No workers warning */
+    .no-workers {
+      padding: 32px 24px; text-align: center;
+      color: var(--gray); font-size: 16px; line-height: 1.6;
+    }
+    .no-workers strong { color: var(--navy); }
+
+    /* Transcript preview */
+    .transcript-preview {
+      font-size: 14px; color: var(--gray);
+      text-align: center; min-height: 20px;
+      padding: 0 8px 4px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════════
+       Screen 1 — PIN Login
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-pin" class="screen active">
+    <div class="header" style="text-align:center; padding: 28px 20px 20px;">
+      <h1>Ledgerman</h1>
+      <p>Daily Site Report</p>
+    </div>
+
+    <div id="pin-no-workers" class="no-workers hidden">
+      <strong>No workers registered.</strong><br>
+      Please ask your administrator to set up worker accounts in the main app.
+    </div>
+
+    <div id="pin-main">
+      <div class="pin-display" id="pin-display">
+        <div class="pin-dot" id="dot-0"></div>
+        <div class="pin-dot" id="dot-1"></div>
+        <div class="pin-dot" id="dot-2"></div>
+        <div class="pin-dot" id="dot-3"></div>
+      </div>
+      <div class="pin-error" id="pin-error"></div>
+      <div class="pin-grid" id="pin-grid">
+        <button class="pin-btn" data-digit="1" ontouchstart="" onclick="pinPress('1')">1</button>
+        <button class="pin-btn" data-digit="2" ontouchstart="" onclick="pinPress('2')">2</button>
+        <button class="pin-btn" data-digit="3" ontouchstart="" onclick="pinPress('3')">3</button>
+        <button class="pin-btn" data-digit="4" ontouchstart="" onclick="pinPress('4')">4</button>
+        <button class="pin-btn" data-digit="5" ontouchstart="" onclick="pinPress('5')">5</button>
+        <button class="pin-btn" data-digit="6" ontouchstart="" onclick="pinPress('6')">6</button>
+        <button class="pin-btn" data-digit="7" ontouchstart="" onclick="pinPress('7')">7</button>
+        <button class="pin-btn" data-digit="8" ontouchstart="" onclick="pinPress('8')">8</button>
+        <button class="pin-btn" data-digit="9" ontouchstart="" onclick="pinPress('9')">9</button>
+        <button class="pin-btn empty"></button>
+        <button class="pin-btn" data-digit="0" ontouchstart="" onclick="pinPress('0')">0</button>
+        <button class="pin-btn del-btn" ontouchstart="" onclick="pinDelete()">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       Screen 2 — Role Selection
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-role" class="screen">
+    <div class="header">
+      <div class="header-row">
+        <button class="back-btn" onclick="goBack('role')">‹</button>
+        <div>
+          <h1>Daily Site Report</h1>
+          <p id="role-header-sub">Select your role</p>
+        </div>
+      </div>
+    </div>
+    <div class="content">
+      <div id="role-greeting" class="greeting"></div>
+      <div id="role-subtext" class="subtext">What's your role today?<br><small style="font-size:14px;color:#999;">Select all that apply</small></div>
+      <div id="role-cards"></div>
+      <button class="start-btn" id="start-interview-btn" onclick="startInterview()" disabled>
+        Start Interview →
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       Screen 3 — Voice Interview
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-interview" class="screen">
+    <div class="header" style="padding: 0;">
+      <!-- Progress bar lives inside header -->
+      <div style="display:flex; align-items:center; gap:8px; padding: 14px 16px 0;">
+        <button class="back-btn" style="color:white; font-size:22px; min-width:36px;" onclick="goBack('interview')">‹</button>
+        <div style="flex:1;">
+          <div class="progress-text" id="progress-text">Step 1</div>
+        </div>
+      </div>
+      <div style="padding: 6px 16px 12px;">
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width:5%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-area" id="chat-area"></div>
+
+    <div class="input-area">
+      <div class="transcript-preview" id="transcript-preview"></div>
+      <div class="mic-row">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+          <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎙️</button>
+          <div class="mic-label" id="mic-label">Tap to speak</div>
+        </div>
+      </div>
+      <div class="text-row">
+        <textarea
+          class="text-input"
+          id="text-input"
+          placeholder="Or type your answer…"
+          rows="1"
+          oninput="autoResize(this)"
+          onkeydown="handleKeydown(event)"
+        ></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendText()" disabled>↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       Screen 4 — Summary & Confirm
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-summary" class="screen">
+    <div class="header">
+      <div class="header-row">
+        <button class="back-btn" onclick="goBack('summary')">‹</button>
+        <div>
+          <h1>Review Report</h1>
+          <p>Confirm before saving</p>
+        </div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="summary-title">📋 Daily Report Summary</div>
+      <div class="summary-card" id="summary-card">
+        <!-- populated by JS -->
+      </div>
+      <button class="save-btn" onclick="saveReport()">✓ Looks good — Save Report</button>
+      <button class="edit-btn" onclick="goBack('summary')">← Edit Answers</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       Screen 5 — Done
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-done" class="screen">
+    <div class="header">
+      <h1 style="font-size:18px; padding: 4px 0;">Ledgerman</h1>
+    </div>
+    <div class="content">
+      <div class="done-check">✓</div>
+      <div class="done-title">Report Saved!</div>
+      <div class="done-sub" id="done-sub">Your daily site report has been recorded.</div>
+      <div class="done-actions">
+        <button class="another-btn" onclick="submitAnother()">Submit Another Report</button>
+        <button class="done-btn" onclick="goHome()">Done</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════════════════ */
+const API_BASE = 'http://localhost:3333';
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+const state = {
+  worker:        null,   // authenticated worker object
+  selectedRoles: [],     // array of role keys
+  messages:      [],     // [{role:'assistant'|'user', content:'...'}]
+  extractedData: null,   // from AI when isComplete
+  currentChips:  null,   // chip array for current question
+  isRecording:   false,
+  mediaRecorder: null,
+  audioChunks:   [],
+  recognition:   null,
+  totalSteps:    7,      // estimated, updated per role
+  step:          0,
+  waitingForAI:  false,
+};
+
+/* ══════════════════════════════════════════════════════
+   STORAGE HELPERS
+══════════════════════════════════════════════════════ */
+function storageGet(key) {
+  try {
+    const raw = localStorage.getItem('ledgeman_' + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem('ledgeman_' + key, JSON.stringify(value)); } catch {}
+}
+function storageGetRaw(key) {
+  // For direct keys not prefixed
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   PIN SCREEN
+══════════════════════════════════════════════════════ */
+let pinValue = '';
+
+function initPinScreen() {
+  const workers = getWorkers();
+  if (!workers || workers.length === 0) {
+    document.getElementById('pin-no-workers').classList.remove('hidden');
+    document.getElementById('pin-main').classList.add('hidden');
+  }
+}
+
+function getWorkers() {
+  // Try both storage patterns
+  return storageGet('workers') || storageGetRaw('ledgeman_workers') || [];
+}
+
+function getProjects() {
+  return storageGet('projects') || storageGetRaw('ledgeman_projects') || [];
+}
+
+function pinPress(digit) {
+  if (pinValue.length >= 4) return;
+  pinValue += digit;
+  updatePinDisplay();
+  if (pinValue.length === 4) {
+    setTimeout(verifyPin, 80);
+  }
+}
+
+function pinDelete() {
+  if (pinValue.length === 0) return;
+  pinValue = pinValue.slice(0, -1);
+  updatePinDisplay();
+  clearPinError();
+}
+
+function updatePinDisplay() {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('dot-' + i);
+    dot.classList.toggle('filled', i < pinValue.length);
+  }
+}
+
+function verifyPin() {
+  const workers = getWorkers();
+  const match = workers.find(w =>
+    String(w.pin) === String(pinValue) &&
+    (!w.status || w.status === 'Active' || w.status === 'active')
+  );
+
+  if (match) {
+    state.worker = match;
+    clearPinError();
+    pinValue = '';
+    updatePinDisplay();
+    proceedAfterLogin();
+  } else {
+    pinValue = '';
+    updatePinDisplay();
+    showPinError('Incorrect PIN. Please try again.');
+    document.getElementById('pin-display').classList.add('shake');
+    setTimeout(() => document.getElementById('pin-display').classList.remove('shake'), 500);
+  }
+}
+
+function showPinError(msg) {
+  document.getElementById('pin-error').textContent = msg;
+}
+function clearPinError() {
+  document.getElementById('pin-error').textContent = '';
+}
+
+/* ══════════════════════════════════════════════════════
+   ROLE SCREEN
+══════════════════════════════════════════════════════ */
+const ROLES = [
+  { key: 'worker',           label: 'Worker',                emoji: '👷' },
+  { key: 'foreman',          label: 'Foreman',               emoji: '🦺' },
+  { key: 'superintendent',   label: 'Superintendent',        emoji: '🏗️' },
+  { key: 'project_admin',    label: 'Project Administrator', emoji: '📋' },
+  { key: 'project_manager',  label: 'Project Manager',       emoji: '📊' },
+];
+
+const ROLE_STEPS = {
+  worker: 6, foreman: 8, superintendent: 10,
+  project_admin: 6, project_manager: 8
+};
+
+function proceedAfterLogin() {
+  const w = state.worker;
+  const roles = w.roles || [];
+
+  if (roles.length === 1) {
+    // Skip role screen, go straight to interview
+    state.selectedRoles = [normalizeRole(roles[0])];
+    updateTotalSteps();
+    showScreen('interview');
+    initInterview();
+  } else if (roles.length > 1) {
+    showRoleScreen();
+    showScreen('role');
+  } else {
+    // No roles defined — show all options
+    showRoleScreen();
+    showScreen('role');
+  }
+}
+
+function normalizeRole(r) {
+  if (!r) return 'worker';
+  const s = String(r).toLowerCase().replace(/[\s-]/g, '_');
+  const map = {
+    'project_manager': 'project_manager', 'pm': 'project_manager',
+    'project_admin': 'project_admin', 'pa': 'project_admin',
+    'project_administrator': 'project_admin',
+    'superintendent': 'superintendent', 'super': 'superintendent',
+    'foreman': 'foreman', 'worker': 'worker', 'labourer': 'worker',
+    'laborer': 'worker'
+  };
+  return map[s] || s;
+}
+
+function showRoleScreen() {
+  const w = state.worker;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('role-greeting').textContent = `${greeting}, ${w.name}! 👋`;
+
+  const allowedRoles = (w.roles || []).map(normalizeRole);
+  const rolesToShow = allowedRoles.length > 0
+    ? ROLES.filter(r => allowedRoles.includes(r.key))
+    : ROLES;
+
+  const container = document.getElementById('role-cards');
+  container.innerHTML = '';
+  rolesToShow.forEach(role => {
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.dataset.key = role.key;
+    card.innerHTML = `
+      <span class="emoji">${role.emoji}</span>
+      <span class="label">${role.label}</span>
+      <span class="check">✓</span>
+    `;
+    card.addEventListener('click', () => toggleRole(role.key, card));
+    container.appendChild(card);
+  });
+
+  state.selectedRoles = [];
+  document.getElementById('start-interview-btn').disabled = true;
+}
+
+function toggleRole(key, card) {
+  card.classList.toggle('selected');
+  if (card.classList.contains('selected')) {
+    if (!state.selectedRoles.includes(key)) state.selectedRoles.push(key);
+  } else {
+    state.selectedRoles = state.selectedRoles.filter(r => r !== key);
+  }
+  document.getElementById('start-interview-btn').disabled = state.selectedRoles.length === 0;
+  updateTotalSteps();
+}
+
+function updateTotalSteps() {
+  let total = 0;
+  state.selectedRoles.forEach(r => { total += (ROLE_STEPS[r] || 6); });
+  // Deduct shared questions for stacked roles
+  if (state.selectedRoles.length > 1) total -= (state.selectedRoles.length - 1);
+  state.totalSteps = Math.max(total, 1);
+}
+
+/* ══════════════════════════════════════════════════════
+   INTERVIEW SCREEN
+══════════════════════════════════════════════════════ */
+function initInterview() {
+  state.messages = [];
+  state.step = 0;
+  state.extractedData = null;
+  state.waitingForAI = false;
+  document.getElementById('chat-area').innerHTML = '';
+  document.getElementById('text-input').value = '';
+  document.getElementById('transcript-preview').textContent = '';
+  updateProgress(0);
+  initVoice();
+  fetchNextQuestion();
+}
+
+async function fetchNextQuestion() {
+  if (state.waitingForAI) return;
+  state.waitingForAI = true;
+
+  // Show typing indicator
+  const typingId = addTypingBubble();
+
+  try {
+    const projects = getProjects();
+    const workers  = getWorkers();
+
+    const resp = await fetch(`${API_BASE}/interview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: state.messages,
+        role:     state.selectedRoles,
+        context:  { projects, workers },
+        step:     state.step,
+      })
+    });
+
+    removeTypingBubble(typingId);
+
+    if (!resp.ok) throw new Error('API error ' + resp.status);
+    const data = await resp.json();
+
+    if (data.isComplete && data.extractedData) {
+      state.extractedData = data.extractedData;
+      // Show final AI message if there's a question/closing message
+      if (data.question) {
+        addAIBubble(data.question, null);
+        state.messages.push({ role: 'assistant', content: data.question });
+      }
+      setTimeout(() => showSummary(), 1200);
+    } else {
+      const q = data.question || "Can you tell me more about today?";
+      state.currentChips = data.chips || null;
+      addAIBubble(q, data.chips);
+      state.messages.push({ role: 'assistant', content: q });
+      state.step++;
+      updateProgress(state.step);
+    }
+  } catch (err) {
+    removeTypingBubble(typingId);
+    console.error('Interview API error:', err);
+    const fallback = state.step === 0
+      ? "Which project are you reporting for today?"
+      : "What else happened on site today?";
+    addAIBubble(fallback, null);
+    state.messages.push({ role: 'assistant', content: fallback });
+    state.step++;
+    updateProgress(state.step);
+  } finally {
+    state.waitingForAI = false;
+  }
+}
+
+function sendUserMessage(text) {
+  text = text.trim();
+  if (!text || state.waitingForAI) return;
+
+  addUserBubble(text);
+  state.messages.push({ role: 'user', content: text });
+  document.getElementById('text-input').value = '';
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('transcript-preview').textContent = '';
+
+  // Clear chips
+  const area = document.getElementById('chat-area');
+  const chipsEl = area.querySelector('.chips-row');
+  if (chipsEl) chipsEl.remove();
+  state.currentChips = null;
+
+  fetchNextQuestion();
+}
+
+function sendText() {
+  const val = document.getElementById('text-input').value.trim();
+  if (val) sendUserMessage(val);
+}
+
+function handleKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  document.getElementById('send-btn').disabled = !el.value.trim();
+}
+
+/* ── Chat bubbles ──────────────────────────────────── */
+function addAIBubble(text, chips) {
+  const area = document.getElementById('chat-area');
+
+  const row = document.createElement('div');
+  row.className = 'bubble-row ai';
+  const bub = document.createElement('div');
+  bub.className = 'bubble ai';
+  bub.textContent = text;
+  row.appendChild(bub);
+  area.appendChild(row);
+
+  // Add chips if present
+  if (chips && chips.length > 0) {
+    const chipsRow = document.createElement('div');
+    chipsRow.className = 'chips-row';
+
+    // Special case: yes/no
+    const lower = chips.map(c => c.toLowerCase());
+    if (lower.includes('clock in') || lower.includes('clock out')) {
+      const cr = document.createElement('div');
+      cr.className = 'clock-row';
+      chips.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'clock-btn ' + (c.toLowerCase().includes('in') ? 'in' : 'out');
+        btn.textContent = c;
+        btn.onclick = () => { removeChips(); sendUserMessage(c); };
+        cr.appendChild(btn);
+      });
+      chipsRow.appendChild(cr);
+    } else {
+      chips.forEach(c => {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = c;
+        chip.onclick = () => { removeChips(); sendUserMessage(c); };
+        chipsRow.appendChild(chip);
+      });
+    }
+    area.appendChild(chipsRow);
+  }
+
+  scrollChat();
+}
+
+function addUserBubble(text) {
+  const area = document.getElementById('chat-area');
+  const row = document.createElement('div');
+  row.className = 'bubble-row user';
+  const bub = document.createElement('div');
+  bub.className = 'bubble user';
+  bub.textContent = text;
+  row.appendChild(bub);
+  area.appendChild(row);
+  scrollChat();
+}
+
+let _typingCounter = 0;
+function addTypingBubble() {
+  const id = 'typing-' + (++_typingCounter);
+  const area = document.getElementById('chat-area');
+  const row = document.createElement('div');
+  row.className = 'bubble-row ai';
+  row.id = id;
+  const bub = document.createElement('div');
+  bub.className = 'bubble typing';
+  bub.textContent = '…';
+  row.appendChild(bub);
+  area.appendChild(row);
+  scrollChat();
+  return id;
+}
+function removeTypingBubble(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function removeChips() {
+  const area = document.getElementById('chat-area');
+  const chipsEl = area.querySelector('.chips-row');
+  if (chipsEl) chipsEl.remove();
+}
+
+function scrollChat() {
+  const area = document.getElementById('chat-area');
+  requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
+}
+
+function updateProgress(step) {
+  const pct = Math.min(100, Math.round((step / state.totalSteps) * 100));
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent =
+    step > 0 ? `Step ${step} of ${state.totalSteps}` : 'Starting interview…';
+}
+
+/* ══════════════════════════════════════════════════════
+   VOICE / MIC
+══════════════════════════════════════════════════════ */
+function initVoice() {
+  // Prefer Web Speech API (instant, no upload)
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRec) {
+    state.recognition = new SpeechRec();
+    state.recognition.lang = 'en-CA';
+    state.recognition.continuous = false;
+    state.recognition.interimResults = true;
+
+    state.recognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (const res of e.results) {
+        if (res.isFinal) final += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      document.getElementById('transcript-preview').textContent = interim || final;
+      if (final) {
+        document.getElementById('text-input').value = final.trim();
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('transcript-preview').textContent = '';
+      }
+    };
+
+    state.recognition.onend = () => {
+      if (state.isRecording) stopRecording();
+    };
+
+    state.recognition.onerror = (e) => {
+      console.warn('Speech recognition error:', e.error);
+      if (state.isRecording) stopRecording();
+      if (e.error === 'not-allowed') {
+        document.getElementById('mic-label').textContent = 'Mic permission denied';
+      }
+    };
+  }
+}
+
+function toggleMic() {
+  if (state.isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+function startRecording() {
+  state.isRecording = true;
+  const btn = document.getElementById('mic-btn');
+  btn.classList.add('recording');
+  btn.textContent = '⏹';
+  document.getElementById('mic-label').textContent = 'Recording… tap to stop';
+
+  if (state.recognition) {
+    try { state.recognition.start(); } catch {}
+  } else {
+    // MediaRecorder fallback → Whisper
+    startMediaRecorder();
+  }
+}
+
+function stopRecording() {
+  state.isRecording = false;
+  const btn = document.getElementById('mic-btn');
+  btn.classList.remove('recording');
+  btn.textContent = '🎙️';
+  document.getElementById('mic-label').textContent = 'Tap to speak';
+
+  if (state.recognition) {
+    try { state.recognition.stop(); } catch {}
+  } else if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+    state.mediaRecorder.stop();
+  }
+}
+
+function startMediaRecorder() {
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      state.audioChunks = [];
+      state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      state.mediaRecorder.ondataavailable = e => state.audioChunks.push(e.data);
+      state.mediaRecorder.onstop = () => {
+        const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+        transcribeBlob(blob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      state.mediaRecorder.start();
+    })
+    .catch(err => {
+      console.warn('MediaRecorder error:', err);
+      stopRecording();
+      document.getElementById('mic-label').textContent = 'Mic unavailable — type instead';
+    });
+}
+
+async function transcribeBlob(blob) {
+  document.getElementById('mic-label').textContent = 'Transcribing…';
+  try {
+    const resp = await fetch(`${API_BASE}/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'audio/webm' },
+      body: blob
+    });
+    const data = await resp.json();
+    if (data.transcript) {
+      document.getElementById('text-input').value = data.transcript.trim();
+      document.getElementById('send-btn').disabled = false;
+    }
+  } catch (err) {
+    console.warn('Transcribe error:', err);
+  } finally {
+    document.getElementById('mic-label').textContent = 'Tap to speak';
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   SUMMARY SCREEN
+══════════════════════════════════════════════════════ */
+function showSummary() {
+  // If we have extractedData from AI, use it; otherwise build from messages
+  const d = state.extractedData || buildFallbackData();
+  renderSummaryCard(d);
+  showScreen('summary');
+}
+
+function buildFallbackData() {
+  // Build basic data from conversation if AI extraction failed
+  return {
+    projectId: null, date: new Date().toISOString().split('T')[0],
+    roles: state.selectedRoles, workersPresent: [],
+    timeEntries: [], materials: [], equipment: [],
+    issues: null, plan: null, notes: null, reportType: 'end-of-day'
+  };
+}
+
+function renderSummaryCard(d) {
+  const today = new Date().toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const roles = (d.roles || state.selectedRoles).map(r => {
+    return ROLES.find(x => x.key === r)?.label || r;
+  }).join(', ');
+
+  const sections = [
+    { label: 'Date',    value: today },
+    { label: 'Worker',  value: state.worker?.name || '—' },
+    { label: 'Role',    value: roles || '—' },
+    { label: 'Project', value: d.projectId || d.project || null, fallback: 'Not specified' },
+    { label: 'Work Completed', value: summarizeTimeEntries(d.timeEntries, d) },
+    { label: 'Workers Present', value: (d.workersPresent||[]).join(', ') || null, fallback: 'Not specified' },
+    { label: 'Materials', value: summarizeMaterials(d.materials) },
+    { label: 'Equipment', rawHtml: renderEquipmentHTML(d.equipment) },
+    { label: 'Issues', value: d.issues || null, fallback: 'None reported' },
+    { label: "Tomorrow's Plan", value: d.plan || null, fallback: 'Not specified' },
+    { label: 'Schedule', value: d.scheduleStatus || null },
+    { label: 'Budget Notes', value: d.budgetVariances || null },
+    { label: 'Scope Changes', value: d.scopeChanges || null },
+    { label: 'Invoices / Payments', value: [d.invoices, d.payments].filter(Boolean).join(' | ') || null },
+    { label: 'Notes', value: d.notes || null },
+  ].filter(s => s.value !== undefined && s.value !== null && s.value !== '' || s.fallback);
+
+  const card = document.getElementById('summary-card');
+  card.innerHTML = sections.map(s => {
+    // rawHtml sections (e.g. equipment with rich per-item formatting)
+    if ('rawHtml' in s) {
+      if (!s.rawHtml) return '';
+      return `<div class="summary-section">
+        <div class="summary-label">${s.label}</div>
+        ${s.rawHtml}
+      </div>`;
+    }
+    const val = (s.value && s.value !== '') ? s.value : (s.fallback || null);
+    if (!val) return '';
+    const cls = (!s.value || s.value === '') ? 'summary-value none' : 'summary-value';
+    return `<div class="summary-section">
+      <div class="summary-label">${s.label}</div>
+      <div class="${cls}">${escapeHtml(val)}</div>
+    </div>`;
+  }).join('');
+}
+
+function summarizeTimeEntries(entries, d) {
+  if (!entries || entries.length === 0) {
+    if (d && d.description) return d.description;
+    if (d && d.workCompleted) return d.workCompleted;
+    return null;
+  }
+  return entries.map(e =>
+    `${e.workerName || 'Worker'}: ${e.hours || '?'}h — ${e.description || ''}`
+  ).join('\n');
+}
+function summarizeMaterials(mats) {
+  if (!mats || mats.length === 0) return null;
+  return mats.map(m => `${m.name}: ${m.qty || ''} @ $${m.unitCost || '?'}`).join('\n');
+}
+function summarizeEquipment(equip) {
+  if (!equip || equip.length === 0) return null;
+  return equip.map(e => {
+    const qty = e.qty ? ` (${e.qty})` : '';
+    return `${e.name || 'Equipment'}${qty}: $${parseFloat(e.cost || 0).toFixed(2)}`;
+  }).join('\n');
+}
+function renderEquipmentHTML(equip) {
+  if (!equip || equip.length === 0) return null;
+  let subtotal = 0;
+  const itemsHtml = equip.map(e => {
+    const cost = parseFloat(e.cost) || 0;
+    subtotal += cost;
+    const qty = e.qty ? ` <span style="color:#6c757d;font-size:13px;">(${escapeHtml(String(e.qty))})</span>` : '';
+    return `<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #f0f0f0;">
+      <div style="font-size:15px;"><strong>${escapeHtml(e.name || 'Equipment')}</strong>${qty} — <strong>$${cost.toFixed(2)}</strong></div>
+      <div style="font-size:12px; color:#28a745; margin-top:3px;">💾 Equipment expense → will be saved to project expenses</div>
+    </div>`;
+  }).join('');
+  const subtotalHtml = equip.length > 1
+    ? `<div style="margin-top:6px; font-weight:700; font-size:15px; color:#1a2744;">Subtotal: $${subtotal.toFixed(2)}</div>`
+    : '';
+  return `<div class="summary-value">${itemsHtml}${subtotalHtml}</div>`;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/\n/g,'<br>');
+}
+
+/* ══════════════════════════════════════════════════════
+   SAVE REPORT
+══════════════════════════════════════════════════════ */
+function saveReport() {
+  const d = state.extractedData || buildFallbackData();
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+
+  const report = {
+    id: 'rpt_' + Date.now(),
+    date: today,
+    projectId: d.projectId || d.project || null,
+    workerId: state.worker?.id || null,
+    workerName: state.worker?.name || null,
+    roles: state.selectedRoles,
+    timeEntries: d.timeEntries || [],
+    workersPresent: d.workersPresent || [],
+    materials: d.materials || [],
+    equipment: d.equipment || [],
+    issues: d.issues || null,
+    plan: d.plan || null,
+    scheduleStatus: d.scheduleStatus || null,
+    budgetVariances: d.budgetVariances || null,
+    scopeChanges: d.scopeChanges || null,
+    invoices: d.invoices || null,
+    payments: d.payments || null,
+    notes: d.notes || null,
+    reportType: 'end-of-day',
+    conversationHistory: state.messages,
+    createdAt: now.toISOString(),
+  };
+
+  // Save to ledgeman_daily_reports
+  const reports = storageGet('daily_reports') || [];
+  reports.push(report);
+  storageSet('daily_reports', reports);
+
+  // Update time entries if present
+  if (d.timeEntries && d.timeEntries.length > 0) {
+    const timeEntries = storageGet('time_entries') || [];
+    d.timeEntries.forEach(te => {
+      timeEntries.push({
+        id: 'te_' + Date.now() + '_' + Math.random().toString(36).slice(2),
+        date: today,
+        projectId: d.projectId || null,
+        workerId: te.workerId || state.worker?.id,
+        workerName: te.workerName || state.worker?.name,
+        hours: te.hours,
+        description: te.description,
+        source: 'daily-report',
+        reportId: report.id,
+      });
+    });
+    storageSet('time_entries', timeEntries);
+  }
+
+  // Update expenses if materials/equipment present
+  const expenses = storageGet('expenses') || [];
+  const origExpenseCount = expenses.length;
+  (d.materials || []).forEach(m => {
+    expenses.push({
+      id: 'exp_' + Date.now() + '_' + Math.random().toString(36).slice(2),
+      date: today,
+      projectId: d.projectId || null,
+      category: 'materials',
+      description: m.name,
+      quantity: m.qty,
+      unitCost: m.unitCost,
+      total: m.total || (parseFloat(m.qty) * parseFloat(m.unitCost)) || null,
+      source: 'daily-report',
+      reportId: report.id,
+    });
+  });
+
+  // Equipment entries — written to ledgeman_expenses with fields the main app expects
+  const roleLabel = state.selectedRoles
+    .map(r => ROLES.find(x => x.key === r)?.label || r)
+    .join(' + ');
+  (d.equipment || []).forEach(eq => {
+    expenses.push({
+      id: generateUUID(),
+      projectId: d.projectId || null,
+      category: 'Equipment',
+      description: (eq.name || eq.description || 'Equipment').trim(),
+      amount: parseFloat(eq.cost) || 0,
+      date: today,
+      note: `Added via Daily Report — ${roleLabel}`,
+      createdAt: now.toISOString(),
+    });
+  });
+
+  if (expenses.length > origExpenseCount) {
+    storageSet('expenses', expenses);
+  }
+
+  // Show done screen
+  const projectLabel = d.projectId || d.project || 'Site';
+  document.getElementById('done-sub').textContent =
+    `Report saved for ${projectLabel} — ${new Date().toLocaleDateString('en-CA', { weekday:'long', month:'short', day:'numeric' })}`;
+  showScreen('done');
+}
+
+/* ══════════════════════════════════════════════════════
+   DONE SCREEN
+══════════════════════════════════════════════════════ */
+function submitAnother() {
+  state.worker = null;
+  state.selectedRoles = [];
+  state.messages = [];
+  state.extractedData = null;
+  pinValue = '';
+  updatePinDisplay();
+  showScreen('pin');
+}
+
+function goHome() {
+  window.location.href = 'index.html';
+}
+
+/* ══════════════════════════════════════════════════════
+   SCREEN NAVIGATION
+══════════════════════════════════════════════════════ */
+function showScreen(name) {
+  const current = document.querySelector('.screen.active');
+  const next = document.getElementById('screen-' + name);
+  if (!next || current === next) return;
+
+  if (current) {
+    current.classList.add('slide-out');
+    setTimeout(() => current.classList.remove('active', 'slide-out'), 260);
+  }
+  next.classList.add('active');
+
+  // Scroll new screen to top
+  setTimeout(() => { next.scrollTop = 0; }, 50);
+}
+
+function goBack(from) {
+  if (from === 'role') {
+    showScreen('pin');
+  } else if (from === 'interview') {
+    if (state.selectedRoles.length > 1 || (state.worker?.roles?.length > 1)) {
+      state.selectedRoles = [];
+      showRoleScreen();
+      showScreen('role');
+    } else {
+      showScreen('pin');
+    }
+  } else if (from === 'summary') {
+    showScreen('interview');
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+initPinScreen();
+</script>
+</body>
+</html>

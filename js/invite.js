@@ -142,7 +142,7 @@ window.WorkerInvite = {
                 div.style.display = 'block';
                 if (!totpSecret) {
                     totpSecret = TOTP.generateSecret();
-                    const issuer = AppData.getCompanyName() || 'Ledgeman';
+                    const issuer = AppData.getCompanyName() || 'Ledgerman';
                     const otpUrl = TOTP.getOtpAuthUrl(totpSecret, workerName, issuer);
                     const qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=192x192&data=' + encodeURIComponent(otpUrl);
                     document.getElementById('totpSecretDisplay').textContent = totpSecret;
