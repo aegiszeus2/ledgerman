@@ -107,49 +107,53 @@ window.AdminClients = {
         overlay.style.display = 'flex';
         overlay.innerHTML = `
             <div class="modal" style="max-width:600px">
-                <h3>${isEdit ? 'Edit Client' : 'Add Client'}</h3>
-                <form id="clientModalForm" novalidate>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Company / Client Name *</label>
-                        <input class="form-control" name="name" value="${esc(client ? client.name : '')}" required>
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Contact Person</label>
-                        <input class="form-control" name="contactPerson" value="${esc(client ? client.contactPerson : '')}">
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Address</label>
-                        <input class="form-control" name="address" value="${esc(client ? client.address : '')}">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>City</label>
-                            <input class="form-control" name="city" value="${esc(client ? client.city : '')}">
+                <div class="modal-header">
+                    <h3 style="margin:0">${isEdit ? 'Edit Client' : 'Add Client'}</h3>
+                </div>
+                <div class="modal-body">
+                    <form id="clientModalForm" novalidate>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Company / Client Name *</label>
+                            <input class="form-control" name="name" value="${esc(client ? client.name : '')}" required>
                         </div>
-                        <div class="form-group">
-                            <label>Province</label>
-                            <input class="form-control" name="province" value="${esc(client ? client.province : 'Ontario')}">
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Contact Person</label>
+                            <input class="form-control" name="contactPerson" value="${esc(client ? client.contactPerson : '')}">
                         </div>
-                        <div class="form-group">
-                            <label>Postal Code</label>
-                            <input class="form-control" name="postalCode" value="${esc(client ? client.postalCode : '')}">
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Address</label>
+                            <input class="form-control" name="address" value="${esc(client ? client.address : '')}">
                         </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Phone</label>
-                            <input class="form-control" name="phone" value="${esc(client ? client.phone : '')}" type="tel">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>City</label>
+                                <input class="form-control" name="city" value="${esc(client ? client.city : '')}">
+                            </div>
+                            <div class="form-group">
+                                <label>Province</label>
+                                <input class="form-control" name="province" value="${esc(client ? client.province : 'Ontario')}">
+                            </div>
+                            <div class="form-group">
+                                <label>Postal Code</label>
+                                <input class="form-control" name="postalCode" value="${esc(client ? client.postalCode : '')}">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Email</label>
-                            <input class="form-control" name="email" value="${esc(client ? client.email : '')}" type="email">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input class="form-control" name="phone" value="${esc(client ? client.phone : '')}" type="tel">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input class="form-control" name="email" value="${esc(client ? client.email : '')}" type="email">
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Client</button>
-                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="clientSubmitBtn">${isEdit ? 'Update' : 'Add'} Client</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -161,10 +165,11 @@ window.AdminClients = {
             overlay.remove();
         });
 
-        overlay.querySelector('#clientModalForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Utils.validateForm(this)) return;
-            const fd = Utils.getFormData(this);
+        // Handle form submission via submit button (now in modal-footer, outside form)
+        overlay.querySelector('#clientSubmitBtn').addEventListener('click', function() {
+            const form = overlay.querySelector('#clientModalForm');
+            if (!Utils.validateForm(form)) return;
+            const fd = Utils.getFormData(form);
             if (!fd.name.trim()) {
                 Utils.showToast('Client name is required', 'error');
                 return;

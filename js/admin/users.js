@@ -181,71 +181,75 @@ window.AdminUsers = {
         overlay.className = 'modal-overlay active';
         overlay.style.display = 'flex';
         overlay.innerHTML = `
-            <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
-                <h3>${isEdit ? 'Edit Worker' : 'Add Worker'}</h3>
-                <form id="workerModalForm" novalidate>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Worker Name *</label>
-                        <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Role *</label>
-                            <select class="form-control" name="role">
-                                <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
-                                <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
-                            </select>
+            <div class="modal" style="max-width:600px">
+                <div class="modal-header">
+                    <h3 style="margin:0">${isEdit ? 'Edit Worker' : 'Add Worker'}</h3>
+                </div>
+                <div class="modal-body">
+                    <form id="workerModalForm" novalidate>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Worker Name *</label>
+                            <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
                         </div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select class="form-control" name="status">
-                                <option value="Active" ${(!worker || worker.status === 'Active') ? 'selected' : ''}>Active</option>
-                                <option value="Inactive" ${worker && worker.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Email Address</label>
-                        <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-                            <input type="checkbox" name="email2FA" ${worker && worker.email2FAEnabled ? 'checked' : ''}>
-                            Enable Email 2FA
-                        </label>
-                        <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>PIN (4-6 digits) *</label>
-                            <div style="position:relative">
-                                <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="${esc(worker ? worker.pin : '')}" required style="padding-right:50px">
-                                <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Role *</label>
+                                <select class="form-control" name="role">
+                                    <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
+                                    <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select class="form-control" name="status">
+                                    <option value="Active" ${(!worker || worker.status === 'Active') ? 'selected' : ''}>Active</option>
+                                    <option value="Inactive" ${worker && worker.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                                </select>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Default Hourly Rate ($)</label>
-                            <input class="form-control" type="number" name="defaultRate" step="0.01" min="0" value="${worker ? worker.defaultRate || '' : ''}" placeholder="Optional">
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Email Address</label>
+                            <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
                         </div>
-                    </div>
-                    ${projects.length > 0 ? `
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Assign to Projects</label>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-                            ${projects.map(function(p) {
-                                const checked = assignedProjects.includes(p.id) ? ' checked' : '';
-                                return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
-                                    '<input type="checkbox" class="project-checkbox" value="' + p.id + '"' + checked + '> ' +
-                                    esc(p.name) +
-                                '</label>';
-                            }).join('')}
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" name="email2FA" ${worker && worker.email2FAEnabled ? 'checked' : ''}>
+                                Enable Email 2FA
+                            </label>
+                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
                         </div>
-                    </div>` : ''}
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Worker</button>
-                        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>PIN (4-6 digits) *</label>
+                                <div style="position:relative">
+                                    <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="${esc(worker ? worker.pin : '')}" required style="padding-right:50px">
+                                    <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Default Hourly Rate ($)</label>
+                                <input class="form-control" type="number" name="defaultRate" step="0.01" min="0" value="${worker ? worker.defaultRate || '' : ''}" placeholder="Optional">
+                            </div>
+                        </div>
+                        ${projects.length > 0 ? `
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Assign to Projects</label>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+                                ${projects.map(function(p) {
+                                    const checked = assignedProjects.includes(p.id) ? ' checked' : '';
+                                    return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
+                                        '<input type="checkbox" class="project-checkbox" value="' + p.id + '"' + checked + '> ' +
+                                        esc(p.name) +
+                                    '</label>';
+                                }).join('')}
+                            </div>
+                        </div>` : ''}
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="workerSubmitBtn">${isEdit ? 'Update' : 'Add'} Worker</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -269,10 +273,11 @@ window.AdminUsers = {
             overlay.remove();
         });
 
-        overlay.querySelector('#workerModalForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Utils.validateForm(this)) return;
-            const fd = Utils.getFormData(this);
+        // Handle form submission via submit button (now in modal-footer, outside form)
+        overlay.querySelector('#workerSubmitBtn').addEventListener('click', function() {
+            const form = overlay.querySelector('#workerModalForm');
+            if (!Utils.validateForm(form)) return;
+            const fd = Utils.getFormData(form);
             if (!fd.name.trim()) {
                 Utils.showToast('Worker name is required', 'error');
                 return;

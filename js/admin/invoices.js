@@ -1119,46 +1119,51 @@ window.AdminInvoices = {
         overlay.style.display = 'flex';
         overlay.innerHTML =
             '<div class="modal" style="max-width:450px">' +
-                '<h3>Record Payment</h3>' +
-                '<form id="paymentForm" novalidate>' +
-                    '<div class="form-row">' +
-                        '<div class="form-group">' +
-                            '<label>Payment Date *</label>' +
-                            '<input type="date" name="date" value="' + Utils.today() + '" required>' +
+                '<div class="modal-header">' +
+                    '<h3 style="margin:0">Record Payment</h3>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                    '<form id="paymentForm" novalidate>' +
+                        '<div class="form-row">' +
+                            '<div class="form-group">' +
+                                '<label>Payment Date *</label>' +
+                                '<input type="date" name="date" value="' + Utils.today() + '" required>' +
+                            '</div>' +
+                            '<div class="form-group">' +
+                                '<label>Amount ($) *</label>' +
+                                '<input type="number" name="amount" step="0.01" min="0.01" max="' + maxAmount.toFixed(2) + '" value="' + maxAmount.toFixed(2) + '" required>' +
+                            '</div>' +
                         '</div>' +
-                        '<div class="form-group">' +
-                            '<label>Amount ($) *</label>' +
-                            '<input type="number" name="amount" step="0.01" min="0.01" max="' + maxAmount.toFixed(2) + '" value="' + maxAmount.toFixed(2) + '" required>' +
+                        '<div class="form-group" style="margin-bottom:12px">' +
+                            '<label>Payment Method</label>' +
+                            '<select name="method">' +
+                                '<option value="Cheque">Cheque</option>' +
+                                '<option value="E-Transfer">E-Transfer</option>' +
+                                '<option value="Cash">Cash</option>' +
+                                '<option value="Other">Other</option>' +
+                            '</select>' +
                         '</div>' +
-                    '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Payment Method</label>' +
-                        '<select name="method">' +
-                            '<option value="Cheque">Cheque</option>' +
-                            '<option value="E-Transfer">E-Transfer</option>' +
-                            '<option value="Cash">Cash</option>' +
-                            '<option value="Other">Other</option>' +
-                        '</select>' +
-                    '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Notes</label>' +
-                        '<textarea name="notes" rows="2"></textarea>' +
-                    '</div>' +
-                    '<div class="form-actions">' +
-                        '<button type="submit" class="btn-primary">Record Payment</button>' +
-                        '<button type="button" class="btn-secondary modal-close">Cancel</button>' +
-                    '</div>' +
-                '</form>' +
+                        '<div class="form-group" style="margin-bottom:12px">' +
+                            '<label>Notes</label>' +
+                            '<textarea name="notes" rows="2"></textarea>' +
+                        '</div>' +
+                    '</form>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                    '<button class="btn-primary" id="paymentSubmitBtn">Record Payment</button>' +
+                    '<button type="button" class="btn-secondary modal-close">Cancel</button>' +
+                '</div>' +
             '</div>';
 
         document.body.appendChild(overlay);
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#paymentForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Utils.validateForm(this)) return;
-            var fd = Utils.getFormData(this);
+        // Handle form submission via submit button (now in modal-footer, outside form)
+        overlay.querySelector('#paymentSubmitBtn').addEventListener('click', function() {
+            var form = overlay.querySelector('#paymentForm');
+            if (!Utils.validateForm(form)) return;
+            var fd = Utils.getFormData(form);
             var amount = parseFloat(fd.amount);
             if (!amount || amount <= 0) {
                 Utils.showToast('Enter a valid amount', 'error');

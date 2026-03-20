@@ -309,34 +309,38 @@ window.AdminExpenses = {
 
         overlay.innerHTML = `
             <div class="modal" style="max-width:550px">
-                <h3>${isEdit ? 'Edit' : 'Add'} ${type} Expense</h3>
-                <form id="expenseFormModal" novalidate>
-                    ${formFields}
-                    <div class="form-row">
-                        <div class="form-group">
-                            <div class="toggle-wrap">
-                                <label class="toggle">
-                                    <input type="checkbox" name="billable" ${(!existing || existing.billable) ? 'checked' : ''}>
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Billable</span>
+                <div class="modal-header">
+                    <h3 style="margin:0">${isEdit ? 'Edit' : 'Add'} ${type} Expense</h3>
+                </div>
+                <div class="modal-body">
+                    <form id="expenseFormModal" novalidate>
+                        ${formFields}
+                        <div class="form-row">
+                            <div class="form-group">
+                                <div class="toggle-wrap">
+                                    <label class="toggle">
+                                        <input type="checkbox" name="billable" ${(!existing || existing.billable) ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span>Billable</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="toggle-wrap">
+                                    <label class="toggle">
+                                        <input type="checkbox" name="changeOrder" ${existing && existing.changeOrder ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span>Change Order</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <div class="toggle-wrap">
-                                <label class="toggle">
-                                    <input type="checkbox" name="changeOrder" ${existing && existing.changeOrder ? 'checked' : ''}>
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Change Order</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'} Expense</button>
-                        <button type="button" class="btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" id="expenseSubmitBtn">${isEdit ? 'Update' : 'Add'} Expense</button>
+                    <button type="button" class="btn-secondary modal-close">Cancel</button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -361,10 +365,11 @@ window.AdminExpenses = {
             });
         }
 
-        overlay.querySelector('#expenseFormModal').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Utils.validateForm(this)) return;
-            const fd = Utils.getFormData(this);
+        // Handle form submission via submit button (now in modal-footer, outside form)
+        overlay.querySelector('#expenseSubmitBtn').addEventListener('click', function() {
+            const form = overlay.querySelector('#expenseFormModal');
+            if (!Utils.validateForm(form)) return;
+            const fd = Utils.getFormData(form);
             if (!fd.description || !fd.description.trim()) {
                 Utils.showToast('Description is required', 'error');
                 return;

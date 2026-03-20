@@ -140,103 +140,106 @@ window.AdminProjects = {
         overlay.style.display = 'flex';
         overlay.innerHTML = `
             <div class="modal" style="max-width:700px">
-                <h3>${isEdit ? 'Edit Project' : 'New Project'}</h3>
-                <form id="projectModalForm" novalidate>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Project Name *</label>
-                        <input name="name" value="${esc(project ? project.name : '')}" required>
-                    </div>
+                <div class="modal-header">
+                    <h3 style="margin:0">${isEdit ? 'Edit Project' : 'New Project'}</h3>
+                </div>
+                <div class="modal-body">
+                    <form id="projectModalForm" novalidate>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Project Name *</label>
+                            <input name="name" value="${esc(project ? project.name : '')}" required>
+                        </div>
 
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Client (select from address book or type manually)</label>
-                        <select id="projectClientSelect" style="margin-bottom:8px">
-                            <option value="">-- Select from address book --</option>
-                            ${clients.map(function(c) {
-                                const sel = project && project.clientId === c.id ? ' selected' : '';
-                                return '<option value="' + c.id + '"' + sel + '>' + esc(c.name) + '</option>';
-                            }).join('')}
-                        </select>
-                        <input name="clientName" value="${esc(project ? (project.clientName || project.client || '') : '')}" placeholder="Or type client name manually">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Client Address</label>
-                            <input name="clientAddress" value="${esc(project ? project.clientAddress : '')}">
-                        </div>
-                        <div class="form-group">
-                            <label>Client City</label>
-                            <input name="clientCity" value="${esc(project ? project.clientCity : '')}">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Client Province</label>
-                            <input name="clientProvince" value="${esc(project ? project.clientProvince : '')}">
-                        </div>
-                        <div class="form-group">
-                            <label>Client Postal Code</label>
-                            <input name="clientPostalCode" value="${esc(project ? project.clientPostalCode : '')}">
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Job Site Address</label>
-                        <input name="jobSiteAddress" value="${esc(project ? project.jobSiteAddress : '')}">
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Contract / PO Number</label>
-                        <input name="contractNumber" value="${esc(project ? project.contractNumber : '')}">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Start Date</label>
-                            <input type="date" name="startDate" value="${project ? project.startDate || '' : Utils.today()}">
-                        </div>
-                        <div class="form-group">
-                            <label>Estimated End Date</label>
-                            <input type="date" name="endDate" value="${project ? project.endDate || '' : ''}">
-                        </div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select name="status">
-                                <option value="Active" ${(!project || project.status === 'Active') ? 'selected' : ''}>Active</option>
-                                <option value="Completed" ${project && project.status === 'Completed' ? 'selected' : ''}>Completed</option>
-                                <option value="On Hold" ${project && project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Client (select from address book or type manually)</label>
+                            <select id="projectClientSelect" style="margin-bottom:8px">
+                                <option value="">-- Select from address book --</option>
+                                ${clients.map(function(c) {
+                                    const sel = project && project.clientId === c.id ? ' selected' : '';
+                                    return '<option value="' + c.id + '"' + sel + '>' + esc(c.name) + '</option>';
+                                }).join('')}
                             </select>
+                            <input name="clientName" value="${esc(project ? (project.clientName || project.client || '') : '')}" placeholder="Or type client name manually">
                         </div>
-                    </div>
 
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Description / Scope</label>
-                        <textarea name="description" rows="3">${esc(project ? project.description : '')}</textarea>
-                    </div>
-
-                    ${workers.length > 0 ? `
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Assign Workers</label>
-                        <div style="margin-bottom:8px">
-                            <label style="display:inline;cursor:pointer">
-                                <input type="checkbox" id="assignAllWorkers"> Assign all active workers
-                            </label>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Client Address</label>
+                                <input name="clientAddress" value="${esc(project ? project.clientAddress : '')}">
+                            </div>
+                            <div class="form-group">
+                                <label>Client City</label>
+                                <input name="clientCity" value="${esc(project ? project.clientCity : '')}">
+                            </div>
                         </div>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px">
-                            ${workers.map(function(w) {
-                                const checked = assignedWorkers.includes(w.id) ? ' checked' : '';
-                                return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
-                                    '<input type="checkbox" class="worker-checkbox" value="' + w.id + '"' + checked + '> ' +
-                                    esc(w.name) +
-                                '</label>';
-                            }).join('')}
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Client Province</label>
+                                <input name="clientProvince" value="${esc(project ? project.clientProvince : '')}">
+                            </div>
+                            <div class="form-group">
+                                <label>Client Postal Code</label>
+                                <input name="clientPostalCode" value="${esc(project ? project.clientPostalCode : '')}">
+                            </div>
                         </div>
-                    </div>` : ''}
 
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Create'} Project</button>
-                        <button type="button" class="btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Job Site Address</label>
+                            <input name="jobSiteAddress" value="${esc(project ? project.jobSiteAddress : '')}">
+                        </div>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Contract / PO Number</label>
+                            <input name="contractNumber" value="${esc(project ? project.contractNumber : '')}">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" name="startDate" value="${project ? project.startDate || '' : Utils.today()}">
+                            </div>
+                            <div class="form-group">
+                                <label>Estimated End Date</label>
+                                <input type="date" name="endDate" value="${project ? project.endDate || '' : ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select name="status">
+                                    <option value="Active" ${(!project || project.status === 'Active') ? 'selected' : ''}>Active</option>
+                                    <option value="Completed" ${project && project.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                                    <option value="On Hold" ${project && project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Description / Scope</label>
+                            <textarea name="description" rows="3">${esc(project ? project.description : '')}</textarea>
+                        </div>
+
+                        ${workers.length > 0 ? `
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label>Assign Workers</label>
+                            <div style="margin-bottom:8px">
+                                <label style="display:inline;cursor:pointer">
+                                    <input type="checkbox" id="assignAllWorkers"> Assign all active workers
+                                </label>
+                            </div>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px">
+                                ${workers.map(function(w) {
+                                    const checked = assignedWorkers.includes(w.id) ? ' checked' : '';
+                                    return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
+                                        '<input type="checkbox" class="worker-checkbox" value="' + w.id + '"' + checked + '> ' +
+                                        esc(w.name) +
+                                    '</label>';
+                                }).join('')}
+                            </div>
+                        </div>` : ''}
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn-primary" id="projectSubmitBtn">${isEdit ? 'Update' : 'Create'} Project</button>
+                    <button type="button" class="btn-secondary modal-close">Cancel</button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -268,10 +271,11 @@ window.AdminProjects = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#projectModalForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Utils.validateForm(this)) return;
-            const fd = Utils.getFormData(this);
+        // Handle form submission via submit button (now in modal-footer, outside form)
+        overlay.querySelector('#projectSubmitBtn').addEventListener('click', function() {
+            const form = overlay.querySelector('#projectModalForm');
+            if (!Utils.validateForm(form)) return;
+            const fd = Utils.getFormData(form);
             if (!fd.name || !fd.name.trim()) {
                 Utils.showToast('Project name is required', 'error');
                 return;
