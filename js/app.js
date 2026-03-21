@@ -32,16 +32,12 @@
                 return;
             }
 
-            // Check first run
-            if (AppData.isFirstRun()) {
-                this.showWelcome();
-            } else {
-                // Check backup reminder
-                if (AppData.shouldRemindBackup()) {
-                    this._pendingBackupReminder = true;
-                }
-                this.showLogin();
+            // Always show the main login screen — clean slate every session.
+            // "Create Company" is a button on the login screen for new signups.
+            if (AppData.shouldRemindBackup()) {
+                this._pendingBackupReminder = true;
             }
+            this.showLogin();
         },
 
         // ============ LOGIN SCREENS ============

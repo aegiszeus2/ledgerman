@@ -32,15 +32,17 @@ function openDB() {
 }
 
 // ─── JWT / CompanyId Storage ───────────────────────────────────────────────
-function getJwt() { return localStorage.getItem('ledgeman_jwt') || ''; }
+// sessionStorage: persists during the browser session (tab stays logged in on refresh)
+// but clears when the browser/tab is closed — no cross-session pre-population of company
+function getJwt() { return sessionStorage.getItem('ledgeman_jwt') || ''; }
 function setJwt(token) {
-    if (token) localStorage.setItem('ledgeman_jwt', token);
-    else localStorage.removeItem('ledgeman_jwt');
+    if (token) sessionStorage.setItem('ledgeman_jwt', token);
+    else sessionStorage.removeItem('ledgeman_jwt');
 }
-function getCompanyId() { return localStorage.getItem('ledgeman_companyId') || ''; }
+function getCompanyId() { return sessionStorage.getItem('ledgeman_companyId') || ''; }
 function setCompanyId(id) {
-    if (id) localStorage.setItem('ledgeman_companyId', id);
-    else localStorage.removeItem('ledgeman_companyId');
+    if (id) sessionStorage.setItem('ledgeman_companyId', id);
+    else sessionStorage.removeItem('ledgeman_companyId');
 }
 function isApiMode() { return !!(getCompanyId()); }
 
