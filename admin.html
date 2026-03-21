@@ -26,6 +26,10 @@
         button { width: 100%; padding: 12px; background: var(--primary); color: #000; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; }
         button:hover { opacity: 0.9; }
         #errorMsg { color: #e74c3c; text-align: center; font-size: 13px; margin-bottom: 15px; display: none; }
+        /* ── Password Toggle ──────────────────────────────────────── */
+        .password-field-wrap { position: relative; display: flex; align-items: center; }
+        .password-toggle { position: absolute; right: 8px; background: none; border: none; color: #8888aa; cursor: pointer; font-size: 0.75rem; font-weight: 600; padding: 4px 6px; transition: color .2s; }
+        .password-toggle:hover { color: var(--primary); }
     </style>
 </head>
 <body>
@@ -36,7 +40,10 @@
             <div id="errorMsg"></div>
             <div class="form-group">
                 <label for="adminKey">Admin Key</label>
-                <input type="password" id="adminKey" placeholder="Paste your key" autocomplete="off">
+                <div class="password-field-wrap">
+                    <input type="password" id="adminKey" placeholder="Paste your key" autocomplete="off" style="padding-right:40px">
+                    <button type="button" class="password-toggle" data-toggle="adminKey">Show</button>
+                </div>
             </div>
             <button onclick="validateAdmin()">Unlock</button>
         </div>
@@ -55,10 +62,13 @@
         <form id="loginForm">
             <div class="form-group" style="text-align:left">
                 <label>API Key</label>
-                <input type="password" id="apiKeyInput" placeholder="Enter super-admin key" autocomplete="off" required>
+                <div class="password-field-wrap">
+                    <input type="password" id="apiKeyInput" placeholder="Enter super-admin key" autocomplete="off" required style="padding-right:40px">
+                    <button type="button" class="password-toggle" data-toggle="apiKeyInput">Show</button>
+                </div>
             </div>
             <div id="loginError" style="display:none;color:var(--danger);font-size:.85rem;margin-bottom:12px;text-align:left"></div>
-            <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Access Console</button>
+            <button type="button" class="btn btn-primary btn-block" id="loginBtn" onclick="(async function() { const key = document.getElementById('apiKeyInput').value.trim(); const btn = document.getElementById('loginBtn'); const errEl = document.getElementById('loginError'); errEl.style.display = 'none'; btn.disabled = true; btn.textContent = 'Connecting…'; try { _key = key; await apiFetch('/api/superadmin/auth', { method: 'POST' }); localStorage.setItem('ls_admin_key', key); document.getElementById('loginScreen').style.display = 'none'; document.getElementById('app').classList.add('visible'); initDashboard(); } catch(err) { _key = ''; btn.disabled = false; btn.textContent = 'Access Console'; errEl.textContent = err.message === 'Super-admin access denied' ? 'Invalid API key.' : 'Connection failed: ' + err.message; errEl.style.display = 'block'; } })()">Access Console</button>
         </form>
         <p style="margin-top:16px;font-size:.75rem;color:var(--text2)">
             Key location: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">ledgerman-backend/.superadmin_key</code>
@@ -330,6 +340,28 @@ function timeAgo(iso) {
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return hrs + 'h ago';
     return Math.floor(hrs / 24) + 'd ago';
+}
+
+// ── Login Handler ──────────────────────────────────────
+async function handleAdminLogin() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    const btn = document.getElementById('loginBtn');
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    try {
+        _key = key;
+        await apiFetch('/api/superadmin/auth', { method: 'POST' });
+        localStorage.setItem('ls_admin_key', key);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').classList.add('visible');
+        initDashboard();
+    } catch(err) {
+        _key = '';
+        btn.disabled = false; btn.textContent = 'Access Console';
+        errEl.textContent = err.message === 'Super-admin access denied' ? 'Invalid API key.' : 'Connection failed: ' + err.message;
+        errEl.style.display = 'block';
+    }
 }
 
 // ── Login ────────────────────────────────────────────────────
@@ -954,5 +986,26 @@ function esc(str) {
             checkSession();
         }
     </script>
+
+// ── Password Toggle Visibility ───────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleButtons = document.querySelectorAll('.password-toggle');
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const fieldId = this.getAttribute('data-toggle');
+            const field = document.getElementById(fieldId);
+            if (field) {
+                if (field.type === 'password') {
+                    field.type = 'text';
+                    this.textContent = 'Hide';
+                } else {
+                    field.type = 'password';
+                    this.textContent = 'Show';
+                }
+            }
+        });
+    });
+});
 </body>
 </html>
