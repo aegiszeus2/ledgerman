@@ -68,7 +68,7 @@
                 </div>
             </div>
             <div id="loginError" style="display:none;color:var(--danger);font-size:.85rem;margin-bottom:12px;text-align:left"></div>
-            <button type="button" class="btn btn-primary btn-block" id="loginBtn" onclick="(async function() { const key = document.getElementById('apiKeyInput').value.trim(); const btn = document.getElementById('loginBtn'); const errEl = document.getElementById('loginError'); errEl.style.display = 'none'; btn.disabled = true; btn.textContent = 'Connecting…'; try { _key = key; await apiFetch('/api/superadmin/auth', { method: 'POST' }); localStorage.setItem('ls_admin_key', key); document.getElementById('loginScreen').style.display = 'none'; document.getElementById('app').classList.add('visible'); initDashboard(); } catch(err) { _key = ''; btn.disabled = false; btn.textContent = 'Access Console'; errEl.textContent = err.message === 'Super-admin access denied' ? 'Invalid API key.' : 'Connection failed: ' + err.message; errEl.style.display = 'block'; } })()">Access Console</button>
+            <button type="button" class="btn btn-primary btn-block" id="loginBtn" onclick="handleAdminLogin()">Access Console</button>
         </form>
         <p style="margin-top:16px;font-size:.75rem;color:var(--text2)">
             Key location: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">ledgerman-backend/.superadmin_key</code>
