@@ -48,11 +48,6 @@
 
         showLogin() {
             const app = document.getElementById('app');
-            const linkedCompanyName = AppData.getCompanyName();
-            const isLinked = AppData.isApiMode() && !!localStorage.getItem('ledgeman_companyId');
-            const workerSubtext = isLinked
-                ? `Linked to: <strong>${linkedCompanyName}</strong> &nbsp;<a href="#" id="switchCompanyLink" style="font-size:.8rem;color:var(--primary)">Switch</a>`
-                : 'Link your device to your company first';
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-header">
@@ -64,7 +59,7 @@
                         <div class="login-option" id="workerLoginBtn">
                             <div class="login-option-icon">👷</div>
                             <div><h2>Worker Login</h2>
-                            <p>${workerSubtext}</p></div>
+                            <p>Enter your company name and PIN</p></div>
                         </div>
                         <div class="login-option" id="adminLoginBtn">
                             <div class="login-option-icon">⚙️</div>
@@ -87,22 +82,7 @@
                 }
             }).catch(() => {});
 
-            // Switch company link — clear device link and go to setup
-            const switchLink = document.getElementById('switchCompanyLink');
-            if (switchLink) {
-                switchLink.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    AppData.setCompanyId('');
-                    AppData.setJwt('');
-                    this.showWelcome();
-                };
-            }
-
-            document.getElementById('workerLoginBtn').onclick = () => {
-                if (!isLinked) { this.showWelcome(); return; }
-                this.showWorkerLogin();
-            };
+            document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
             document.getElementById('createCompanyBtn').onclick = () => this.showWelcome();
 
@@ -123,8 +103,12 @@
                 <div class="login-screen">
                     <div class="login-card">
                         <h2>Worker Login</h2>
-                        <p class="text-muted">Enter your PIN to continue</p>
+                        <p class="text-muted">Enter your company name and PIN</p>
                         <form id="workerLoginForm">
+                            <div class="form-group">
+                                <input type="text" class="form-control" id="workerCompanyName"
+                                    placeholder="Company Name" required autocomplete="off">
+                            </div>
                             <div class="form-group">
                                 <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                             </div>
@@ -136,11 +120,12 @@
                     </div>
                 </div>
             `;
-            document.getElementById('workerPin').focus();
+            document.getElementById('workerCompanyName').focus();
             document.getElementById('backToLogin').onclick = () => this.showLogin();
             document.getElementById('forgotPin').onclick = () => this._showPinReset();
             document.getElementById('workerLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
+                const companyName = document.getElementById('workerCompanyName').value.trim();
                 const pin = document.getElementById('workerPin').value;
                 const errEl = document.getElementById('workerLoginError');
                 errEl.style.display = 'none';
@@ -152,12 +137,12 @@
                     return;
                 }
 
-                if (AppData.isApiMode()) {
-                    // API mode — validate PIN server-side
+                if (AppData.isApiMode() || companyName) {
+                    // API mode — validate company name + PIN server-side
                     const loginBtn = document.querySelector('#workerLoginForm button[type="submit"]');
                     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Logging in…'; }
                     try {
-                        const data = await AppData.apiLoginWorker(pin);
+                        const data = await AppData.apiLoginWorkerByName(companyName, pin);
                         if (data.twoFARequired) {
                             // Server says 2FA needed — go to verification step
                             this._show2FAStep({ id: data.workerId, name: data.workerName });
