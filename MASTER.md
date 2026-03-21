@@ -1,6 +1,6 @@
 # Ledgerman — MASTER.md
 
-**Last Updated:** 2026-03-20 18:00 (Mobile signup fix deployed, known issues documented)
+**Last Updated:** 2026-03-21 18:55 (Mobile signup fix deployed, known issues documented)
 **Status:** Phase 2.3.1 LIVE — Mobile signup buttons now stay visible on all devices
 **Next Milestone:** Test signup with Laurence & Damiano on phones → monitor for issues
 
@@ -310,3 +310,4 @@ curl https://ledgerman-backend.onrender.com/api/health
 | 2026-03-16 | Phase 2.3 | READY | Encrypted backups noted for Phase 3; ready for Belfort onboarding |
 | 2026-03-18 | Phase 2.4 | BLOCKER | All Render Static Sites deployed (marketing + Belfort), GitHub repos live, DNS misconfiguration identified |
 | 2026-03-20 | Phase 2.4+ | IN PROGRESS | Mobile signup buttons fixed (fixed footer), API verified HTTP 201, Super Admin key exposed (urgent rotation), "Load Failed" error under investigation |
+| 2026-03-21 | Phase 2.4+ | IN PROGRESS | Super admin login fixed (replaced 500-char inline onclick with handleAdminLogin() function for mobile compat) |
