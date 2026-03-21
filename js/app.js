@@ -48,23 +48,28 @@
 
         showLogin() {
             const app = document.getElementById('app');
+            const linkedCompanyName = AppData.getCompanyName();
+            const isLinked = AppData.isApiMode() && !!localStorage.getItem('ledgeman_companyId');
+            const workerSubtext = isLinked
+                ? `Linked to: <strong>${linkedCompanyName}</strong> &nbsp;<a href="#" id="switchCompanyLink" style="font-size:.8rem;color:var(--primary)">Switch</a>`
+                : 'Link your device to your company first';
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-header">
                         <div class="login-logo" id="loginLogo"></div>
-                        <h1>${AppData.getCompanyName()}</h1>
-                        <p class="text-muted">Powered by <strong>Ledgerman</strong></p>
+                        <h1>Ledgerman</h1>
+                        <p class="text-muted">Construction Management</p>
                     </div>
                     <div class="login-options">
                         <div class="login-option" id="workerLoginBtn">
                             <div class="login-option-icon">👷</div>
                             <div><h2>Worker Login</h2>
-                            <p>Submit time entries and photos</p></div>
+                            <p>${workerSubtext}</p></div>
                         </div>
                         <div class="login-option" id="adminLoginBtn">
                             <div class="login-option-icon">⚙️</div>
                             <div><h2>Admin Login</h2>
-                            <p>Manage projects, invoices & team</p></div>
+                            <p>Enter company name &amp; password</p></div>
                         </div>
                         <div class="login-option" id="createCompanyBtn" style="border:2px dashed var(--border);background:transparent;cursor:pointer;transition:all 0.2s">
                             <div class="login-option-icon" style="font-size:1.8rem">➕</div>
@@ -82,7 +87,22 @@
                 }
             }).catch(() => {});
 
-            document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
+            // Switch company link — clear device link and go to setup
+            const switchLink = document.getElementById('switchCompanyLink');
+            if (switchLink) {
+                switchLink.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    AppData.setCompanyId('');
+                    AppData.setJwt('');
+                    this.showWelcome();
+                };
+            }
+
+            document.getElementById('workerLoginBtn').onclick = () => {
+                if (!isLinked) { this.showWelcome(); return; }
+                this.showWorkerLogin();
+            };
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
             document.getElementById('createCompanyBtn').onclick = () => this.showWelcome();
 
@@ -106,9 +126,7 @@
                         <p class="text-muted">Enter your PIN to continue</p>
                         <form id="workerLoginForm">
                             <div class="form-group">
-                                <input type="password" class="form-control pin-input" id="workerPin"
-                                    placeholder="Enter PIN" maxlength="6" inputmode="numeric"
-                                    pattern="[0-9]{4,6}" required autocomplete="off">
+                                <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                             </div>
                             <div class="form-error" id="workerLoginError" style="display:none"></div>
                             <button type="submit" class="btn btn-primary btn-block">Login</button>
@@ -355,12 +373,12 @@
                                 </div>
                                 <div class="form-group" style="margin-bottom:12px">
                                     <label>New Password</label>
-                                    <input type="password" class="form-control" id="resetNewPw" required minlength="12">
+                                    <div style="position:relative"><input type="password" class="form-control" id="resetNewPw" required minlength="12" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="resetNewPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                                     <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Min 12 chars, mixed case, number, special character</p>
                                 </div>
                                 <div class="form-group" style="margin-bottom:12px">
                                     <label>Confirm New Password</label>
-                                    <input type="password" class="form-control" id="resetConfirmPw" required minlength="12">
+                                    <div style="position:relative"><input type="password" class="form-control" id="resetConfirmPw" required minlength="12" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="resetConfirmPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                                 </div>
                                 <div class="form-error" id="resetError" style="display:none"></div>
                                 <button type="submit" class="btn btn-primary btn-block">Reset Password</button>
@@ -766,11 +784,11 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Admin Password</label>
-                                    <input type="password" class="form-control" id="regPw" placeholder="Choose a strong password" required>
+                                    <div style="position:relative"><input type="password" class="form-control" id="regPw" placeholder="Choose a strong password" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="regPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                                 </div>
                                 <div class="form-group">
                                     <label>Confirm Password</label>
-                                    <input type="password" class="form-control" id="regPw2" placeholder="Re-enter password" required>
+                                    <div style="position:relative"><input type="password" class="form-control" id="regPw2" placeholder="Re-enter password" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="regPw2" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                                 </div>
                                 <div class="form-error" id="regError" style="display:none"></div>
                             </form>
@@ -786,7 +804,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Admin Password</label>
-                                    <input type="password" class="form-control" id="linkPw" placeholder="Admin password" required>
+                                    <div style="position:relative"><input type="password" class="form-control" id="linkPw" placeholder="Admin password" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="linkPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                                 </div>
                                 <div class="form-error" id="linkError" style="display:none"></div>
                             </form>
