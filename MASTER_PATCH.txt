@@ -1,0 +1,12 @@
+## Known Issues & Tech Debt (UPDATED 2026-03-20)
+
+| Issue | Status | Priority | Notes |
+|-------|--------|----------|-------|
+| **Super Admin API key exposed** | 🔴 URGENT | CRITICAL | Key visible in conversation 2026-03-20. Immediate rotation required. Affects ledgerman-admin access. |
+| Signup "Load Failed" error | 🟡 INVESTIGATING | HIGH | Mobile signup form appears but error occurs after submit. Frontend error handling suspected. Blocking customer testing. |
+| Mobile signup buttons hidden (FIXED 2026-03-20 17:30) | ✅ DONE | N/A | Create Company button scrolled off-screen on mobile. Fixed with fixed footer layout. Deployed & verified live. |
+| Encrypted backups | TODO | Low | Phase 3; local backup not exposed |
+| Server-side rate limiting | ✅ DONE | N/A | flask_limiter active |
+| Bcrypt hashing | ✅ DONE | N/A | Passwords + PINs hashed |
+| CSP headers | ✅ DONE | N/A | Content-Security-Policy deployed |
+| Audit logs | ✅ DONE | N/A | Server-side logging active |
