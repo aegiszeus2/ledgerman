@@ -1,8 +1,8 @@
 # Ledgerman — MASTER.md
 
-**Last Updated:** 2026-03-21 18:55 (Mobile signup fix deployed, known issues documented)
-**Status:** Phase 2.3.1 LIVE — Mobile signup buttons now stay visible on all devices
-**Next Milestone:** Test signup with Laurence & Damiano on phones → monitor for issues
+**Last Updated:** 2026-03-21 21:35 (Self-service signup removed, invitation-based login implemented)
+**Status:** Phase 2.3.2 LIVE — Only login page (no self-service signup). Invitations use pre-filled credentials.
+**Next Milestone:** Create invitation system with pre-set company name + password links. Test with Laurence & Damiano.
 
 ---
 
@@ -311,3 +311,16 @@ curl https://ledgerman-backend.onrender.com/api/health
 | 2026-03-18 | Phase 2.4 | BLOCKER | All Render Static Sites deployed (marketing + Belfort), GitHub repos live, DNS misconfiguration identified |
 | 2026-03-20 | Phase 2.4+ | IN PROGRESS | Mobile signup buttons fixed (fixed footer), API verified HTTP 201, Super Admin key exposed (urgent rotation), "Load Failed" error under investigation |
 | 2026-03-21 | Phase 2.4+ | IN PROGRESS | Super admin login fixed (replaced 500-char inline onclick with handleAdminLogin() function for mobile compat) |
+| 2026-03-21 | Phase 2.4+ | IN PROGRESS | Self-service signup removed; invitations now use pre-filled login with company name + password URL params |
+
+---
+
+## Decisions Log
+
+**2026-03-21 21:35 — Removed self-service signup, implement invitation-only onboarding**
+- **Rationale:** Multi-tenant SaaS model requires Lucas to control who gets access. Self-service signup page was confusing (company name + password, but localStorage stored companyId which created device-assumption bugs). Browser pre-population was causing confusion on shared devices.
+- **Decision:** Remove "Create Company" button and entire signup flow (showWelcome). Keep only login page with company name + password.
+- **Invitations:** Will use pre-filled URL params: `ledgerman.org?company=Belfort%20Construction&password=temp123` → auto-fill login + auto-submit
+- **Admin control:** Lucas pre-creates accounts in super admin console, generates invitations with unique URLs that pre-fill credentials
+- **Implementation:** Both showWorkerLogin() and showAdminLogin() now parse URLSearchParams for `company`, `pin`/`password` and auto-fill + auto-submit if both present
+- **Status:** DEPLOYED to ledgerman-frontend (2026-03-21 21:35)

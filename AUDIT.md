@@ -1,3 +1,18 @@
+## [2026-03-21 21:35 UTC] - FEATURE: Self-Service Signup Removed, Invitation-Based Login Implemented
+
+**Architectural Change:**
+- **Removed:** "Create Company" button from login screen; entire showWelcome() signup flow deleted
+- **Reason:** SaaS model needs Lucas control. Self-service signup was creating confusion (localStorage companyId assumption bug, browser device-assumption issues)
+- **New Flow:** Only login page exists. Invitations pre-fill credentials via URL params → auto-login
+- **Implementation:** Both showWorkerLogin() + showAdminLogin() parse URLSearchParams for `company`, `pin`/`password`
+- **Files Changed:** js/app.js (commit 3dad551)
+- **Deployment:** ledgerman-frontend service (2026-03-21 21:35 UTC) ✅ VERIFIED LIVE
+- **Test:** https://ledgerman.org shows Worker + Admin login only (no Create Company button)
+- **Status:** COMPLETE
+
+**Next Step:** Build invitation system in super admin console to generate pre-filled URLs for customer onboarding
+
+---
 
 ## [2026-03-21 16:09 UTC] - VERIFICATION COMPLETE: Admin Console Login Fix
 - **Issue Reported:** "Sign in failed. Said that failed to load" on mobile (2026-03-21 10:40)
