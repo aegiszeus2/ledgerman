@@ -845,16 +845,28 @@
                 const btn = document.getElementById('regBtn');
                 btn.disabled = true; btn.textContent = 'Creating…';
                 try {
-                    await AppData.apiRegister(name, pw);
+                    console.log('[Ledgerman] Starting company registration for:', name);
+                    const registerResult = await AppData.apiRegister(name, pw);
+                    console.log('[Ledgerman] Registration successful, received companyId:', registerResult.companyId);
+
+                    console.log('[Ledgerman] Syncing data from server...');
                     await AppData.syncFromServer();
+                    console.log('[Ledgerman] Sync complete');
+
                     AppData.markSetupDone();
                     this.currentUser = { type: 'admin', name: 'Admin' };
                     AppData.addAuditLog('Admin', 'Company Registered', name);
+                    console.log('[Ledgerman] Starting admin panel...');
                     this.startAdminPanel();
-                    setTimeout(() => this.navigate('settings', { wizard: true }), 100);
+                    setTimeout(() => {
+                        console.log('[Ledgerman] Navigating to settings...');
+                        this.navigate('settings', { wizard: true });
+                    }, 100);
                 } catch(err) {
                     btn.disabled = false; btn.textContent = 'Create Company';
-                    errEl.textContent = 'Registration failed: ' + err.message;
+                    const errorMsg = (err && err.message) ? err.message : String(err);
+                    console.error('[Ledgerman] Registration error:', errorMsg, err);
+                    errEl.textContent = 'Registration failed: ' + errorMsg;
                     errEl.style.display = 'block';
                 }
             };
@@ -869,15 +881,20 @@
                 const btn = document.getElementById('linkBtn');
                 btn.disabled = true; btn.textContent = 'Linking…';
                 try {
+                    console.log('[Ledgerman] Linking device to company:', companyId);
                     await AppData.apiLinkDevice(companyId, pw);
+                    console.log('[Ledgerman] Link successful, syncing data...');
                     await AppData.syncFromServer();
                     AppData.markSetupDone();
                     this.currentUser = { type: 'admin', name: 'Admin' };
                     AppData.addAuditLog('Admin', 'Device Linked', companyId);
+                    console.log('[Ledgerman] Device linked, starting admin panel...');
                     this.startAdminPanel();
                 } catch(err) {
                     btn.disabled = false; btn.textContent = 'Link This Device';
-                    errEl.textContent = 'Could not link: ' + err.message;
+                    const errorMsg = (err && err.message) ? err.message : String(err);
+                    console.error('[Ledgerman] Link error:', errorMsg, err);
+                    errEl.textContent = 'Could not link: ' + errorMsg;
                     errEl.style.display = 'block';
                 }
             };

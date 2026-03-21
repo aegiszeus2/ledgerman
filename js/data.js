@@ -50,13 +50,26 @@ async function _apiFetch(path, options) {
     const jwt = getJwt();
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
     if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
-    const res = await fetch(API_BASE + path, Object.assign({}, options, { headers: headers }));
-    if (!res.ok) {
-        let errMsg = 'HTTP ' + res.status;
-        try { const j = await res.json(); errMsg = j.error || errMsg; } catch(e) {}
-        throw new Error(errMsg);
+    try {
+        const res = await fetch(API_BASE + path, Object.assign({}, options, { headers: headers }));
+        if (!res.ok) {
+            let errMsg = 'HTTP ' + res.status;
+            try { const j = await res.json(); errMsg = j.error || errMsg; } catch(e) {}
+            throw new Error(errMsg);
+        }
+        try {
+            return await res.json();
+        } catch(e) {
+            console.error('[Ledgerman] Failed to parse JSON response from', path, ':', e.message);
+            throw new Error('Failed to parse server response: ' + e.message);
+        }
+    } catch(e) {
+        if (e instanceof TypeError) {
+            console.error('[Ledgerman] Network error on', path, ':', e.message);
+            throw new Error('Network error - check your connection. Details: ' + e.message);
+        }
+        throw e;
     }
-    return res.json();
 }
 
 // ─── Auth API ──────────────────────────────────────────────────────────────
