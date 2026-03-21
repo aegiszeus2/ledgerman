@@ -26,11 +26,7 @@
                 return;
             }
 
-            // Check for signup link (#signup)
-            if (hash === '#signup') {
-                this.showWelcome();
-                return;
-            }
+            // Signup flow removed — invitations now use pre-filled login only
 
             // Always show the main login screen — clean slate every session.
             // "Create Company" is a button on the login screen for new signups.
@@ -62,11 +58,6 @@
                             <div><h2>Admin Login</h2>
                             <p>Enter company name &amp; password</p></div>
                         </div>
-                        <div class="login-option" id="createCompanyBtn" style="border:2px dashed var(--border);background:transparent;cursor:pointer;transition:all 0.2s">
-                            <div class="login-option-icon" style="font-size:1.8rem">➕</div>
-                            <div><h2>Create Company</h2>
-                            <p>Set up a new Ledgerman account</p></div>
-                        </div>
                     </div>
                 </div>
             `;
@@ -80,21 +71,16 @@
 
             document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
-            document.getElementById('createCompanyBtn').onclick = () => this.showWelcome();
-
-            // Hover effect for create company
-            document.getElementById('createCompanyBtn').onmouseover = function() {
-                this.style.background = 'var(--bg2)';
-                this.style.borderColor = 'var(--primary)';
-            };
-            document.getElementById('createCompanyBtn').onmouseout = function() {
-                this.style.background = 'transparent';
-                this.style.borderColor = 'var(--border)';
-            };
         },
 
         showWorkerLogin() {
             const app = document.getElementById('app');
+
+            // Parse pre-filled credentials from URL (for invitations)
+            const params = new URLSearchParams(window.location.search);
+            const prefilledCompany = params.get('company') || '';
+            const prefilledPin = params.get('pin') || '';
+
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-card">
@@ -103,10 +89,10 @@
                         <form id="workerLoginForm">
                             <div class="form-group">
                                 <input type="text" class="form-control" id="workerCompanyName"
-                                    placeholder="Company Name" required autocomplete="off">
+                                    placeholder="Company Name" value="${Utils.escapeHtml(prefilledCompany)}" required autocomplete="off">
                             </div>
                             <div class="form-group">
-                                <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
+                                <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" value="${Utils.escapeHtml(prefilledPin)}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                             </div>
                             <div class="form-error" id="workerLoginError" style="display:none"></div>
                             <button type="submit" class="btn btn-primary btn-block">Login</button>
@@ -116,7 +102,15 @@
                     </div>
                 </div>
             `;
-            document.getElementById('workerCompanyName').focus();
+
+            // Auto-submit if both credentials are pre-filled
+            if (prefilledCompany && prefilledPin) {
+                setTimeout(() => {
+                    document.getElementById('workerLoginForm').dispatchEvent(new Event('submit'));
+                }, 100);
+            } else {
+                document.getElementById('workerCompanyName').focus();
+            }
             document.getElementById('backToLogin').onclick = () => this.showLogin();
             document.getElementById('forgotPin').onclick = () => this._showPinReset();
             document.getElementById('workerLoginForm').onsubmit = async (e) => {
@@ -647,6 +641,12 @@
 
         showAdminLogin() {
             const app = document.getElementById('app');
+
+            // Parse pre-filled credentials from URL (for invitations)
+            const params = new URLSearchParams(window.location.search);
+            const prefilledCompany = params.get('company') || '';
+            const prefilledPassword = params.get('password') || '';
+
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-card">
@@ -655,11 +655,11 @@
                         <form id="adminLoginForm">
                             <div class="form-group">
                                 <input type="text" class="form-control" id="adminCompanyName"
-                                    placeholder="Company Name" required autocomplete="off">
+                                    placeholder="Company Name" value="${Utils.escapeHtml(prefilledCompany)}" required autocomplete="off">
                             </div>
                             <div class="form-group">
                                 <input type="password" class="form-control" id="adminPassword"
-                                    placeholder="Password" required autocomplete="off">
+                                    placeholder="Password" value="${Utils.escapeHtml(prefilledPassword)}" required autocomplete="off">
                             </div>
                             <div class="form-error" id="adminLoginError" style="display:none"></div>
                             <button type="submit" class="btn btn-primary btn-block" id="adminLoginBtn">Login</button>
@@ -669,7 +669,15 @@
                     </div>
                 </div>
             `;
-            document.getElementById('adminCompanyName').focus();
+
+            // Auto-submit if both credentials are pre-filled
+            if (prefilledCompany && prefilledPassword) {
+                setTimeout(() => {
+                    document.getElementById('adminLoginForm').dispatchEvent(new Event('submit'));
+                }, 100);
+            } else {
+                document.getElementById('adminCompanyName').focus();
+            }
             document.getElementById('backToLogin').onclick = () => this.showLogin();
             document.getElementById('forgotPassword').onclick = () => this._showPasswordReset();
             document.getElementById('adminLoginForm').onsubmit = async (e) => {
@@ -741,163 +749,8 @@
 
         // ============ FIRST RUN ============
 
-        showWelcome() {
-            const app = document.getElementById('app');
-            app.innerHTML = `
-                <div class="login-screen">
-                    <div class="login-card" style="max-width:500px;display:flex;flex-direction:column;height:100%">
-                        <div style="overflow-y:auto;flex:1;padding-bottom:20px">
-                            <div style="margin-bottom:12px">
-                                <img src="../LedgemanLogo.jpg" alt="Ledgerman" style="max-width:260px;width:100%;height:auto;border-radius:6px">
-                            </div>
-                            <p class="text-muted" style="margin-bottom:1.5rem">Automated Construction Intelligence — by PMs for PMs.</p>
-
-                            <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)">
-                                <button type="button" class="btn-tab-lg active" id="tabNew" style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--primary);margin-bottom:-2px;color:var(--primary);font-weight:600;cursor:pointer">New Company</button>
-                                <button type="button" class="btn-tab-lg" id="tabExisting" style="flex:1;padding:10px;background:none;border:none;color:var(--text2);cursor:pointer">Link Existing</button>
-                            </div>
-
-                            <!-- NEW COMPANY -->
-                            <form id="registerForm">
-                                <div class="form-group">
-                                    <label>Company Name</label>
-                                    <input type="text" class="form-control" id="regName" placeholder="e.g. Belfort Construction" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Admin Password</label>
-                                    <div style="position:relative"><input type="password" class="form-control" id="regPw" placeholder="Choose a strong password" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="regPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
-                                </div>
-                                <div class="form-group">
-                                    <label>Confirm Password</label>
-                                    <div style="position:relative"><input type="password" class="form-control" id="regPw2" placeholder="Re-enter password" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="regPw2" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
-                                </div>
-                                <div class="form-error" id="regError" style="display:none"></div>
-                            </form>
-
-                            <!-- LINK EXISTING (hidden by default) -->
-                            <form id="linkForm" style="display:none">
-                                <p class="text-muted" style="font-size:.875rem;margin-bottom:16px">
-                                    Enter your Company ID to connect this device to an existing Ledgerman company.
-                                </p>
-                                <div class="form-group">
-                                    <label>Company ID</label>
-                                    <input type="text" class="form-control" id="linkId" placeholder="e.g. m8f3k2xyz" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Admin Password</label>
-                                    <div style="position:relative"><input type="password" class="form-control" id="linkPw" placeholder="Admin password" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="linkPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
-                                </div>
-                                <div class="form-error" id="linkError" style="display:none"></div>
-                            </form>
-                        </div>
-
-                        <!-- FIXED FOOTER WITH BUTTONS -->
-                        <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;gap:8px;flex-direction:column">
-                            <button type="submit" class="btn btn-primary btn-block" id="regBtn" form="registerForm">Create Company</button>
-                            <button type="submit" class="btn btn-primary btn-block" id="linkBtn" form="linkForm" style="display:none">Link This Device</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const logoImg = document.querySelector('.login-card img[alt="Ledgerman"]');
-            if (logoImg) {
-                logoImg.addEventListener('error', function() {
-                    const fallback = document.createElement('div');
-                    fallback.style.fontSize = '2.5rem';
-                    fallback.textContent = '🏗️';
-                    this.replaceWith(fallback);
-                });
-            }
-
-            // Tab switching
-            const tabNew = document.getElementById('tabNew');
-            const tabEx  = document.getElementById('tabExisting');
-            tabNew.onclick = () => {
-                document.getElementById('registerForm').style.display = 'block';
-                document.getElementById('linkForm').style.display = 'none';
-                document.getElementById('regBtn').style.display = 'block';
-                document.getElementById('linkBtn').style.display = 'none';
-                tabNew.style.cssText += ';color:var(--primary);font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px';
-                tabEx.style.cssText  += ';color:var(--text2);border-bottom:none;margin-bottom:0';
-            };
-            tabEx.onclick = () => {
-                document.getElementById('registerForm').style.display = 'none';
-                document.getElementById('linkForm').style.display = 'block';
-                document.getElementById('regBtn').style.display = 'none';
-                document.getElementById('linkBtn').style.display = 'block';
-                tabEx.style.cssText  += ';color:var(--primary);font-weight:600;border-bottom:2px solid var(--primary);margin-bottom:-2px';
-                tabNew.style.cssText += ';color:var(--text2);border-bottom:none;margin-bottom:0';
-            };
-
-            // Register new company
-            document.getElementById('registerForm').onsubmit = async (e) => {
-                e.preventDefault();
-                const name = document.getElementById('regName').value.trim();
-                const pw   = document.getElementById('regPw').value;
-                const pw2  = document.getElementById('regPw2').value;
-                const errEl = document.getElementById('regError');
-                errEl.style.display = 'none';
-                if (pw !== pw2) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
-                const pwCheck = Utils.validatePassword(pw);
-                if (!pwCheck.valid) { errEl.textContent = 'Password requirements: ' + pwCheck.errors.join(', '); errEl.style.display = 'block'; return; }
-                const btn = document.getElementById('regBtn');
-                btn.disabled = true; btn.textContent = 'Creating…';
-                try {
-                    console.log('[Ledgerman] Starting company registration for:', name);
-                    const registerResult = await AppData.apiRegister(name, pw);
-                    console.log('[Ledgerman] Registration successful, received companyId:', registerResult.companyId);
-
-                    console.log('[Ledgerman] Syncing data from server...');
-                    await AppData.syncFromServer();
-                    console.log('[Ledgerman] Sync complete');
-
-                    AppData.markSetupDone();
-                    this.currentUser = { type: 'admin', name: 'Admin' };
-                    AppData.addAuditLog('Admin', 'Company Registered', name);
-                    console.log('[Ledgerman] Starting admin panel...');
-                    this.startAdminPanel();
-                    setTimeout(() => {
-                        console.log('[Ledgerman] Navigating to settings...');
-                        this.navigate('settings', { wizard: true });
-                    }, 100);
-                } catch(err) {
-                    btn.disabled = false; btn.textContent = 'Create Company';
-                    const errorMsg = (err && err.message) ? err.message : String(err);
-                    console.error('[Ledgerman] Registration error:', errorMsg, err);
-                    errEl.textContent = 'Registration failed: ' + errorMsg;
-                    errEl.style.display = 'block';
-                }
-            };
-
-            // Link existing company
-            document.getElementById('linkForm').onsubmit = async (e) => {
-                e.preventDefault();
-                const companyId = document.getElementById('linkId').value.trim();
-                const pw = document.getElementById('linkPw').value;
-                const errEl = document.getElementById('linkError');
-                errEl.style.display = 'none';
-                const btn = document.getElementById('linkBtn');
-                btn.disabled = true; btn.textContent = 'Linking…';
-                try {
-                    console.log('[Ledgerman] Linking device to company:', companyId);
-                    await AppData.apiLinkDevice(companyId, pw);
-                    console.log('[Ledgerman] Link successful, syncing data...');
-                    await AppData.syncFromServer();
-                    AppData.markSetupDone();
-                    this.currentUser = { type: 'admin', name: 'Admin' };
-                    AppData.addAuditLog('Admin', 'Device Linked', companyId);
-                    console.log('[Ledgerman] Device linked, starting admin panel...');
-                    this.startAdminPanel();
-                } catch(err) {
-                    btn.disabled = false; btn.textContent = 'Link This Device';
-                    const errorMsg = (err && err.message) ? err.message : String(err);
-                    console.error('[Ledgerman] Link error:', errorMsg, err);
-                    errEl.textContent = 'Could not link: ' + errorMsg;
-                    errEl.style.display = 'block';
-                }
-            };
-        },
+        // showWelcome() — REMOVED. Self-service signup/company linking is gone.
+        // Invitations now use pre-filled login only via URL parameters.
 
         // ============ ADMIN PANEL ============
 
