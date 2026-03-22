@@ -695,8 +695,8 @@
                     return;
                 }
 
-                if (AppData.isApiMode()) {
-                    // API mode — async login
+                // Always try API first if company name is provided
+                if (companyName) {
                     btn.disabled = true; btn.textContent = 'Logging in…';
                     try {
                         await AppData.apiLoginAdmin(companyName, pw);
@@ -717,8 +717,30 @@
                         document.getElementById('adminPassword').value = '';
                         document.getElementById('adminPassword').focus();
                     }
+                } else if (AppData.isApiMode()) {
+                    // Fallback: If no company name and already in API mode, try with stored company ID
+                    btn.disabled = true; btn.textContent = 'Logging in…';
+                    try {
+                        await AppData.apiLinkDevice(AppData.getCompanyId(), pw);
+                        await AppData.syncFromServer();
+                        this.currentUser = { type: 'admin', name: 'Admin' };
+                        AppData.addAuditLog('Admin', 'Admin Login', '');
+                        this.startAdminPanel();
+                    } catch(err) {
+                        btn.disabled = false; btn.textContent = 'Login';
+                        this._loginAttempts++;
+                        if (window.LedgermanAnalytics) LedgermanAnalytics.logLoginFailure('admin');
+                        if (this._loginAttempts >= 5) {
+                            this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
+                            this._loginAttempts = 0;
+                        }
+                        errEl.textContent = err.message || 'Invalid password.';
+                        errEl.style.display = 'block';
+                        document.getElementById('adminPassword').value = '';
+                        document.getElementById('adminPassword').focus();
+                    }
                 } else {
-                    // Legacy localStorage mode
+                    // Legacy localStorage mode (offline only)
                     if (pw === AppData.getAdminPassword()) {
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         AppData.addAuditLog('Admin', 'Admin Login', '');
