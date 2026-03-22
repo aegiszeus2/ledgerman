@@ -86,6 +86,7 @@
         <div class="top-bar-right">
             <div class="status-dot" id="serverDot" title="Server status"></div>
             <span class="text-sm text-muted" id="serverStatus">Connected</span>
+            <button class="btn btn-secondary btn-sm" id="refreshBtn" onclick="refreshCompanyAdmin()">↻ Refresh</button>
             <button class="btn btn-secondary btn-sm" id="logoutBtn">Logout</button>
         </div>
     </div>
@@ -371,6 +372,24 @@ window.addEventListener('load', function() {
         document.getElementById('apiKeyInput').value = saved;
     }
 });
+
+// Refresh current tab
+function refreshCompanyAdmin() {
+    const activeBtn = document.querySelector('.nav-btn.active');
+    const currentTab = activeBtn ? activeBtn.dataset.tab : 'overview';
+    const btn = document.getElementById('refreshBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⟳ Refreshing…';
+    }
+    setTimeout(() => {
+        switchTab(currentTab);
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '↻ Refresh';
+        }
+    }, 300);
+}
 
 document.getElementById('logoutBtn').onclick = function() {
     _key = '';

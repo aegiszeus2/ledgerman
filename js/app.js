@@ -1012,6 +1012,7 @@
                     <h3>${AppData.getCompanyName()}</h3>
                     <div class="worker-header-right">
                         <span class="worker-name">${Utils.escapeHtml(worker.name)}</span>
+                        <button class="btn btn-secondary btn-sm" id="workerRefresh" title="Refresh data">↻ Refresh</button>
                         <button class="btn btn-secondary btn-sm" id="workerLogout">Logout</button>
                     </div>
                 </header>
@@ -1042,6 +1043,23 @@
             });
 
             document.getElementById('workerLogout').onclick = () => this.logout();
+            const refreshWorkerBtn = document.getElementById('workerRefresh');
+            if (refreshWorkerBtn) {
+                refreshWorkerBtn.onclick = async () => {
+                    refreshWorkerBtn.disabled = true;
+                    refreshWorkerBtn.textContent = '⟳ Refreshing…';
+                    try {
+                        await AppData.syncFromServer();
+                        this.navigateWorker(this.currentView, worker);
+                    } catch(err) {
+                        console.error('Refresh failed:', err);
+                        alert('Failed to refresh data');
+                    } finally {
+                        refreshWorkerBtn.disabled = false;
+                        refreshWorkerBtn.textContent = '↻ Refresh';
+                    }
+                };
+            }
 
             this.navigateWorker('home', worker);
         },
