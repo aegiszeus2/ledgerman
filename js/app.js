@@ -682,8 +682,8 @@
             document.getElementById('forgotPassword').onclick = () => this._showPasswordReset();
             document.getElementById('adminLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const companyName = document.getElementById('adminCompanyName').value;
-                const pw = document.getElementById('adminPassword').value;
+                const companyName = document.getElementById('adminCompanyName').value.trim();
+                const pw = document.getElementById('adminPassword').value.trim();
                 const errEl = document.getElementById('adminLoginError');
                 const btn = document.getElementById('adminLoginBtn');
                 errEl.style.display = 'none';
