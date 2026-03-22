@@ -87,8 +87,12 @@
                 <div class="login-screen">
                     <div class="login-card">
                         <h2>Worker Login</h2>
-                        <p class="text-muted">Enter your PIN to continue</p>
+                        <p class="text-muted">Enter your company and PIN</p>
                         <form id="workerLoginForm">
+                            <div class="form-group">
+                                <input type="text" class="form-control" id="workerCompany"
+                                    placeholder="Company name" required autocomplete="off">
+                            </div>
                             <div class="form-group">
                                 <input type="password" class="form-control pin-input" id="workerPin"
                                     placeholder="Enter PIN" maxlength="6" inputmode="numeric"
@@ -107,9 +111,16 @@
             document.getElementById('forgotPin').onclick = () => this._showPinReset();
             document.getElementById('workerLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
+                const companyName = document.getElementById('workerCompany').value.trim();
                 const pin = document.getElementById('workerPin').value;
                 const errEl = document.getElementById('workerLoginError');
                 errEl.style.display = 'none';
+
+                if (!companyName) {
+                    errEl.textContent = 'Please enter company name.';
+                    errEl.style.display = 'block';
+                    return;
+                }
 
                 if (Date.now() < this._loginLockoutUntil) {
                     const secs = Math.ceil((this._loginLockoutUntil - Date.now()) / 1000);
@@ -123,7 +134,7 @@
                     const loginBtn = document.querySelector('#workerLoginForm button[type="submit"]');
                     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Logging in…'; }
                     try {
-                        const data = await AppData.apiLoginWorker(pin);
+                        const data = await AppData.apiLoginWorker(companyName, pin);
                         if (data.twoFARequired) {
                             // Server says 2FA needed — go to verification step
                             this._show2FAStep({ id: data.workerId, name: data.workerName });

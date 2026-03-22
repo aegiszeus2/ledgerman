@@ -91,12 +91,20 @@ async function apiLinkDevice(companyId, password) {
     return data;
 }
 
-async function apiLoginWorker(pin) {
-    const companyId = getCompanyId();
-    if (!companyId) throw new Error('No company registered on this device');
+async function apiLoginWorker(companyName, pin) {
+    // Prefer companyName if provided (for new devices without registered company)
+    // Fall back to companyId if available (for registered devices)
+    let body;
+    if (companyName) {
+        body = { companyName: companyName, pin: pin };
+    } else {
+        const companyId = getCompanyId();
+        if (!companyId) throw new Error('No company registered on this device');
+        body = { companyId: companyId, pin: pin };
+    }
     const data = await _apiFetch('/api/auth/worker', {
         method: 'POST',
-        body: JSON.stringify({ companyId: companyId, pin: pin })
+        body: JSON.stringify(body)
     });
     if (data.token) setJwt(data.token);
     return data; // { token, worker } OR { twoFARequired: true, workerId, workerName }
