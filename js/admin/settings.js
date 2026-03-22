@@ -154,16 +154,16 @@ window.AdminSettings = {
                     <div class="form-row">
                         <div class="form-group">
                             <label>Current Password</label>
-                            <input class="form-control" type="password" id="pwCurrent" required>
+                            <div style="position:relative"><input class="form-control" type="password" id="pwCurrent" required style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="pwCurrent" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                         </div>
                         <div class="form-group">
                             <label>New Password</label>
-                            <input class="form-control" type="password" id="pwNew" required minlength="12">
+                            <div style="position:relative"><input class="form-control" type="password" id="pwNew" required minlength="12" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="pwNew" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                             <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Min 12 chars, mixed case, number, and special character</p>
                         </div>
                         <div class="form-group">
                             <label>Confirm New Password</label>
-                            <input class="form-control" type="password" id="pwConfirm" required minlength="12">
+                            <div style="position:relative"><input class="form-control" type="password" id="pwConfirm" required minlength="12" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="pwConfirm" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                         </div>
                     </div>
                     <div class="form-actions">
@@ -214,6 +214,25 @@ window.AdminSettings = {
         });
 
         // Settings form submit
+
+        // Password visibility toggle
+        const toggleButtons = container.querySelectorAll('.password-toggle');
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const fieldId = this.getAttribute('data-toggle');
+                const field = container.querySelector('#' + fieldId);
+                if (field) {
+                    if (field.type === 'password') {
+                        field.type = 'text';
+                        this.textContent = 'Hide';
+                    } else {
+                        field.type = 'password';
+                        this.textContent = 'Show';
+                    }
+                }
+            });
+        });
         container.querySelector('#settingsForm').addEventListener('submit', function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;

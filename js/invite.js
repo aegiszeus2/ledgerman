@@ -133,6 +133,11 @@ window.WorkerInvite = {
             inp.type = inp.type === 'password' ? 'text' : 'password';
             this.textContent = inp.type === 'password' ? 'Show' : 'Hide';
         });
+        document.getElementById('toggleInvitePinConfirm').addEventListener('click', function() {
+            const inp = document.getElementById('invitePinConfirm');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+            this.textContent = inp.type === 'password' ? 'Show' : 'Hide';
+        });
 
         // 2FA toggle
         let totpSecret = null;

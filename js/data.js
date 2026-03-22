@@ -126,6 +126,17 @@ async function apiLoginWorkerByName(companyName, pin) {
     return data; // { token, worker } OR { twoFARequired: true, workerId, workerName }
 }
 
+
+async function apiLoginWorkerByNameAndPin(companyName, workerName, pin) {
+    const data = await _apiFetch('/api/auth/worker', {
+        method: 'POST',
+        body: JSON.stringify({ companyName: companyName, workerName: workerName, pin: pin })
+    });
+    if (data.token) setJwt(data.token);
+    // Store the companyId returned so session is linked
+    if (data.worker && data.worker.company_id) setCompanyId(data.worker.company_id);
+    return data; // { token, worker } OR { twoFARequired: true, workerId, workerName }
+}
 async function apiVerify2FA(workerId, totpCode) {
     const companyId = getCompanyId();
     const data = await _apiFetch('/api/auth/worker/verify2fa', {
@@ -637,7 +648,7 @@ window.AppData = {
     API_BASE: API_BASE,
     // Auth / session
     getJwt, setJwt, getCompanyId, setCompanyId, isApiMode,
-    apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiVerify2FA,
+    apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin, apiVerify2FA,
     apiCreateInvite, apiGetInvite, apiUseInvite,
     syncFromServer, isCacheLoaded,
     // Photos (IndexedDB)

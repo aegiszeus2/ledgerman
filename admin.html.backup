@@ -59,7 +59,7 @@
         </div>
         <h1>LittleShield</h1>
         <p class="subtitle">Ledgerman Super Admin Console</p>
-        <div id="loginForm">
+        <form id="loginForm">
             <div class="form-group" style="text-align:left">
                 <label>API Key</label>
                 <div class="password-field-wrap">
@@ -69,7 +69,7 @@
             </div>
             <div id="loginError" style="display:none;color:var(--danger);font-size:.85rem;margin-bottom:12px;text-align:left"></div>
             <button type="button" class="btn btn-primary btn-block" id="loginBtn" onclick="handleAdminLogin()">Access Console</button>
-        </div>
+        </form>
         <p style="margin-top:16px;font-size:.75rem;color:var(--text2)">
             Key location: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">ledgerman-backend/.superadmin_key</code>
         </p>
@@ -365,6 +365,29 @@ async function handleAdminLogin() {
 }
 
 // ── Login ────────────────────────────────────────────────────
+document.getElementById('loginForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const key = document.getElementById('apiKeyInput').value.trim();
+    const btn = document.getElementById('loginBtn');
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    try {
+        _key = key;
+        await apiFetch('/api/superadmin/auth', { method: 'POST' });
+        localStorage.setItem('ls_admin_key', key);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').classList.add('visible');
+        initDashboard();
+    } catch(err) {
+        _key = '';
+        btn.disabled = false; btn.textContent = 'Access Console';
+        errEl.textContent = err.message === 'Super-admin access denied' ? 'Invalid API key.' : 'Connection failed: ' + err.message;
+        errEl.style.display = 'block';
+    }
+};
+
+// Auto-login if key in localStorage
 window.addEventListener('load', function() {
     const saved = localStorage.getItem('ls_admin_key');
     if (saved) {
@@ -964,7 +987,6 @@ function esc(str) {
         }
     </script>
 
-    <script>
 // ── Password Toggle Visibility ───────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
     const toggleButtons = document.querySelectorAll('.password-toggle');
@@ -985,6 +1007,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-    </script>
 </body>
 </html>

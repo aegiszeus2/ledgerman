@@ -79,17 +79,22 @@
             // Parse pre-filled credentials from URL (for invitations)
             const params = new URLSearchParams(window.location.search);
             const prefilledCompany = params.get('company') || '';
+            const prefilledName = params.get('name') || '';
             const prefilledPin = params.get('pin') || '';
 
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-card">
                         <h2>Worker Login</h2>
-                        <p class="text-muted">Enter your company name and PIN</p>
+                        <p class="text-muted">Enter your company name, name, and PIN</p>
                         <form id="workerLoginForm">
                             <div class="form-group">
                                 <input type="text" class="form-control" id="workerCompanyName"
                                     placeholder="Company Name" value="${Utils.escapeHtml(prefilledCompany)}" required autocomplete="off">
+                            </div>
+                            <div class="form-group">
+                                <input type="text" class="form-control" id="workerName"
+                                    placeholder="Employee Name" value="${Utils.escapeHtml(prefilledName)}" required autocomplete="off">
                             </div>
                             <div class="form-group">
                                 <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" value="${Utils.escapeHtml(prefilledPin)}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
@@ -103,8 +108,8 @@
                 </div>
             `;
 
-            // Auto-submit if both credentials are pre-filled
-            if (prefilledCompany && prefilledPin) {
+            // Auto-submit if all credentials are pre-filled
+            if (prefilledCompany && prefilledName && prefilledPin) {
                 setTimeout(() => {
                     document.getElementById('workerLoginForm').dispatchEvent(new Event('submit'));
                 }, 100);
@@ -116,7 +121,8 @@
             document.getElementById('workerLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const companyName = document.getElementById('workerCompanyName').value.trim();
-                const pin = document.getElementById('workerPin').value;
+                const workerName = document.getElementById('workerName').value.trim();
+                const pin = document.getElementById('workerPin').value.trim();
                 const errEl = document.getElementById('workerLoginError');
                 errEl.style.display = 'none';
 
@@ -128,11 +134,11 @@
                 }
 
                 if (AppData.isApiMode() || companyName) {
-                    // API mode — validate company name + PIN server-side
+                    // API mode — validate company name + worker name + PIN server-side
                     const loginBtn = document.querySelector('#workerLoginForm button[type="submit"]');
                     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Logging in…'; }
                     try {
-                        const data = await AppData.apiLoginWorkerByName(companyName, pin);
+                        const data = await AppData.apiLoginWorkerByNameAndPin(companyName, workerName, pin);
                         if (data.twoFARequired) {
                             // Server says 2FA needed — go to verification step
                             this._show2FAStep({ id: data.workerId, name: data.workerName });
@@ -149,7 +155,7 @@
                             this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
                             this._loginAttempts = 0;
                         }
-                        errEl.textContent = 'Invalid PIN. Please try again.';
+                        errEl.textContent = err.message || 'Invalid PIN or worker not found.';
                         errEl.style.display = 'block';
                         document.getElementById('workerPin').value = '';
                         document.getElementById('workerPin').focus();
@@ -173,7 +179,7 @@
                             this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
                             this._loginAttempts = 0;
                         }
-                        errEl.textContent = 'Invalid PIN. Please try again.';
+                        errEl.textContent = err.message || 'Invalid PIN or worker not found.';
                         errEl.style.display = 'block';
                         document.getElementById('workerPin').value = '';
                         document.getElementById('workerPin').focus();
