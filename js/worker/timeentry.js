@@ -264,9 +264,7 @@ window.WorkerTimeEntry = {
         // ── Complete-entry form (shared by both modes after clock-out) ───
         function renderCompleteForm(defaultDate, defaultStart, defaultEnd) {
             // Remove any existing form to prevent duplicates
-            while (contentArea.firstChild) {
-                contentArea.removeChild(contentArea.firstChild);
-            }
+            contentArea.innerHTML = '';
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
             var selectedExpenses = [];
@@ -401,7 +399,7 @@ window.WorkerTimeEntry = {
             if (subtaskSelect) { subtaskSelect.addEventListener('change', updateUnits); updateUnits(); }
 
             // Expenses
-            form.querySelector('#teAddExpense').addEventListener('click', function() {
+            form.querySelector('#addExpenseBtn').addEventListener('click', function() {
                 var desc = form.querySelector('#teExpenseDesc').value.trim();
                 var amt = parseFloat(form.querySelector('#teExpenseAmount').value);
                 if (!desc || isNaN(amt) || amt <= 0) {
@@ -415,7 +413,7 @@ window.WorkerTimeEntry = {
             });
 
             function renderExpenseList() {
-                var list = form.querySelector('#teExpenseList');
+                var list = form.querySelector('#expenseList');
                 list.innerHTML = '';
                 var total = 0;
                 selectedExpenses.forEach(function(exp, idx) {
