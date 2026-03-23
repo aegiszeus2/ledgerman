@@ -162,7 +162,9 @@ window.WorkerTimeEntry = {
 
         // ── Clock In / Out mode ──────────────────────────────────────────
         function renderClockinMode() {
-            contentArea.innerHTML = '';
+            while (contentArea.firstChild) {
+                contentArea.removeChild(contentArea.firstChild);
+            }
 
             if (!activeClock) {
                 // Not clocked in yet
@@ -251,7 +253,9 @@ window.WorkerTimeEntry = {
 
         // ── Manual Entry mode ────────────────────────────────────────────
         function renderManualMode() {
-            contentArea.innerHTML = '';
+            while (contentArea.firstChild) {
+                contentArea.removeChild(contentArea.firstChild);
+            }
             var startTime = defaults.startTime || '';
             var endTime   = defaults.endTime   || '';
             renderCompleteForm(
@@ -264,7 +268,10 @@ window.WorkerTimeEntry = {
         // ── Complete-entry form (shared by both modes after clock-out) ───
         function renderCompleteForm(defaultDate, defaultStart, defaultEnd) {
             // Remove any existing form to prevent duplicates
-            contentArea.innerHTML = '';
+            // Use aggressive clearing to ensure no leftover elements
+            while (contentArea.firstChild) {
+                contentArea.removeChild(contentArea.firstChild);
+            }
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
             var selectedExpenses = [];
