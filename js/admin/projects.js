@@ -37,6 +37,7 @@ window.AdminProjects = {
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Projects</h2>
                 <div style="display:flex;gap:8px">
+                    <button class="btn-secondary btn-sm" id="projectRefreshBtn">🔄 Refresh</button>
                     <button class="btn-secondary btn-sm" id="projectWizardBtn">Walk me through it</button>
                     <button class="btn-primary" id="addProjectBtn">+ New Project</button>
                 </div>
@@ -86,6 +87,22 @@ window.AdminProjects = {
 
         container.querySelector('#projectWizardBtn').addEventListener('click', function() {
             self._startWizard();
+        });
+
+        container.querySelector('#projectRefreshBtn').addEventListener('click', async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = '🔄 Syncing…';
+            try {
+                await AppData.syncFromServer();
+                Utils.showToast('Projects refreshed');
+                self._renderList();
+            } catch(err) {
+                Utils.showToast('Refresh failed: ' + (err.message || 'Unknown error'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Refresh';
+            }
         });
 
         // Click row to view detail
