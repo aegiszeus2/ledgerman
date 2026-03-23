@@ -264,7 +264,10 @@ window.WorkerTimeEntry = {
 
         // ── Complete-entry form (shared by both modes after clock-out) ───
         function renderCompleteForm(defaultDate, defaultStart, defaultEnd) {
-            contentArea.innerHTML = '';
+            // Remove any existing form to prevent duplicates
+            while (contentArea.firstChild) {
+                contentArea.removeChild(contentArea.firstChild);
+            }
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
 
@@ -273,8 +276,11 @@ window.WorkerTimeEntry = {
             form.id = 'timeEntryForm';
             form.noValidate = true;
 
+            // Build form HTML in one string to avoid potential issues with repeated +=
+            var formHTML = '';
+
             // Date
-            form.innerHTML +=
+            formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label" for="teDate">Date</label>' +
                     '<input class="form-control" type="date" id="teDate" name="date" value="' + esc(defaultDate) + '" required>' +
@@ -287,7 +293,7 @@ window.WorkerTimeEntry = {
                     stOptions += '<option value="' + esc(st.id) + '" data-unit="' + esc(st.unitOfMeasure || '') + '"' +
                         (st.id === (defaults.subtaskId || '') ? ' selected' : '') + '>' + esc(st.name) + '</option>';
                 });
-                form.innerHTML +=
+                formHTML +=
                     '<div class="form-group">' +
                         '<label class="form-label" for="teSubtask">Subtask</label>' +
                         '<select class="form-control" id="teSubtask" name="subtask">' + stOptions + '</select>' +
@@ -295,7 +301,7 @@ window.WorkerTimeEntry = {
             }
 
             // Start / End time
-            form.innerHTML +=
+            formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Start &amp; End Time</label>' +
                     '<div class="time-input-group">' +
@@ -310,17 +316,17 @@ window.WorkerTimeEntry = {
                 '</div>';
 
             // Hidden rate
-            form.innerHTML += '<input type="hidden" id="teRate" value="' + esc(String(workerRate)) + '">';
+            formHTML += '<input type="hidden" id="teRate" value="' + esc(String(workerRate)) + '">';
 
             // Description
-            form.innerHTML +=
+            formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label" for="teDescription">Description of Work <span style="font-weight:400;color:var(--text2)">(required)</span></label>' +
                     '<textarea class="form-control" id="teDescription" name="description" rows="4" placeholder="Describe the work you performed today…" style="resize:vertical" required>' + esc(defaults.description || '') + '</textarea>' +
                 '</div>';
 
             // Units
-            form.innerHTML +=
+            formHTML +=
                 '<div id="unitsSection" style="display:none">' +
                     '<div class="form-group">' +
                         '<label class="form-label" for="teUnits">Units Completed <span id="unitLabel" style="color:var(--amber);font-weight:400"></span></label>' +
@@ -329,7 +335,7 @@ window.WorkerTimeEntry = {
                 '</div>';
 
             // Expenses
-            form.innerHTML +=
+            formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Expenses <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
                     '<div id="expenseList" style="margin-bottom:12px"></div>' +
@@ -341,7 +347,7 @@ window.WorkerTimeEntry = {
                 '</div>';
 
             // Photos
-            form.innerHTML +=
+            formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Photos <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -354,9 +360,11 @@ window.WorkerTimeEntry = {
                 '</div>';
 
             // Submit
-            form.innerHTML +=
+            formHTML +=
                 '<button type="submit" class="submit-btn-large" id="teSubmitBtn">&#10003; Submit Time Entry</button>';
 
+            // Set form HTML all at once
+            form.innerHTML = formHTML;
             contentArea.appendChild(form);
 
             // ── Wire events ──────────────────────────────────────────────
