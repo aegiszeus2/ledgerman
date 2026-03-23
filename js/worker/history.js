@@ -82,12 +82,10 @@ window.WorkerHistory = {
                 var desc = sub.description || '';
                 var truncDesc = desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
 
-                // Amount display
-                var amountText = '';
-                if (sub.rateType === 'Hourly' && sub.hours && sub.rate) {
-                    amountText = sub.hours + 'h @ ' + Utils.formatCurrency(sub.rate) + '/hr = ' + Utils.formatCurrency(sub.hours * sub.rate);
-                } else if (sub.rateType === 'Flat' && sub.flatRate) {
-                    amountText = 'Flat Rate: ' + Utils.formatCurrency(sub.flatRate);
+                // Hours only (no pay display)
+                var hoursText = '';
+                if (sub.hours) {
+                    hoursText = sub.hours + ' hours worked';
                 }
 
                 var card = document.createElement('div');
@@ -108,11 +106,20 @@ window.WorkerHistory = {
                         '<span style="font-size:.75rem;padding:4px 10px;border-radius:12px;font-weight:600;white-space:nowrap;' + badgeStyle + '">' + esc(sub.status) + '</span>' +
                     '</div>' +
                     '<p style="font-size:.9rem;color:var(--text);margin-bottom:6px">' + esc(truncDesc) + '</p>' +
-                    (amountText ? '<div style="font-size:.85rem;color:var(--text2);font-variant-numeric:tabular-nums">' + esc(amountText) + '</div>' : '');
+                    (hoursText ? '<div style="font-size:.85rem;color:var(--text2);font-variant-numeric:tabular-nums">' + esc(hoursText) + '</div>' : '');
 
                 // Units completed
                 if (sub.unitsCompleted && sub.unitOfMeasure) {
                     cardHTML += '<div style="font-size:.85rem;color:var(--text2);margin-top:2px">Units: ' + esc(String(sub.unitsCompleted)) + ' ' + esc(sub.unitOfMeasure) + '</div>';
+                }
+
+                // Expense count
+                if (sub.expenses && sub.expenses.length > 0) {
+                    var expenseTotal = 0;
+                    for (var i = 0; i < sub.expenses.length; i++) {
+                        expenseTotal += (sub.expenses[i].amount || 0);
+                    }
+                    cardHTML += '<div style="font-size:.85rem;color:var(--text2);margin-top:2px">💰 ' + sub.expenses.length + ' expense' + (sub.expenses.length !== 1 ? 's' : '') + '</div>';
                 }
 
                 // Photo count

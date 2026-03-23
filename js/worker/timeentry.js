@@ -327,6 +327,21 @@ window.WorkerTimeEntry = {
                     '</div>' +
                 '</div>';
 
+            // Expenses
+            var selectedExpenses = [];
+            form.innerHTML +=
+                '<div class="form-group">' +
+                    '<label class="form-label">Expenses <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
+                    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+                        '<input type="text" id="teExpenseDesc" placeholder="Expense description" class="form-control" style="flex:1">' +
+                        '<input type="number" id="teExpenseAmount" placeholder="Amount" class="form-control" style="width:120px;min-width:100px" step="0.01" min="0">' +
+                        '<button type="button" class="btn-secondary btn-sm" id="teAddExpense" style="padding:10px 16px">+ Add</button>' +
+                    '</div>' +
+                    '<div id="teExpenseList" style="margin-bottom:12px"></div>' +
+                '</div>';
+
+            // Photos
+            form.innerHTML +=
             // Photos
             form.innerHTML +=
                 '<div class="form-group">' +
@@ -378,6 +393,46 @@ window.WorkerTimeEntry = {
                 if (unitLabel) unitLabel.textContent = unit ? '(' + unit + ')' : '';
             }
             if (subtaskSelect) { subtaskSelect.addEventListener('change', updateUnits); updateUnits(); }
+
+            // Expenses
+            form.querySelector('#teAddExpense').addEventListener('click', function() {
+                var desc = form.querySelector('#teExpenseDesc').value.trim();
+                var amt = parseFloat(form.querySelector('#teExpenseAmount').value);
+                if (!desc || isNaN(amt) || amt <= 0) {
+                    Utils.showToast('Enter expense description and valid amount', 'error');
+                    return;
+                }
+                selectedExpenses.push({ description: desc, amount: amt });
+                form.querySelector('#teExpenseDesc').value = '';
+                form.querySelector('#teExpenseAmount').value = '';
+                renderExpenseList();
+            });
+
+            function renderExpenseList() {
+                var list = form.querySelector('#teExpenseList');
+                list.innerHTML = '';
+                var total = 0;
+                selectedExpenses.forEach(function(exp, idx) {
+                    total += exp.amount;
+                    var item = document.createElement('div');
+                    item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(245,158,11,.1);border-radius:6px;margin-bottom:6px';
+                    item.innerHTML = 
+                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + '</span>' +
+                        '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
+                    item.querySelector('button').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        selectedExpenses.splice(parseInt(this.dataset.idx), 1);
+                        renderExpenseList();
+                    });
+                    list.appendChild(item);
+                });
+                if (total > 0) {
+                    var totalDiv = document.createElement('div');
+                    totalDiv.style.cssText = 'padding:8px;font-weight:600;text-align:right;border-top:1px solid var(--border)';
+                    totalDiv.textContent = 'Total: $' + total.toFixed(2);
+                    list.appendChild(totalDiv);
+                }
+            }
 
             // Photos
             form.querySelector('#teCameraBtn').addEventListener('click', function() { form.querySelector('#teCameraInput').click(); });
@@ -481,6 +536,7 @@ window.WorkerTimeEntry = {
                         unitsCompleted: unitsValue,
                         unitOfMeasure: unitOfMeasure,
                         photoIds: photoIds,
+                        expenses: selectedExpenses || [],
                         status: 'Pending',
                         submittedAt: new Date().toISOString(),
                         rejectionReason: null,
