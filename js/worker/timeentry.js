@@ -86,7 +86,6 @@ window.WorkerTimeEntry = {
 
         // ── Build page ───────────────────────────────────────────────────
         container.innerHTML = '';
-        var selectedExpenses = [];
 
         // Header
         var header = document.createElement('div');
@@ -270,6 +269,7 @@ window.WorkerTimeEntry = {
             }
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
+            var selectedExpenses = [];
 
             var form = document.createElement('form');
             form.className = 'time-entry-form';
@@ -400,6 +400,46 @@ window.WorkerTimeEntry = {
             }
             if (subtaskSelect) { subtaskSelect.addEventListener('change', updateUnits); updateUnits(); }
 
+            // Expenses
+            form.querySelector('#teAddExpense').addEventListener('click', function() {
+                var desc = form.querySelector('#teExpenseDesc').value.trim();
+                var amt = parseFloat(form.querySelector('#teExpenseAmount').value);
+                if (!desc || isNaN(amt) || amt <= 0) {
+                    Utils.showToast('Enter expense description and valid amount', 'error');
+                    return;
+                }
+                selectedExpenses.push({ description: desc, amount: amt });
+                form.querySelector('#teExpenseDesc').value = '';
+                form.querySelector('#teExpenseAmount').value = '';
+                renderExpenseList();
+            });
+
+            function renderExpenseList() {
+                var list = form.querySelector('#teExpenseList');
+                list.innerHTML = '';
+                var total = 0;
+                selectedExpenses.forEach(function(exp, idx) {
+                    total += exp.amount;
+                    var item = document.createElement('div');
+                    item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(245,158,11,.1);border-radius:6px;margin-bottom:6px';
+                    item.innerHTML = 
+                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + '</span>' +
+                        '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
+                    item.querySelector('button').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        selectedExpenses.splice(parseInt(this.dataset.idx), 1);
+                        renderExpenseList();
+                    });
+                    list.appendChild(item);
+                });
+                if (total > 0) {
+                    var totalDiv = document.createElement('div');
+                    totalDiv.style.cssText = 'padding:8px;font-weight:600;text-align:right;border-top:1px solid var(--border)';
+                    totalDiv.textContent = 'Total: $' + total.toFixed(2);
+                    list.appendChild(totalDiv);
+                }
+            }
+
             // Photos
             form.querySelector('#teCameraBtn').addEventListener('click', function() { form.querySelector('#teCameraInput').click(); });
             form.querySelector('#teFileBtn').addEventListener('click', function() { form.querySelector('#teFileInput').click(); });
@@ -436,61 +476,6 @@ window.WorkerTimeEntry = {
                     area.appendChild(item);
                 });
             }
-
-            // Expenses
-            function renderExpenses() {
-                var list = form.querySelector('#expenseList');
-                list.innerHTML = '';
-                var total = 0;
-                selectedExpenses.forEach(function(exp, idx) {
-                    total += parseFloat(exp.amount) || 0;
-                    var item = document.createElement('div');
-                    item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg2);border-radius:var(--radius);margin-bottom:8px;font-size:.9rem';
-                    item.innerHTML =
-                        '<span>' + esc(exp.description) + '</span>' +
-                        '<div style="display:flex;align-items:center;gap:8px">' +
-                            '<span style="font-weight:600">' + Utils.formatCurrency(exp.amount) + '</span>' +
-                            '<button type="button" class="remove-expense" data-idx="' + idx + '" style="background:transparent;border:none;color:var(--text2);cursor:pointer;padding:0;font-size:1.2rem">×</button>' +
-                        '</div>';
-                    item.querySelector('.remove-expense').addEventListener('click', function() {
-                        selectedExpenses.splice(parseInt(this.dataset.idx, 10), 1);
-                        renderExpenses();
-                    });
-                    list.appendChild(item);
-                });
-                if (selectedExpenses.length > 0) {
-                    var totalsLine = document.createElement('div');
-                    totalsLine.style.cssText = 'padding:10px;border-top:1px solid var(--border);font-weight:600;display:flex;justify-content:space-between;align-items:center';
-                    totalsLine.innerHTML = '<span>Total Expenses:</span><span>' + Utils.formatCurrency(total) + '</span>';
-                    list.appendChild(totalsLine);
-                }
-            }
-
-            form.querySelector('#addExpenseBtn').addEventListener('click', function(e) {
-                e.preventDefault();
-                var desc = form.querySelector('#teExpenseDesc').value.trim();
-                var amt = parseFloat(form.querySelector('#teExpenseAmount').value) || 0;
-                if (!desc) {
-                    Utils.showToast('Please enter an expense description.', 'error');
-                    return;
-                }
-                if (amt <= 0) {
-                    Utils.showToast('Please enter an amount greater than 0.', 'error');
-                    return;
-                }
-                selectedExpenses.push({ description: desc, amount: amt });
-                form.querySelector('#teExpenseDesc').value = '';
-                form.querySelector('#teExpenseAmount').value = '';
-                form.querySelector('#teExpenseDesc').focus();
-                renderExpenses();
-            });
-
-            // Enter key on amount field to add expense
-            form.querySelector('#teExpenseAmount').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    form.querySelector('#addExpenseBtn').click();
-                }
-            });
 
             // ── Submit ───────────────────────────────────────────────────
             form.addEventListener('submit', async function(e) {
@@ -556,8 +541,8 @@ window.WorkerTimeEntry = {
                         description: descValue,
                         unitsCompleted: unitsValue,
                         unitOfMeasure: unitOfMeasure,
-                        expenses: selectedExpenses.length > 0 ? selectedExpenses : null,
                         photoIds: photoIds,
+                        expenses: selectedExpenses || [],
                         status: 'Pending',
                         submittedAt: new Date().toISOString(),
                         rejectionReason: null,
