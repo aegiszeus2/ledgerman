@@ -26,6 +26,13 @@
                 return;
             }
 
+            // Check for persistent login (Keep Me Signed In)
+            const persistentLogin = AppData.getPersistentLogin();
+            if (persistentLogin && persistentLogin.credentials) {
+                this._restorePersistentLogin(persistentLogin);
+                return;
+            }
+
             // Signup flow removed — invitations now use pre-filled login only
 
             // Always show the main login screen — clean slate every session.
@@ -34,6 +41,66 @@
                 this._pendingBackupReminder = true;
             }
             this.showLogin();
+        },
+
+        async _restorePersistentLogin(persistentLogin) {
+            const type = persistentLogin.type;
+            const creds = persistentLogin.credentials;
+            const app = document.getElementById('app');
+
+            // Show loading screen
+            app.innerHTML = `
+                <div class="login-screen">
+                    <div class="login-card">
+                        <div style="font-size:2rem;margin-bottom:8px">⏳</div>
+                        <h2>Restoring Session</h2>
+                        <p class="text-muted">One moment…</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                if (type === 'admin') {
+                    // Restore admin JWT and try to sync
+                    if (creds.jwt) AppData.setJwt(creds.jwt);
+                    if (creds.companyId) AppData.setCompanyId(creds.companyId);
+
+                    try {
+                        await AppData.syncFromServer();
+                        this.currentUser = { type: 'admin', name: 'Admin' };
+                        this.startAdminPanel();
+                        return;
+                    } catch(err) {
+                        // JWT expired or invalid — clear and show login
+                        console.log('[Ledgerman] Persistent admin JWT invalid, showing login');
+                        AppData.clearPersistentLogin();
+                        AppData.setJwt('');
+                        this.showAdminLogin();
+                    }
+                } else if (type === 'worker') {
+                    // Restore worker JWT and try to sync
+                    if (creds.jwt) AppData.setJwt(creds.jwt);
+                    if (creds.companyId) AppData.setCompanyId(creds.companyId);
+
+                    try {
+                        const data = await AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin);
+                        await AppData.syncFromServer();
+                        const worker = AppData.getWorker(data.worker.id) || data.worker;
+                        this._completeWorkerLogin(worker, 'Restored from persistent login');
+                        return;
+                    } catch(err) {
+                        // Credentials invalid — clear and show login
+                        console.log('[Ledgerman] Persistent worker credentials invalid, showing login');
+                        AppData.clearPersistentLogin();
+                        AppData.setJwt('');
+                        this.showWorkerLogin();
+                    }
+                }
+            } catch(err) {
+                console.error('[Ledgerman] Error restoring persistent login:', err);
+                AppData.clearPersistentLogin();
+                this.showLogin();
+            }
         },
 
         // ============ LOGIN SCREENS ============
@@ -99,6 +166,10 @@
                             <div class="form-group">
                                 <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" value="${Utils.escapeHtml(prefilledPin)}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                             </div>
+                            <div class="form-group" style="display:flex;align-items:center;margin-bottom:16px">
+                                <input type="checkbox" id="workerKeepMeSignedIn" style="margin-right:8px;cursor:pointer">
+                                <label for="workerKeepMeSignedIn" style="cursor:pointer;font-size:.9rem">Keep me signed in</label>
+                            </div>
                             <div class="form-error" id="workerLoginError" style="display:none"></div>
                             <button type="submit" class="btn btn-primary btn-block">Login</button>
                             <button type="button" class="btn btn-secondary btn-block mt-1" id="backToLogin">Back</button>
@@ -123,6 +194,7 @@
                 const companyName = document.getElementById('workerCompanyName').value.trim();
                 const workerName = document.getElementById('workerName').value.trim();
                 const pin = document.getElementById('workerPin').value.trim();
+                const keepMeSignedIn = document.getElementById('workerKeepMeSignedIn').checked;
                 const errEl = document.getElementById('workerLoginError');
                 errEl.style.display = 'none';
 
@@ -140,11 +212,22 @@
                     try {
                         const data = await AppData.apiLoginWorkerByNameAndPin(companyName, workerName, pin);
                         if (data.twoFARequired) {
-                            // Server says 2FA needed — go to verification step
+                            // Server says 2FA needed — store for later and go to verification step
+                            this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn, workerId: data.workerId, workerName: data.workerName };
                             this._show2FAStep({ id: data.workerId, name: data.workerName });
                         } else {
                             await AppData.syncFromServer();
                             const worker = AppData.getWorker(data.worker.id);
+                            // Save persistent login if checkbox is checked
+                            if (keepMeSignedIn) {
+                                AppData.savePersistentLogin('worker', {
+                                    companyName: companyName,
+                                    workerName: workerName,
+                                    pin: pin,
+                                    jwt: AppData.getJwt(),
+                                    companyId: AppData.getCompanyId()
+                                });
+                            }
                             this._completeWorkerLogin(worker || data.worker);
                         }
                     } catch(err) {
@@ -166,10 +249,19 @@
                     if (worker) {
                         // Check if email 2FA is enabled (preferred over TOTP)
                         if (worker.email2FAEnabled && worker.email) {
+                            this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn };
                             this._showEmail2FAStep(worker);
                         } else if (worker.twoFAEnabled && worker.totpSecret) {
+                            this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn };
                             this._show2FAStep(worker);
                         } else {
+                            if (keepMeSignedIn) {
+                                AppData.savePersistentLogin('worker', {
+                                    companyName: companyName,
+                                    workerName: workerName,
+                                    pin: pin
+                                });
+                            }
                             this._completeWorkerLogin(worker);
                         }
                     } else {
@@ -226,6 +318,17 @@
                         await AppData.apiVerify2FA(worker.id, code);
                         await AppData.syncFromServer();
                         const fullWorker = AppData.getWorker(worker.id) || worker;
+                        // Save persistent login if checkbox was checked
+                        if (this._worker2FAData && this._worker2FAData.keepMeSignedIn) {
+                            AppData.savePersistentLogin('worker', {
+                                companyName: this._worker2FAData.companyName,
+                                workerName: this._worker2FAData.workerName,
+                                pin: this._worker2FAData.pin,
+                                jwt: AppData.getJwt(),
+                                companyId: AppData.getCompanyId()
+                            });
+                        }
+                        this._worker2FAData = null;
                         this._completeWorkerLogin(fullWorker, '2FA verified');
                     } catch(err) {
                         if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.textContent = 'Verify'; }
@@ -238,6 +341,15 @@
                     // Legacy — verify client-side
                     const valid = await TOTP.verifyToken(worker.totpSecret, code);
                     if (valid) {
+                        // Save persistent login if checkbox was checked
+                        if (this._worker2FAData && this._worker2FAData.keepMeSignedIn) {
+                            AppData.savePersistentLogin('worker', {
+                                companyName: this._worker2FAData.companyName,
+                                workerName: this._worker2FAData.workerName,
+                                pin: this._worker2FAData.pin
+                            });
+                        }
+                        this._worker2FAData = null;
                         this._completeWorkerLogin(worker, '2FA verified');
                     } else {
                         errEl.textContent = 'Invalid code. Please try again — make sure your phone clock is accurate.';
@@ -307,6 +419,15 @@
 
                 const result = EmailService.verifyCode(worker.email, code);
                 if (result.valid) {
+                    // Save persistent login if checkbox was checked
+                    if (this._worker2FAData && this._worker2FAData.keepMeSignedIn) {
+                        AppData.savePersistentLogin('worker', {
+                            companyName: this._worker2FAData.companyName,
+                            workerName: this._worker2FAData.workerName,
+                            pin: this._worker2FAData.pin
+                        });
+                    }
+                    this._worker2FAData = null;
                     this._completeWorkerLogin(worker, 'Email 2FA verified');
                 } else {
                     errEl.textContent = result.error;
@@ -667,6 +788,10 @@
                                 <input type="password" class="form-control" id="adminPassword"
                                     placeholder="Password" value="${Utils.escapeHtml(prefilledPassword)}" required autocomplete="off">
                             </div>
+                            <div class="form-group" style="display:flex;align-items:center;margin-bottom:16px">
+                                <input type="checkbox" id="adminKeepMeSignedIn" style="margin-right:8px;cursor:pointer">
+                                <label for="adminKeepMeSignedIn" style="cursor:pointer;font-size:.9rem">Keep me signed in</label>
+                            </div>
                             <div class="form-error" id="adminLoginError" style="display:none"></div>
                             <button type="submit" class="btn btn-primary btn-block" id="adminLoginBtn">Login</button>
                             <button type="button" class="btn btn-secondary btn-block mt-1" id="backToLogin">Back</button>
@@ -690,6 +815,7 @@
                 e.preventDefault();
                 const companyName = document.getElementById('adminCompanyName').value.trim();
                 const pw = document.getElementById('adminPassword').value.trim();
+                const keepMeSignedIn = document.getElementById('adminKeepMeSignedIn').checked;
                 const errEl = document.getElementById('adminLoginError');
                 const btn = document.getElementById('adminLoginBtn');
                 errEl.style.display = 'none';
@@ -707,6 +833,15 @@
                     try {
                         await AppData.apiLoginAdmin(companyName, pw);
                         await AppData.syncFromServer();
+                        // Save persistent login if checkbox is checked
+                        if (keepMeSignedIn) {
+                            AppData.savePersistentLogin('admin', {
+                                companyName: companyName,
+                                password: pw,
+                                jwt: AppData.getJwt(),
+                                companyId: AppData.getCompanyId()
+                            });
+                        }
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         AppData.addAuditLog('Admin', 'Admin Login', '');
                         this.startAdminPanel();
@@ -729,6 +864,15 @@
                     try {
                         await AppData.apiLinkDevice(AppData.getCompanyId(), pw);
                         await AppData.syncFromServer();
+                        // Save persistent login if checkbox is checked
+                        if (keepMeSignedIn) {
+                            AppData.savePersistentLogin('admin', {
+                                companyName: companyName || AppData.getCompanyName(),
+                                password: pw,
+                                jwt: AppData.getJwt(),
+                                companyId: AppData.getCompanyId()
+                            });
+                        }
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         AppData.addAuditLog('Admin', 'Admin Login', '');
                         this.startAdminPanel();
@@ -748,6 +892,12 @@
                 } else {
                     // Legacy localStorage mode (offline only)
                     if (pw === AppData.getAdminPassword()) {
+                        if (keepMeSignedIn) {
+                            AppData.savePersistentLogin('admin', {
+                                companyName: companyName,
+                                password: pw
+                            });
+                        }
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         AppData.addAuditLog('Admin', 'Admin Login', '');
                         this.startAdminPanel();
@@ -755,6 +905,12 @@
                         const workers = AppData.getWorkers().filter(w => w.role === 'Approver' && w.status === 'Active');
                         const approver = workers.find(w => w.pin === pw);
                         if (approver) {
+                            if (keepMeSignedIn) {
+                                AppData.savePersistentLogin('admin', {
+                                    companyName: companyName,
+                                    password: pw
+                                });
+                            }
                             this.currentUser = { type: 'admin', name: approver.name, id: approver.id };
                             AppData.addAuditLog(approver.name, 'Approver Login', '');
                             this.startAdminPanel();
@@ -1132,6 +1288,7 @@
             this.currentView = null;
             this.currentProjectId = null;
             AppData.setJwt(''); // clear JWT — require fresh login next time
+            AppData.clearPersistentLogin(); // clear persistent login on logout
             Utils.stopSessionTimer();
             const app = document.getElementById('app');
             app.className = '';
