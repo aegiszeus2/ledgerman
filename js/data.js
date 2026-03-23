@@ -46,6 +46,35 @@ function setCompanyId(id) {
 }
 function isApiMode() { return !!(getCompanyId()); }
 
+// ─── Persistent Storage (Keep Me Signed In) ────────────────────────────────
+function savePersistentLogin(type, credentials) {
+    // type: 'admin' or 'worker'
+    // credentials: { companyName, [workerName], [pin/password], jwt, companyId }
+    try {
+        localStorage.setItem('ledgeman_persistent_login', JSON.stringify({ type, credentials, timestamp: Date.now() }));
+    } catch(e) {
+        console.warn('[Ledgerman] Failed to save persistent login:', e.message);
+    }
+}
+
+function getPersistentLogin() {
+    try {
+        const saved = localStorage.getItem('ledgeman_persistent_login');
+        return saved ? JSON.parse(saved) : null;
+    } catch(e) {
+        console.warn('[Ledgerman] Failed to load persistent login:', e.message);
+        return null;
+    }
+}
+
+function clearPersistentLogin() {
+    try {
+        localStorage.removeItem('ledgeman_persistent_login');
+    } catch(e) {
+        console.warn('[Ledgerman] Failed to clear persistent login:', e.message);
+    }
+}
+
 // ─── API Fetch Helper ──────────────────────────────────────────────────────
 async function _apiFetch(path, options) {
     options = options || {};
