@@ -177,6 +177,7 @@ async function syncFromServer() {
         _cache = {
             workers:     data.workers     || [],
             projects:    data.projects    || [],
+            tasks:       data.tasks       || [],
             clients:     data.clients     || [],
             subtasks:    data.subtasks    || [],
             expenses:    data.expenses    || [],
@@ -189,13 +190,13 @@ async function syncFromServer() {
             settings:    data.settings    || {},
         };
         // Mirror to localStorage as offline backup
-        ['workers','projects','clients','subtasks','expenses','submissions',
+        ['workers','projects','tasks','clients','subtasks','expenses','submissions',
          'invoices','payments','vendors','invites','auditLog'].forEach(function(key) {
             setData(key, _cache[key]);
         });
         setData('settings', _cache.settings);
         console.log('[Ledgerman] Synced from server. Workers:', _cache.workers.length,
-            'Projects:', _cache.projects.length, 'Submissions:', _cache.submissions.length);
+            'Projects:', _cache.projects.length, 'Tasks:', _cache.tasks.length, 'Submissions:', _cache.submissions.length);
         return _cache;
     } catch (e) {
         console.warn('[Ledgerman] Sync failed — using localStorage fallback:', e.message);
@@ -364,6 +365,12 @@ function getProjects() { return getAll('projects'); }
 function getProject(id) { return getById('projects', id); }
 function saveProject(p) { return save('projects', p); }
 function deleteProject(id) { remove('projects', id); }
+
+// ─── Tasks ─────────────────────────────────────────────────────────────────
+function getTasks(projectId) { return projectId ? getAll('tasks').filter(function(t) { return t.projectId === projectId; }) : getAll('tasks'); }
+function getTask(id) { return getById('tasks', id); }
+function saveTask(t) { return save('tasks', t); }
+function deleteTask(id) { remove('tasks', id); }
 
 // ─── Subtasks ──────────────────────────────────────────────────────────────
 function getSubtasks(projectId) { return getAll('subtasks').filter(function(s) { return s.projectId === projectId; }); }
@@ -664,6 +671,8 @@ window.AppData = {
     getClients, getClient, saveClient, deleteClient,
     // Projects
     getProjects, getProject, saveProject, deleteProject,
+    // Tasks
+    getTasks, getTask, saveTask, deleteTask,
     // Subtasks
     getSubtasks, getSubtask, saveSubtask, deleteSubtask,
     // Expenses
