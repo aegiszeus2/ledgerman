@@ -1,5 +1,29 @@
 # Audit Log — Ledgerman
 
+## 2026-03-23 14:35 — PROJECTS/TASKS ENDPOINTS VERIFIED & DEPLOYED
+
+**ACTION:** Verified that Projects and Tasks API endpoints are fully implemented and working on production.
+
+**FINDING:**
+- Endpoints already existed in codebase (generic entity CRUD at /api/projects, /api/tasks, /api/sync)
+- Backend service was stale (previous 502 errors due to undeployed code)
+- Triggered Render redeploy of ledgeman-backend using API token
+- Deploy completed: 3m 20s (build + deploy cycle)
+
+**VERIFICATION TESTS (on production app.ledgerman.org):**
+- ✅ POST /api/projects — created test project, verified ID returned
+- ✅ GET /api/projects — listed projects, verified array returned
+- ✅ POST /api/tasks — created task, verified projectId link
+- ✅ GET /api/tasks — listed tasks by project
+- ✅ DELETE /api/tasks/<id> — verified deletion success
+- ✅ GET /api/sync — full dataset sync, verified projects/tasks/workers arrays
+
+**STATUS:** Tier 2 backend COMPLETE. Ready for frontend UI testing with Laurence/Damiano.
+
+**NEXT:** User acceptance test at https://ledgerman.org (Projects tab → Create → Photos). Monitor for UI issues or API failures.
+
+---
+
 ## 2026-03-22 14:25 — ROOT CAUSE ANALYSIS: "INVALID PASSWORD" LOGIN ERROR
 
 **PROBLEM STATEMENT:**

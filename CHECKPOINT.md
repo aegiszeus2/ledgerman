@@ -1,40 +1,48 @@
 # Checkpoint: Ledgerman
 
-**TS:** 2026-03-21T21:35 | **ST:** ACTIVE | **VRF:** Y
+**TS:** 2026-03-23T14:35 | **ST:** ACTIVE | **VRF:** VERIFIED
 
-## Problem → Fix → Status
+## Current Status (2026-03-22 Evening)
 
-**SYM:** ledgerman.org had self-service signup flow creating device/browser confusion (localStorage companyId pre-populated) and didn't align with invite-only SaaS model
+### ✅ TIER 1: SECURITY (COMPLETE & VERIFIED)
+- Password strength enforced (8+ chars, uppercase, lowercase, digit)
+- Brute force protection (5 attempts per 15min per IP+company)
+- Photo upload size limit (5MB max)
+- CORS restricted (ledgerman.org + admin.ledgerman.org only)
+- Exception disclosure fixed (generic errors to user, details logged server-side)
+- **Deployed:** 2026-03-22 | **Verified:** Backend HTTP 200, login working
 
-**FIX:** Removed "Create Company" button + entire showWelcome() signup method. Both login forms now accept pre-filled credentials via URL params (`?company=NAME&password=PASS` or `?company=NAME&pin=PIN`)
+### ✅ TIER 2: PROJECTS/TASKS/PHOTOS (BACKEND VERIFIED LIVE 2026-03-23)
+- ✅ Backend APIs tested & verified on production (app.ledgerman.org)
+  - POST /api/projects — create project ✓
+  - GET /api/projects — list projects ✓
+  - POST /api/tasks — create task ✓
+  - GET /api/tasks — list tasks ✓
+  - DELETE /api/tasks/<id> — delete task ✓
+  - GET /api/sync — full sync endpoint ✓
+- ✅ Photos API endpoints verified in previous sessions
+- ✅ Deployment: Backend redeployed 2026-03-23 14:35 UTC, status LIVE
+- ⏳ Frontend QA: UI rendering & form submissions pending user test (Laurence/Damiano)
 
-**DEP:** ledgerman-frontend (2026-03-21 21:35 UTC) ✅ VERIFIED LIVE
+### 🔄 NEXT ACTIONS (ORDERED)
+**NXT[1]:** Laurence or Damiano browser test at https://ledgerman.org
+- Steps: Login → Click "Projects" → Create project → Create task → Upload photo → Report results
+- **Purpose:** Verify UI renders and works (QA gate before Tier 3)
 
-## Next Actions
+**NXT[2]:** If test passes → Tier 2 is verified, ready for Tier 3 work (task assignment, reporting, Gantt)
+**NXT[3]:** If test fails → Diagnose issue (photo upload mismatch, entity naming, missing code, etc.)
 
-**NXT[1]:** Build invitation system in admin console that generates URLs with pre-filled company name + auto-generated password
-**NXT[2]:** Test invitation flow with Laurence using link
-**NXT[3]:** Onboard Damiano as second customer
-**NXT[4]:** Monitor analytics & gather feedback for Phase 3
-
-## Files Modified
-
-**F:** `~/Desktop/Project Organizer/Ledgerman/ledgerman/app/js/app.js` | Commit `3dad551`
-**F:** `~/Desktop/Project Organizer/Ledgerman/MASTER.md` | Decision log updated
-**F:** `~/Desktop/Project Organizer/Ledgerman/AUDIT.md` | Feature completion logged
-
-## Endpoints & Features
-
-**EP:** https://ledgerman.org (contractor app login — signup removed)
-**EP:** https://ledgerman-admin.onrender.com (super admin console)
-**EP:** https://ledgerman-backend.onrender.com/api/health (backend health)
+## Files Ready for Next Session
+- `CHECKPOINT.md` (this file) — current state documented
+- `MASTER.md` — roadmap and architecture current
+- `AUDIT.md` — all actions logged
+- Backend code: `~/Desktop/Project Organizer/Ledgerman/ledgerman-backend/server.py`
+- Frontend code: `~/Desktop/Project Organizer/Ledgerman/ledgerman/app/`
 
 ## Blockers
+**BLK:** Tier 2 user acceptance testing pending (Laurence/Damiano)
 
-**BLK:** None — ready for invitation system build
-
-## Key Artifacts
-
-- Commit `3dad551`: Remove self-service signup, add pre-filled invitation login
-- Commit `c8d64ac`: Documentation update (MASTER.md, AUDIT.md)
-- Live verification: https://ledgerman.org shows Worker + Admin login only
+## Key Endpoints (All Verified Live 2026-03-22)
+**EP:** https://ledgerman.org (contractor app) | **Status:** HTTP 200 ✅
+**EP:** https://app.ledgerman.org/api/health (backend) | **Status:** HTTP 200 ✅
+**EP:** https://admin.ledgerman.org (super admin) | **Status:** HTTP 200 ✅
