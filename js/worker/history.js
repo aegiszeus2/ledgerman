@@ -82,10 +82,10 @@ window.WorkerHistory = {
                 var desc = sub.description || '';
                 var truncDesc = desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
 
-                // Hours only (no pay display)
-                var hoursText = '';
+                // Hours display (no pay shown to worker)
+                var amountText = '';
                 if (sub.hours) {
-                    hoursText = sub.hours + ' hours worked';
+                    amountText = sub.hours + ' hours worked';
                 }
 
                 var card = document.createElement('div');
@@ -106,20 +106,32 @@ window.WorkerHistory = {
                         '<span style="font-size:.75rem;padding:4px 10px;border-radius:12px;font-weight:600;white-space:nowrap;' + badgeStyle + '">' + esc(sub.status) + '</span>' +
                     '</div>' +
                     '<p style="font-size:.9rem;color:var(--text);margin-bottom:6px">' + esc(truncDesc) + '</p>' +
-                    (hoursText ? '<div style="font-size:.85rem;color:var(--text2);font-variant-numeric:tabular-nums">' + esc(hoursText) + '</div>' : '');
+                    (amountText ? '<div style="font-size:.85rem;color:var(--text2);font-variant-numeric:tabular-nums">' + esc(amountText) + '</div>' : '');
 
                 // Units completed
                 if (sub.unitsCompleted && sub.unitOfMeasure) {
                     cardHTML += '<div style="font-size:.85rem;color:var(--text2);margin-top:2px">Units: ' + esc(String(sub.unitsCompleted)) + ' ' + esc(sub.unitOfMeasure) + '</div>';
                 }
 
-                // Expense count
+                // Expenses
                 if (sub.expenses && sub.expenses.length > 0) {
                     var expenseTotal = 0;
-                    for (var i = 0; i < sub.expenses.length; i++) {
-                        expenseTotal += (sub.expenses[i].amount || 0);
-                    }
-                    cardHTML += '<div style="font-size:.85rem;color:var(--text2);margin-top:2px">💰 ' + sub.expenses.length + ' expense' + (sub.expenses.length !== 1 ? 's' : '') + '</div>';
+                    var expenseList = '';
+                    sub.expenses.forEach(function(exp) {
+                        expenseTotal += parseFloat(exp.amount) || 0;
+                        expenseList += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.8rem">' +
+                            '<span>' + esc(exp.description) + '</span>' +
+                            '<span>' + Utils.formatCurrency(exp.amount) + '</span>' +
+                        '</div>';
+                    });
+                    cardHTML += '<div style="margin-top:8px;padding:8px;background:rgba(243,156,18,.1);border-radius:var(--radius);border-left:3px solid var(--amber)">' +
+                        '<div style="font-size:.85rem;font-weight:600;color:var(--amber);margin-bottom:4px">Expenses:</div>' +
+                        expenseList +
+                        '<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);margin-top:6px;font-weight:600;font-size:.85rem">' +
+                            '<span>Total:</span>' +
+                            '<span>' + Utils.formatCurrency(expenseTotal) + '</span>' +
+                        '</div>' +
+                    '</div>';
                 }
 
                 // Photo count

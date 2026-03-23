@@ -263,7 +263,12 @@ function save(entity, item) {
         _apiFetch('/api/' + entity, {
             method: 'POST',
             body: JSON.stringify(item)
-        }).catch(function(e) { console.warn('[API] save ' + entity + ':', e.message); });
+        }).catch(function(e) {
+            console.warn('[API] save ' + entity + ':', e.message);
+            // Show error to user instead of silent failure
+            var entityLabel = entity.charAt(0).toUpperCase() + entity.slice(1);
+            Utils.showToast('Error saving ' + entityLabel + ': ' + e.message, 'error');
+        });
     }
     return item;
 }
@@ -272,7 +277,12 @@ function remove(entity, id) {
     _setList(entity, _getList(entity).filter(function(e) { return e.id !== id; }));
     if (isApiMode() && getJwt()) {
         _apiFetch('/api/' + entity + '/' + id, { method: 'DELETE' })
-            .catch(function(e) { console.warn('[API] delete ' + entity + '/' + id + ':', e.message); });
+            .catch(function(e) {
+                console.warn('[API] delete ' + entity + '/' + id + ':', e.message);
+                // Show error to user instead of silent failure
+                var entityLabel = entity.charAt(0).toUpperCase() + entity.slice(1);
+                Utils.showToast('Error deleting ' + entityLabel + ': ' + e.message, 'error');
+            });
     }
 }
 
