@@ -267,14 +267,11 @@ window.WorkerTimeEntry = {
 
         // ── Complete-entry form (shared by both modes after clock-out) ───
         function renderCompleteForm(defaultDate, defaultStart, defaultEnd) {
-            // Remove any existing form to prevent duplicates
-            // Use aggressive clearing to ensure no leftover elements
-            while (contentArea.firstChild) {
-                contentArea.removeChild(contentArea.firstChild);
-            }
+            // CRITICAL: Clear contentArea completely and atomically
+            contentArea.innerHTML = '';
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
-            var selectedExpenses = [];
+            var selectedExpenses = []; // Reset expense list for this form
 
             var form = document.createElement('form');
             form.className = 'time-entry-form';
@@ -305,7 +302,7 @@ window.WorkerTimeEntry = {
                     '</div>';
             }
 
-            // Start / End time
+            // Start / End time (SINGLE occurrence only)
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Start &amp; End Time</label>' +
@@ -323,7 +320,7 @@ window.WorkerTimeEntry = {
             // Hidden rate
             formHTML += '<input type="hidden" id="teRate" value="' + esc(String(workerRate)) + '">';
 
-            // Description
+            // Description (SINGLE occurrence only)
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label" for="teDescription">Description of Work <span style="font-weight:400;color:var(--text2)">(required)</span></label>' +
@@ -339,16 +336,18 @@ window.WorkerTimeEntry = {
                     '</div>' +
                 '</div>';
 
-            // Expenses
+            // Expenses (SINGLE input section)
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Expenses <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
                     '<div id="expenseList" style="margin-bottom:12px"></div>' +
-                    '<div style="display:flex;gap:8px">' +
-                        '<input class="form-control" type="text" id="teExpenseDesc" placeholder="Expense description (e.g. Gas, Tools)" style="flex:1">' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                        '<input class="form-control" type="text" id="teExpenseDesc" placeholder="Expense description (e.g. Gas, Tools)" style="flex:1;min-width:150px">' +
                         '<input class="form-control" type="number" id="teExpenseAmount" placeholder="$0.00" step="0.01" min="0" style="width:100px">' +
-                        '<button type="button" class="btn-secondary" id="addExpenseBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
+                        '<button type="button" class="btn btn-secondary" id="teExpenseFileBtn" style="padding:10px 16px;white-space:nowrap">📎 Attach</button>' +
+                        '<button type="button" class="btn btn-secondary" id="addExpenseBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
                     '</div>' +
+                    '<input type="file" id="teExpenseInput" style="display:none">' +
                 '</div>';
 
             // Photos
@@ -370,6 +369,7 @@ window.WorkerTimeEntry = {
 
             // Set form HTML all at once
             form.innerHTML = formHTML;
+            contentArea.innerHTML = ''; // Double-clear before appending
             contentArea.appendChild(form);
 
             // ── Wire events ──────────────────────────────────────────────
@@ -405,7 +405,22 @@ window.WorkerTimeEntry = {
             }
             if (subtaskSelect) { subtaskSelect.addEventListener('change', updateUnits); updateUnits(); }
 
-            // Expenses
+            // Expenses — with file attachment support
+            var currentExpenseFile = null; // Track current file being attached
+
+            form.querySelector('#teExpenseFileBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                form.querySelector('#teExpenseInput').click();
+            });
+
+            form.querySelector('#teExpenseInput').addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    currentExpenseFile = this.files[0];
+                    Utils.showToast('📎 ' + currentExpenseFile.name + ' attached', 'success');
+                }
+                this.value = '';
+            });
+
             form.querySelector('#addExpenseBtn').addEventListener('click', function() {
                 var desc = form.querySelector('#teExpenseDesc').value.trim();
                 var amt = parseFloat(form.querySelector('#teExpenseAmount').value);
@@ -413,9 +428,10 @@ window.WorkerTimeEntry = {
                     Utils.showToast('Enter expense description and valid amount', 'error');
                     return;
                 }
-                selectedExpenses.push({ description: desc, amount: amt });
+                selectedExpenses.push({ description: desc, amount: amt, file: currentExpenseFile });
                 form.querySelector('#teExpenseDesc').value = '';
                 form.querySelector('#teExpenseAmount').value = '';
+                currentExpenseFile = null;
                 renderExpenseList();
             });
 
@@ -426,10 +442,18 @@ window.WorkerTimeEntry = {
                 selectedExpenses.forEach(function(exp, idx) {
                     total += exp.amount;
                     var item = document.createElement('div');
-                    item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(245,158,11,.1);border-radius:6px;margin-bottom:6px';
-                    item.innerHTML = 
-                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + '</span>' +
-                        '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
+                    item.style.cssText = 'padding:8px;background:rgba(245,158,11,.1);border-radius:6px;margin-bottom:6px';
+
+                    var itemContent = '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + (exp.file ? ' 📎' : '') + '</span>' +
+                        '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>' +
+                        '</div>';
+
+                    if (exp.file) {
+                        itemContent += '<div style="font-size:0.8rem;color:var(--text2);margin-top:4px">Attachment: ' + esc(exp.file.name) + '</div>';
+                    }
+
+                    item.innerHTML = itemContent;
                     item.querySelector('button').addEventListener('click', function(e) {
                         e.preventDefault();
                         selectedExpenses.splice(parseInt(this.dataset.idx), 1);
@@ -513,6 +537,7 @@ window.WorkerTimeEntry = {
                     var submissionId = AppData.generateId();
                     var photoIds = [];
 
+                    // Upload photos
                     for (var p = 0; p < selectedPhotos.length; p++) {
                         var photo = selectedPhotos[p];
                         var thumb = await Utils.createThumbnail(photo.file);
@@ -527,6 +552,29 @@ window.WorkerTimeEntry = {
                             filename: photo.file.name || 'photo.jpg'
                         });
                         photoIds.push(photo.id);
+                    }
+
+                    // Process expenses and upload attachments
+                    var processedExpenses = [];
+                    for (var e = 0; e < selectedExpenses.length; e++) {
+                        var exp = selectedExpenses[e];
+                        var expObj = { description: exp.description, amount: exp.amount, attachmentId: null };
+
+                        // Upload expense attachment if present
+                        if (exp.file) {
+                            var expFileId = AppData.generateId();
+                            await AppData.savePhoto({
+                                id: expFileId,
+                                projectId: projectId,
+                                workerId: worker.id,
+                                submissionId: submissionId,
+                                date: dateValue,
+                                blob: exp.file,
+                                filename: exp.file.name || 'attachment'
+                            });
+                            expObj.attachmentId = expFileId;
+                        }
+                        processedExpenses.push(expObj);
                     }
 
                     var submission = {
@@ -547,7 +595,7 @@ window.WorkerTimeEntry = {
                         unitsCompleted: unitsValue,
                         unitOfMeasure: unitOfMeasure,
                         photoIds: photoIds,
-                        expenses: selectedExpenses || [],
+                        expenses: processedExpenses,
                         status: 'Pending',
                         submittedAt: new Date().toISOString(),
                         rejectionReason: null,
