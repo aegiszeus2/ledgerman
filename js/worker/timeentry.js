@@ -267,11 +267,8 @@ window.WorkerTimeEntry = {
 
         // ── Complete-entry form (shared by both modes after clock-out) ───
         function renderCompleteForm(defaultDate, defaultStart, defaultEnd) {
-            // CRITICAL: Aggressively clear contentArea to remove any leftover elements
-            // Use while loop to ensure complete removal
-            while (contentArea.firstChild) {
-                contentArea.removeChild(contentArea.firstChild);
-            }
+            // CRITICAL: Clear contentArea completely and atomically
+            contentArea.innerHTML = '';
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
             var selectedExpenses = []; // Reset expense list for this form
@@ -284,7 +281,7 @@ window.WorkerTimeEntry = {
             // Build form HTML in one string to avoid potential issues with repeated +=
             var formHTML = '';
 
-            // Date (SINGLE field)
+            // Date
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label" for="teDate">Date</label>' +
@@ -305,7 +302,7 @@ window.WorkerTimeEntry = {
                     '</div>';
             }
 
-            // Start / End time (SINGLE field pair only)
+            // Start / End time (SINGLE occurrence only)
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Start &amp; End Time</label>' +
@@ -323,7 +320,7 @@ window.WorkerTimeEntry = {
             // Hidden rate
             formHTML += '<input type="hidden" id="teRate" value="' + esc(String(workerRate)) + '">';
 
-            // Description (SINGLE field only)
+            // Description (SINGLE occurrence only)
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label" for="teDescription">Description of Work <span style="font-weight:400;color:var(--text2)">(required)</span></label>' +
@@ -339,7 +336,7 @@ window.WorkerTimeEntry = {
                     '</div>' +
                 '</div>';
 
-            // Expenses (SINGLE input section only)
+            // Expenses (SINGLE input section)
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Expenses <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
@@ -366,16 +363,13 @@ window.WorkerTimeEntry = {
                     '<div class="photo-preview-grid" id="photoPreviewArea"></div>' +
                 '</div>';
 
-            // Submit (SINGLE button only)
+            // Submit
             formHTML +=
                 '<button type="submit" class="submit-btn-large" id="teSubmitBtn">&#10003; Submit Time Entry</button>';
 
-            // Set form HTML all at once (safest way to avoid duplication)
+            // Set form HTML all at once
             form.innerHTML = formHTML;
-            // Verify contentArea is empty before appending
-            while (contentArea.lastChild) {
-                contentArea.removeChild(contentArea.lastChild);
-            }
+            contentArea.innerHTML = ''; // Double-clear before appending
             contentArea.appendChild(form);
 
             // ── Wire events ──────────────────────────────────────────────
