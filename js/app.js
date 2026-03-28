@@ -986,6 +986,9 @@
                         <a class="nav-item" data-route="help" data-tooltip="Help — how to use Ledgerman">
                             <span class="nav-icon">❓</span><span class="nav-label">Help</span>
                         </a>
+                        <a class="nav-item" data-route="task-assignment" data-tooltip="Task Assignment — assign tasks to workers">
+                            <span class="nav-icon">✓</span><span class="nav-label">Task Assignment</span>
+                        </a>
                     </nav>
                 </div>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -1150,6 +1153,9 @@
                     if (window.AdminHelp) AdminHelp.render(content);
                     break;
                 default:
+                case 'task-assignment':
+                    if (window.AdminTaskAssignment) AdminTaskAssignment.render(content, params);
+                    break;
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
             }
 
@@ -1191,6 +1197,10 @@
                         <span class="worker-nav-label">Tasks</span>
                     </a>
                     <a class="worker-nav-item" data-route="help">
+                    <a class="worker-nav-item" data-route="tasks">
+                        <span class="worker-nav-icon">✓</span>
+                        <span class="worker-nav-label">My Tasks</span>
+                    </a>
                         <span class="worker-nav-icon">❓</span>
                         <span class="worker-nav-label">Help</span>
                     </a>
@@ -1271,6 +1281,9 @@
                     if (window.WorkerTasksScreen) WorkerTasksScreen.render(content, worker);
                     break;
                 case 'help':
+                case 'tasks':
+                    if (window.WorkerTasks) WorkerTasks.render(content, worker, params);
+                    break;
                     if (window.WorkerHelp) WorkerHelp.render(content);
                     break;
                 default:
