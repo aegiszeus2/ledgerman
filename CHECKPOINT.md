@@ -1,74 +1,73 @@
 # Checkpoint: Ledgerman Mobile (Phase 3)
 
-**Status:** ACTIVE
-**Last Updated:** 2026-03-28 17:30
-**Phase:** 3 — Photo Upload + Projects/Tasks + Persistent Auth
+**Status:** PHOTO UPLOAD COMPLETE
+**Last Updated:** 2026-03-28 21:30
+**Phase:** 3 — Photo Upload ✅ | Projects/Tasks ✅ | Persistent Auth → NEXT
 
 ## Objective
 Convert Ledgerman web-based Till to React Native mobile app for Android/Google Play distribution.
 
-## Latest Work (Phase 3)
-✅ **Auth Persistence** — AsyncStorage stores JWT token on login, restored on app startup
-✅ **Projects Screen** — Lists projects, can drill into project to view tasks
-✅ **Tasks Screen** — Shows all tasks for selected project with status/due dates
-✅ **Photo Upload Screen** — Project selection + caption input with FormData support
-✅ **API Service Expansion** — Added projectService, taskService, photoService
-✅ **App Initialization** — Loading state while restoring auth, seamless resume after logout
-✅ **Dashboard Updates** — Added Photos menu item, removed Expenses (future feature)
+## Phase 3 Completion (Photo Upload)
+✅ **PhotoUploadScreen** — Complete with camera/gallery integration
+✅ **Image Utilities** — Base64 conversion, thumbnail generation, file size validation
+✅ **API Service** — photoService endpoint integrated with backend
+✅ **Dashboard Integration** — "Upload Photos" menu item → navigates to Photos screen
+✅ **Project Selection** — Users select target project before upload
+✅ **Image Preview** — Selected image displayed with filename and size
+✅ **Form Validation** — Validates project and image selection before upload
+✅ **Error Handling** — User-friendly alerts for permission/upload failures
+✅ **Dependencies** — expo-file-system, expo-image-manipulator installed and compatible
 
 ## Project Location
 `~/Desktop/Project Organizer/Ledgerman/LedgermanMobile/`
 
 ## Architecture
-- **Framework:** React Native (Expo)
+- **Framework:** React Native (Expo 50.x)
 - **Language:** TypeScript
-- **State:** Local component state (upgrade to Context/Redux for Phase 4)
-- **API:** Axios with Bearer token auth (persistent via AsyncStorage)
+- **State:** Local component state + persistent auth (AsyncStorage)
+- **API:** Axios with Bearer token auth
 - **Base URL:** `http://app.ledgerman.org/api` (configurable via .env)
-- **Auth Persistence:** AsyncStorage keeps user logged in after restart
+- **Image Handling:** expo-file-system + expo-image-manipulator
 
-## Files Added/Modified
-- `src/App.tsx` — Auth restoration on startup, app initialization state
-- `src/screens/ProjectsScreen.tsx` — Project list + task drill-down
-- `src/screens/PhotoUploadScreen.tsx` — Photo upload with project selector
-- `src/screens/DashboardScreen.tsx` — Added Photos menu item
-- `src/services/api.ts` — projectService, taskService, photoService endpoints
-- `src/types/index.ts` — Project, Task, Photo interfaces
+## Files Added/Modified (Phase 3)
+- `src/screens/PhotoUploadScreen.tsx` — Full implementation with camera/gallery, preview, upload
+- `src/utils/imageUtils.ts` — NEW: imageToBase64, createThumbnail, getImageFilename, formatBytes, getBase64Size
+- `src/App.tsx` — Integrated Photos screen navigation (case 'Photos')
+- `src/screens/DashboardScreen.tsx` — "Upload Photos" menu item with navigation
+- `src/services/api.ts` — photoService with uploadPhoto method
+- `package.json` — Updated with expo SDK 50 compatible versions for image libraries
 
-## Next Actions (Phase 4)
-1. Integrate react-native-image-picker for actual camera/gallery selection
-2. Implement photo preview before upload
-3. Add Expenses tracking screen
-4. Refactor state management to Context API or Redux
-5. Add offline capability (RxDB or WatermelonDB)
-6. Build Android APK and configure signing
-7. Google Play Store account setup and submission
+## Photo Upload Flow
+1. User taps "Upload Photos" on dashboard
+2. PhotoUploadScreen loads and fetches available projects via API
+3. User selects project (displayed as pill buttons)
+4. User taps "Camera" or "Gallery" to select image
+5. Image preview displays with filename and file size
+6. User enters optional caption
+7. User taps "Upload Photo"
+8. Image converted to base64 + thumbnail generated
+9. POST to /api/photos with projectId, workerId, date, filename, blobB64, thumbnailB64
+10. Success alert, return to dashboard
 
-## Known Issues
-- Photo upload form is placeholder (no actual image selection yet)
-- Navigation between screens uses simple state switching (not React Navigation yet)
-- No offline capability
-- No form validation on project/task creation
+## Next Actions (Persistent Auth + Projects/Tasks)
+1. ✅ Photo upload complete
+2. → Persistent authentication (prevent login loop)
+3. → Projects/Tasks screens (view assignments)
+4. → Context API state management (avoid prop drilling)
+5. → Android build + Google Play submission
 
-## Testing
-Ready for Expo simulator testing:
-```
+## Testing Ready
+```bash
 cd ~/Desktop/Project\ Organizer/Ledgerman/LedgermanMobile
 npm start
+# Press 'a' for Android, 'i' for iOS
 ```
-Then: Press `a` for Android emulator or `i` for iOS simulator.
 
-**Test Flow:**
-1. Login with test credentials (Company='Belfort Con', Name='Damiano', PIN='1234')
-2. Navigate to Projects → view available projects and tasks
-3. Navigate to Photos → select project and enter caption
-4. Dashboard should show all three main features
-
-## Dependencies
-- expo, react, react-native: Latest
-- axios: HTTP client
-- @react-native-async-storage/async-storage: Persistent auth storage
-- typescript: Type safety
+**Test Scenario:**
+1. Login: Company='Belfort Con', Name='Damiano', PIN='1234'
+2. Dashboard → "Upload Photos"
+3. Select project → Camera/Gallery → Upload
+4. Verify photo endpoint receives base64 data
 
 ## Deployment
-Phase 4+ includes Android build setup and Google Play submission.
+Ready for Phase 4: Persistent auth implementation + Projects/Tasks completion.

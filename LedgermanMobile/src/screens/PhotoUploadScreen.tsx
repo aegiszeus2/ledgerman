@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,27 +10,43 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { photoService, projectService } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { photoService, projectService, PhotoUploadRequest } from '../services/api';
+import { imageToBase64, createThumbnail, getImageFilename, formatBytes, getBase64Size } from '../utils/imageUtils';
 import { Project, Photo } from '../types/index';
 
 interface PhotoUploadScreenProps {
   onSuccess: () => void;
   onGoBack: () => void;
+  workerId?: string;
 }
 
 export default function PhotoUploadScreen({
   onSuccess,
   onGoBack,
+  workerId,
 }: PhotoUploadScreenProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedImage, setSelectedImage] = useState<{ uri: string; filename: string } | null>(null);
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [imageSize, setImageSize] = useState<string>('');
 
   React.useEffect(() => {
     loadProjects();
+    requestCameraPermissions();
   }, []);
+
+  const requestCameraPermissions = async () => {
+    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+    const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
+      Alert.alert('Permission Required', 'Camera and library access is required to upload photos.');
+    }
+  };
 
   const loadProjects = async () => {
     try {
@@ -50,33 +66,86 @@ export default function PhotoUploadScreen({
     }
   };
 
+  const handlePickImage = async (source: 'camera' | 'library') => {
+    try {
+      let result;
+
+      if (source === 'camera') {
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const base64 = await imageToBase64(asset.uri);
+        const size = getBase64Size(base64);
+
+        setSelectedImage({
+          uri: asset.uri,
+          filename: getImageFilename(asset.uri),
+        });
+        setImageSize(formatBytes(size));
+      }
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to select image. ' + error.message);
+    }
+  };
+
   const handleUploadPhoto = async () => {
     if (!selectedProject) {
       Alert.alert('Error', 'Please select a project');
       return;
     }
 
+    if (!selectedImage) {
+      Alert.alert('Error', 'Please select an image');
+      return;
+    }
+
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('project_id', selectedProject);
-      if (caption) {
-        formData.append('caption', caption);
-      }
-      // In a real app, you would append actual image data here
-      // For now, this is a placeholder for the photo upload structure
+      // Convert image to base64
+      const blobB64 = await imageToBase64(selectedImage.uri);
 
-      const response = await photoService.uploadPhoto(formData);
+      // Create thumbnail
+      const thumbnail = await createThumbnail(selectedImage.uri);
 
-      if (response.data.id) {
+      // Prepare upload data
+      const uploadData: PhotoUploadRequest = {
+        projectId: selectedProject,
+        workerId: workerId || '',
+        date: new Date().toISOString().split('T')[0],
+        filename: selectedImage.filename,
+        blobB64,
+        thumbnailB64: thumbnail.base64,
+      };
+
+      // Upload to backend
+      const response = await photoService.uploadPhoto(uploadData);
+
+      if (response.data.id || response.status === 201) {
         Alert.alert('Success', 'Photo uploaded successfully');
         setCaption('');
+        setSelectedImage(null);
+        setImageSize('');
         onSuccess();
       }
     } catch (error: any) {
+      console.error('Upload error:', error);
       Alert.alert(
         'Error',
-        error.response?.data?.message || 'Failed to upload photo'
+        error.response?.data?.error || error.message || 'Failed to upload photo'
       );
     } finally {
       setUploading(false);
@@ -126,32 +195,66 @@ export default function PhotoUploadScreen({
           ))}
         </View>
 
-        <Text style={styles.label}>Photo Caption</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter photo caption (optional)"
-          value={caption}
-          onChangeText={setCaption}
-          multiline
-          numberOfLines={3}
-        />
+        <Text style={styles.label}>Select Photo</Text>
+        <View style={styles.imagePickerButtons}>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => handlePickImage('camera')}
+            disabled={uploading}
+          >
+            <Text style={styles.pickerButtonText}>📷 Camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => handlePickImage('library')}
+            disabled={uploading}
+          >
+            <Text style={styles.pickerButtonText}>🖼️ Gallery</Text>
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          style={[styles.uploadButton, uploading && styles.buttonDisabled]}
-          onPress={handleUploadPhoto}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.uploadButtonText}>Upload Photo</Text>
-          )}
-        </TouchableOpacity>
+        {selectedImage && (
+          <>
+            <View style={styles.imagePreview}>
+              <Image
+                source={{ uri: selectedImage.uri }}
+                style={styles.previewImage}
+              />
+              <View style={styles.imageInfo}>
+                <Text style={styles.imageFilename}>{selectedImage.filename}</Text>
+                <Text style={styles.imageSize}>{imageSize}</Text>
+              </View>
+            </View>
 
-        <Text style={styles.helpText}>
-          Note: Photo selection from camera/gallery will be integrated with
-          react-native-image-picker in the next update.
-        </Text>
+            <Text style={styles.label}>Photo Caption (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter photo caption"
+              value={caption}
+              onChangeText={setCaption}
+              multiline
+              numberOfLines={3}
+            />
+
+            <TouchableOpacity
+              style={[styles.uploadButton, uploading && styles.buttonDisabled]}
+              onPress={handleUploadPhoto}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.uploadButtonText}>Upload Photo</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+
+        {!selectedImage && (
+          <Text style={styles.helpText}>
+            Tap "Camera" or "Gallery" to select a photo to upload.
+          </Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -219,6 +322,49 @@ const styles = StyleSheet.create({
   projectOptionTextSelected: {
     color: '#007AFF',
     fontWeight: '600',
+  },
+  imagePickerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pickerButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  pickerButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  imagePreview: {
+    marginTop: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#f9f9f9',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  imageInfo: {
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  imageFilename: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  imageSize: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
   },
   input: {
     borderWidth: 1,

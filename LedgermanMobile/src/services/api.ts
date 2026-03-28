@@ -106,30 +106,55 @@ export const timeService = {
     api.put<TimeEntry>(`/time-entries/${id}`, data),
 };
 
+
+export interface PhotoUploadRequest {
+  projectId?: string;
+  workerId?: string;
+  submissionId?: string;
+  date?: string;
+  filename: string;
+  blobB64: string;
+  thumbnailB64: string;
+}
+
+export const photoService = {
+  uploadPhoto: (data: PhotoUploadRequest) =>
+    api.post<Photo>('/photos', data),
+  getPhotos: (projectId?: string) =>
+    api.get<Photo[]>('/photos', { params: { project_id: projectId } }),
+};
+
 export const projectService = {
   getProjects: () => api.get<Project[]>('/projects'),
-  getProject: (id: string) => api.get<Project>(`/projects/${id}`),
+  getProjectById: (id: string) => api.get<Project>(`/projects/${id}`),
   createProject: (data: Omit<Project, 'id' | 'created_at'>) =>
     api.post<Project>('/projects', data),
+  updateProject: (id: string, data: Partial<Project>) =>
+    api.put<Project>(`/projects/${id}`, data),
 };
 
 export const taskService = {
-  getTasks: (projectId: string) =>
-    api.get<Task[]>(`/projects/${projectId}/tasks`),
-  getTask: (id: string) => api.get<Task>(`/tasks/${id}`),
+  getTasks: (projectId?: string) =>
+    api.get<Task[]>('/tasks', { params: { project_id: projectId } }),
+  getTaskById: (id: string) => api.get<Task>(`/tasks/${id}`),
   createTask: (data: Omit<Task, 'id' | 'created_at'>) =>
     api.post<Task>('/tasks', data),
   updateTask: (id: string, data: Partial<Task>) =>
     api.put<Task>(`/tasks/${id}`, data),
+  deleteTask: (id: string) => api.delete<void>(`/tasks/${id}`),
 };
 
-export const photoService = {
-  uploadPhoto: (formData: FormData) =>
-    api.post<Photo>('/photos', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  getPhotos: (projectId?: string) =>
-    api.get<Photo[]>('/photos', { params: { project_id: projectId } }),
+export interface Worker {
+  id: string;
+  name: string;
+  company: string;
+  role?: string;
+}
+
+export const workerService = {
+  getWorker: (id: string) => api.get<Worker>(`/workers/${id}`),
+  updateWorker: (id: string, data: Partial<Worker>) =>
+    api.put<Worker>(`/workers/${id}`, data),
 };
 
 export default api;

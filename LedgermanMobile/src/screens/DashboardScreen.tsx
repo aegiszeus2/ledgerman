@@ -36,10 +36,18 @@ export default function DashboardScreen({
 
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => onNavigate('Tasks')}
+        >
+          <Text style={styles.menuTitle}>All Tasks</Text>
+          <Text style={styles.menuDesc}>View all tasks across projects</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => onNavigate('Projects')}
         >
           <Text style={styles.menuTitle}>Projects</Text>
-          <Text style={styles.menuDesc}>View projects & tasks</Text>
+          <Text style={styles.menuDesc}>View projects & their tasks</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -48,6 +56,22 @@ export default function DashboardScreen({
         >
           <Text style={styles.menuTitle}>Upload Photos</Text>
           <Text style={styles.menuDesc}>Add project photos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => onNavigate('PhotoGallery')}
+        >
+          <Text style={styles.menuTitle}>Photo Gallery</Text>
+          <Text style={styles.menuDesc}>View all uploaded photos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => onNavigate('Settings')}
+        >
+          <Text style={styles.menuTitle}>Settings</Text>
+          <Text style={styles.menuDesc}>Manage your profile</Text>
         </TouchableOpacity>
       </View>
 
