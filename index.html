@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="css/worker.css">
     <link rel="stylesheet" href="css/invoice-print.css">
+    <!-- Frappe Gantt Chart Library (MIT License) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
 </head>
 <body>
     <div id="app">
@@ -24,6 +26,9 @@
 
     <!-- EmailJS SDK (email-based 2FA & password reset) -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <!-- Frappe Gantt Chart Library (MIT License) -->
+    <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.js"></script>
 
     <!-- API config — must load before data.js -->
     <script src="config.js"></script>
@@ -54,6 +59,7 @@
     <script src="js/admin/budget-tracking.js"></script>
     <script src="js/admin/daily-reports.js"></script>
     <script src="js/admin/punch-lists.js"></script>
+    <script src="js/admin/gantt-chart.js"></script>
 
     <!-- Worker Modules -->
     <script src="js/worker/home.js"></script>

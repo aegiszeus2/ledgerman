@@ -998,6 +998,9 @@
                         <a class="nav-item" data-route="punch-lists" data-tooltip="Punch Lists — deficiency tracking and sign-off">
                             <span class="nav-icon">✓</span><span class="nav-label">Punch Lists</span>
                         </a>
+                        <a class="nav-item" data-route="gantt-chart" data-tooltip="Project Timeline — visual schedule of tasks and milestones">
+                            <span class="nav-icon">📊</span><span class="nav-label">Project Timeline</span>
+                        </a>
                     </nav>
                 </div>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -1172,6 +1175,9 @@
                     break;
                 case 'punch-lists':
                     if (window.AdminPunchLists) AdminPunchLists.render(content, params);
+                    break;
+                case 'gantt-chart':
+                    if (window.AdminGanttChart) AdminGanttChart.render(content, params);
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';

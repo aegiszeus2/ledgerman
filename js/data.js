@@ -216,11 +216,13 @@ async function syncFromServer() {
             vendors:     data.vendors     || [],
             invites:     data.invites     || [],
             auditLog:    data.auditLog    || [],
+            daily_reports: data.daily_reports || [],
+            punch_items: data.punch_items || [],
             settings:    data.settings    || {},
         };
         // Mirror to localStorage as offline backup
         ['workers','projects','tasks','clients','subtasks','expenses','submissions',
-         'invoices','payments','vendors','invites','auditLog'].forEach(function(key) {
+         'invoices','payments','vendors','invites','auditLog','daily_reports','punch_items'].forEach(function(key) {
             setData(key, _cache[key]);
         });
         setData('settings', _cache.settings);
@@ -242,6 +244,8 @@ async function syncFromServer() {
             vendors:     getData('vendors')     || [],
             invites:     getData('invites')     || [],
             auditLog:    getData('auditLog')    || [],
+            daily_reports: getData('daily_reports') || [],
+            punch_items: getData('punch_items') || [],
             settings:    getData('settings')    || {},
         };
         return _cache;
