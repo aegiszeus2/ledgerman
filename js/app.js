@@ -989,6 +989,9 @@
                         <a class="nav-item" data-route="task-assignment" data-tooltip="Task Assignment — assign tasks to workers">
                             <span class="nav-icon">✓</span><span class="nav-label">Task Assignment</span>
                         </a>
+                        <a class="nav-item" data-route="budget-tracking" data-tooltip="Budget Tracking — project budgets vs actual spending">
+                            <span class="nav-icon">💰</span><span class="nav-label">Budget Tracking</span>
+                        </a>
                     </nav>
                 </div>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -1152,10 +1155,13 @@
                 case 'help':
                     if (window.AdminHelp) AdminHelp.render(content);
                     break;
-                default:
                 case 'task-assignment':
                     if (window.AdminTaskAssignment) AdminTaskAssignment.render(content, params);
                     break;
+                case 'budget-tracking':
+                    if (window.AdminBudgetTracking) AdminBudgetTracking.render(content, params);
+                    break;
+                default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
             }
 
