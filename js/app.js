@@ -995,6 +995,9 @@
                         <a class="nav-item" data-route="daily-reports" data-tooltip="Daily Reports — crew summaries and site conditions">
                             <span class="nav-icon">📋</span><span class="nav-label">Daily Reports</span>
                         </a>
+                        <a class="nav-item" data-route="punch-lists" data-tooltip="Punch Lists — deficiency tracking and sign-off">
+                            <span class="nav-icon">✓</span><span class="nav-label">Punch Lists</span>
+                        </a>
                     </nav>
                 </div>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -1166,6 +1169,9 @@
                     break;
                 case 'daily-reports':
                     if (window.AdminDailyReports) AdminDailyReports.render(content, params);
+                    break;
+                case 'punch-lists':
+                    if (window.AdminPunchLists) AdminPunchLists.render(content, params);
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
