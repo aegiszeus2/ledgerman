@@ -992,6 +992,9 @@
                         <a class="nav-item" data-route="budget-tracking" data-tooltip="Budget Tracking — project budgets vs actual spending">
                             <span class="nav-icon">💰</span><span class="nav-label">Budget Tracking</span>
                         </a>
+                        <a class="nav-item" data-route="daily-reports" data-tooltip="Daily Reports — crew summaries and site conditions">
+                            <span class="nav-icon">📋</span><span class="nav-label">Daily Reports</span>
+                        </a>
                     </nav>
                 </div>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -1160,6 +1163,9 @@
                     break;
                 case 'budget-tracking':
                     if (window.AdminBudgetTracking) AdminBudgetTracking.render(content, params);
+                    break;
+                case 'daily-reports':
+                    if (window.AdminDailyReports) AdminDailyReports.render(content, params);
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
