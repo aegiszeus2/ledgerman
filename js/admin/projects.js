@@ -2,7 +2,7 @@
 window.AdminProjects = {
     _statusFilter: 'All',
     _viewingProjectId: null,
-    _activeTab: 'subtasks',
+    _activeTab: 'tasks',
     _wizardMode: false,
 
     render(container, params) {
@@ -209,6 +209,12 @@ window.AdminProjects = {
                                     <option value="On Hold" ${project && project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
                                 </select>
                             </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Project Budget / Contract Value ($)</label>
+                                <input type="number" name="budget" step="0.01" min="0" value="${project ? project.budget || '' : ''}">
+                            </div>
+                        </div>
                         </div>
 
                         <div class="form-group" style="margin-bottom:12px">
@@ -301,7 +307,8 @@ window.AdminProjects = {
                 endDate: fd.endDate || '',
                 status: fd.status || 'Active',
                 description: (fd.description || '').trim(),
-                assignedWorkers: workerIds
+                assignedWorkers: workerIds,
+                budget: parseFloat(fd.budget) || 0,
             };
             AppData.saveProject(projectData);
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
@@ -322,7 +329,7 @@ window.AdminProjects = {
             return;
         }
         const esc = Utils.escapeHtml;
-        const tabs = ['subtasks', 'expenses', 'photos', 'invoices'];
+        const tabs = ['tasks', 'budget', 'subtasks', 'expenses', 'photos', 'invoices'];
 
         container.innerHTML = `
             <div style="margin-bottom:16px">
@@ -369,11 +376,149 @@ window.AdminProjects = {
 
         const tabContent = container.querySelector('#projectTabContent');
         switch (self._activeTab) {
+            case 'tasks': self._renderTasksTab(tabContent, project); break;
+            case 'budget': self._renderBudgetTab(tabContent, project); break;
             case 'subtasks': self._renderSubtasksTab(tabContent, project); break;
             case 'expenses': self._renderExpensesTab(tabContent, project); break;
             case 'photos': self._renderPhotosTab(tabContent, project); break;
             case 'invoices': self._renderInvoicesTab(tabContent, project); break;
         }
+    },
+
+    _renderTasksTab(tabContent, project) {
+        const self = this;
+        const tasks = AppData.getTasks(project.id);
+        const workers = AppData.getWorkers();
+        const esc = Utils.escapeHtml;
+
+        tabContent.innerHTML = `
+            <div style="margin-bottom:12px">
+                <button class="btn-primary btn-sm" id="addTaskBtn">+ Add Task</button>
+            </div>
+            <div class="card">
+                ${tasks.length === 0
+                    ? '<div class="empty"><h3>No Tasks</h3><p>Add tasks to assign work to team members and track progress.</p></div>'
+                    : `<table style="width:100%;font-size:.9rem">
+                        <thead><tr>
+                            <th>Task</th><th>Assigned To</th><th>Due Date</th><th>Status</th><th>Actions</th>
+                        </tr></thead>
+                        <tbody>${tasks.map(function(t) {
+                            const assignedWorker = workers.find(function(w) { return w.id === t.assigned_to; });
+                            const statusClass = t.status === 'Done' ? 'status-done' : (t.status === 'Active' ? 'status-active' : 'status-todo');
+                            return '<tr>' +
+                                '<td><strong>' + esc(t.name) + '</strong>' +
+                                    (t.description ? '<br><span style="font-size:.8rem;color:var(--text2)">' + esc(t.description) + '</span>' : '') +
+                                '</td>' +
+                                '<td>' + (assignedWorker ? esc(assignedWorker.name) : '<span style="color:var(--text2)">Unassigned</span>') + '</td>' +
+                                '<td>' + (t.due_date ? esc(t.due_date) : '-') + '</td>' +
+                                '<td><span class="status-badge ' + statusClass + '">' + esc(t.status || 'Todo') + '</span></td>' +
+                                '<td style="white-space:nowrap">' +
+                                    '<button class="btn-ghost btn-sm edit-task" data-id="' + t.id + '">Edit</button>' +
+                                    '<button class="btn-ghost btn-sm delete-task" data-id="' + t.id + '" style="color:var(--accent)">Del</button>' +
+                                '</td>' +
+                            '</tr>';
+                        }).join('')}</tbody>
+                    </table>`
+                }
+            </div>
+        `;
+
+        tabContent.querySelector('#addTaskBtn').addEventListener('click', function() {
+            self._showTaskModal(project.id, null);
+        });
+        tabContent.querySelectorAll('.edit-task').forEach(function(btn) {
+            btn.addEventListener('click', function() { self._showTaskModal(project.id, btn.dataset.id); });
+        });
+        tabContent.querySelectorAll('.delete-task').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+                const confirmed = await Utils.confirm('Delete this task?');
+                if (!confirmed) return;
+                AppData.deleteTask(btn.dataset.id);
+                const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+                AppData.addAuditLog(username, 'Task Deleted', 'Project: ' + project.name);
+                Utils.showToast('Task deleted');
+                self._renderDetail();
+            });
+        });
+    },
+
+    _showTaskModal(projectId, editId) {
+        const self = this;
+        const task = editId ? AppData.getTask(editId) : null;
+        const isEdit = !!task;
+        const esc = Utils.escapeHtml;
+        const workers = AppData.getWorkers();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+            <div class="modal" style="max-width:500px">
+                <h3>${isEdit ? 'Edit Task' : 'Add Task'}</h3>
+                <form id="taskForm" novalidate>
+                    <div class="form-group" style="margin-bottom:12px">
+                        <label>Task Name *</label>
+                        <input name="name" value="${esc(task ? task.name : '')}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px">
+                        <label>Description</label>
+                        <textarea name="description" rows="2">${esc(task ? (task.description || '') : '')}</textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Assigned To</label>
+                            <select name="assigned_to">
+                                <option value="">-- Unassigned --</option>
+                                ${workers.map(function(w) {
+                                    return '<option value="' + w.id + '" ' + (task && task.assigned_to === w.id ? 'selected' : '') + '>' + esc(w.name) + '</option>';
+                                }).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Due Date</label>
+                            <input type="date" name="due_date" value="${task && task.due_date ? esc(task.due_date) : ''}">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px">
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="Todo" ${(!task || task.status === 'Todo') ? 'selected' : ''}>Todo</option>
+                            <option value="Active" ${task && task.status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Done" ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'}</button>
+                        <button type="button" class="btn-secondary modal-close">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+
+        overlay.querySelector('#taskForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!Utils.validateForm(this)) return;
+            const fd = Utils.getFormData(this);
+            if (!fd.name.trim()) { Utils.showToast('Task name is required', 'error'); return; }
+            const data = {
+                id: isEdit ? task.id : AppData.generateId(),
+                projectId: projectId,
+                name: fd.name.trim(),
+                description: (fd.description || '').trim(),
+                assigned_to: fd.assigned_to || null,
+                due_date: fd.due_date || null,
+                status: fd.status || 'Todo'
+            };
+            AppData.saveTask(data);
+            const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            AppData.addAuditLog(username, isEdit ? 'Task Updated' : 'Task Added', data.name);
+            Utils.showToast(isEdit ? 'Task updated' : 'Task added');
+            overlay.remove();
+            self._renderDetail();
+        });
     },
 
     _renderSubtasksTab(tabContent, project) {
@@ -982,6 +1127,7 @@ window.AdminProjects = {
                         endDate: d.endDate || '',
                         status: 'Active',
                         assignedWorkers: workerIds,
+                budget: parseFloat(fd.budget) || 0,
                         clientAddress: '', clientCity: '', clientProvince: '', clientPostalCode: ''
                     };
                     // Auto-fill client fields if selected from address book

@@ -1143,6 +1143,9 @@
                 case 'reports':
                     if (window.AdminReports) AdminReports.render(content);
                     break;
+                case 'tasks':
+                    if (window.WorkerTasksScreen) WorkerTasksScreen.render(content, worker);
+                    break;
                 case 'help':
                     if (window.AdminHelp) AdminHelp.render(content);
                     break;
@@ -1182,6 +1185,10 @@
                     <a class="worker-nav-item" data-route="history">
                         <span class="worker-nav-icon">📋</span>
                         <span class="worker-nav-label">History</span>
+                    </a>
+                    <a class="worker-nav-item" data-route="tasks">
+                        <span class="worker-nav-icon">✅</span>
+                        <span class="worker-nav-label">Tasks</span>
                     </a>
                     <a class="worker-nav-item" data-route="help">
                         <span class="worker-nav-icon">❓</span>
@@ -1259,6 +1266,9 @@
                     break;
                 case 'history':
                     if (window.WorkerHistory) WorkerHistory.render(content, worker);
+                    break;
+                case 'tasks':
+                    if (window.WorkerTasksScreen) WorkerTasksScreen.render(content, worker);
                     break;
                 case 'help':
                     if (window.WorkerHelp) WorkerHelp.render(content);
