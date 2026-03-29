@@ -145,13 +145,8 @@
                     </div>
                 </div>
             `;
-            // Load logo if exists
-            AppData.getLogo().then(logo => {
-                if (logo && logo.blob) {
-                    const url = URL.createObjectURL(logo.blob);
-                    document.getElementById('loginLogo').innerHTML = `<img src="${url}" alt="Logo" style="max-height:80px;">`;
-                }
-            }).catch(() => {});
+            // Load logo — static asset
+            document.getElementById('loginLogo').innerHTML = `<img src="assets/images/logo.jpg" alt="Ledgerman Logo" style="max-height:80px;">`;
 
             document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
