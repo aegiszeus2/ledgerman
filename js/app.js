@@ -18,8 +18,17 @@
                 EmailService.init();
             }
 
-            // Check for invite link first (#invite/TOKEN)
+            // Check for emergency clear (#clear-session) — clears all storage and shows login
             const hash = window.location.hash;
+            if (hash === '#clear-session') {
+                AppData.clearPersistentLogin();
+                AppData.setJwt('');
+                window.location.hash = '';
+                this.showLogin();
+                return;
+            }
+
+            // Check for invite link first (#invite/TOKEN)
             if (hash.startsWith('#invite/')) {
                 const token = hash.slice(8);
                 WorkerInvite.show(token);
@@ -59,6 +68,11 @@
                 </div>
             `;
 
+            // 15-second timeout for persistent login restoration (prevents mobile hangs)
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Session restoration timeout')), 15000)
+            );
+
             try {
                 if (type === 'admin') {
                     // Restore admin JWT and try to sync
@@ -66,13 +80,13 @@
                     if (creds.companyId) AppData.setCompanyId(creds.companyId);
 
                     try {
-                        await AppData.syncFromServer();
+                        await Promise.race([AppData.syncFromServer(), timeoutPromise]);
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         this.startAdminPanel();
                         return;
                     } catch(err) {
-                        // JWT expired or invalid — clear and show login
-                        console.log('[Ledgerman] Persistent admin JWT invalid, showing login');
+                        // JWT expired or invalid OR timeout — clear and show login
+                        console.log('[Ledgerman] Persistent admin JWT invalid or timeout, showing login');
                         AppData.clearPersistentLogin();
                         AppData.setJwt('');
                         this.showAdminLogin();
@@ -83,14 +97,14 @@
                     if (creds.companyId) AppData.setCompanyId(creds.companyId);
 
                     try {
-                        const data = await AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin);
-                        await AppData.syncFromServer();
+                        const data = await Promise.race([AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin), timeoutPromise]);
+                        await Promise.race([AppData.syncFromServer(), timeoutPromise]);
                         const worker = AppData.getWorker(data.worker.id) || data.worker;
                         this._completeWorkerLogin(worker, 'Restored from persistent login');
                         return;
                     } catch(err) {
-                        // Credentials invalid — clear and show login
-                        console.log('[Ledgerman] Persistent worker credentials invalid, showing login');
+                        // Credentials invalid OR timeout — clear and show login
+                        console.log('[Ledgerman] Persistent worker credentials invalid or timeout, showing login');
                         AppData.clearPersistentLogin();
                         AppData.setJwt('');
                         this.showWorkerLogin();
@@ -102,8 +116,6 @@
                 this.showLogin();
             }
         },
-
-        // ============ LOGIN SCREENS ============
 
         showLogin() {
             const app = document.getElementById('app');
