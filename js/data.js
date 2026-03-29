@@ -81,8 +81,16 @@ async function _apiFetch(path, options) {
     const jwt = getJwt();
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
     if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+
+    // Add timeout: 15s for sync, 30s for others
+    const timeout = path === '/api/sync' ? 15000 : 30000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
     try {
-        const res = await fetch(API_BASE + path, Object.assign({}, options, { headers: headers }));
+        const res = await fetch(API_BASE + path, Object.assign({}, options, { headers: headers, signal: controller.signal }));
+        clearTimeout(timeoutId);
+
         if (!res.ok) {
             let errMsg = 'HTTP ' + res.status;
             try { const j = await res.json(); errMsg = j.error || errMsg; } catch(e) {}
@@ -95,6 +103,11 @@ async function _apiFetch(path, options) {
             throw new Error('Failed to parse server response: ' + e.message);
         }
     } catch(e) {
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') {
+            console.error('[Ledgerman] Request timeout on', path, '(timeout: ' + timeout + 'ms)');
+            throw new Error('Server request timed out - check your connection or try again');
+        }
         if (e instanceof TypeError) {
             console.error('[Ledgerman] Network error on', path, ':', e.message);
             throw new Error('Network error - check your connection. Details: ' + e.message);
