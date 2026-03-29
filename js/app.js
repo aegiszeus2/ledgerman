@@ -109,6 +109,11 @@
                         AppData.setJwt('');
                         this.showWorkerLogin();
                     }
+                } else {
+                    // Unknown type — clear and show login to prevent stuck loading screen
+                    console.warn('[Ledgerman] Unknown persistent login type:', type);
+                    AppData.clearPersistentLogin();
+                    this.showLogin();
                 }
             } catch(err) {
                 console.error('[Ledgerman] Error restoring persistent login:', err);
