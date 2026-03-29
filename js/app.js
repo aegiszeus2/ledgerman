@@ -1233,10 +1233,6 @@
                         <span class="worker-nav-label">Tasks</span>
                     </a>
                     <a class="worker-nav-item" data-route="help">
-                    <a class="worker-nav-item" data-route="tasks">
-                        <span class="worker-nav-icon">✓</span>
-                        <span class="worker-nav-label">My Tasks</span>
-                    </a>
                         <span class="worker-nav-icon">❓</span>
                         <span class="worker-nav-label">Help</span>
                     </a>
@@ -1362,3 +1358,4 @@
         App.init();
     });
 })();
+// Trigger redeploy Sat Mar 28 11:15:21 PM EDT 2026
