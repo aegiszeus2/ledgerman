@@ -19,10 +19,21 @@
 </head>
 <body>
     <div id="app">
-        <div class="loading-screen">
+        <div class="loading-screen" id="initialLoadingScreen">
             <h2>Loading...</h2>
         </div>
     </div>
+    <script>
+        // Failsafe: if app is still showing loading screen after 4 seconds, clear session and reload
+        setTimeout(function() {
+            var screen = document.getElementById('initialLoadingScreen');
+            if (screen && screen.parentNode && screen.parentNode.id === 'app') {
+                localStorage.removeItem('ledgeman_persistent_login');
+                localStorage.removeItem('ledgeman_jwt');
+                window.location.reload();
+            }
+        }, 4000);
+    </script>
 
     <!-- EmailJS SDK (email-based 2FA & password reset) -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
