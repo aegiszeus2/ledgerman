@@ -1347,9 +1347,35 @@
 
     window.App = App;
 
+    // Global error handler — display errors visually so we can diagnose
+    window.onerror = function(msg, src, line, col, err) {
+        var app = document.getElementById('app');
+        if (app) {
+            app.innerHTML = '<div style="padding:2rem;color:#fff;background:#c0392b;font-family:monospace;font-size:14px">'
+                + '<h2>JS Error — please screenshot this</h2>'
+                + '<p><b>Message:</b> ' + msg + '</p>'
+                + '<p><b>File:</b> ' + src + '</p>'
+                + '<p><b>Line:</b> ' + line + ':' + col + '</p>'
+                + '<p><b>Error:</b> ' + (err ? err.stack : 'none') + '</p>'
+                + '</div>';
+        }
+        return false;
+    };
+
     // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', () => {
-        App.init();
+        try {
+            App.init();
+        } catch(e) {
+            var app = document.getElementById('app');
+            if (app) {
+                app.innerHTML = '<div style="padding:2rem;color:#fff;background:#c0392b;font-family:monospace;font-size:14px">'
+                    + '<h2>App.init() crashed — please screenshot this</h2>'
+                    + '<p>' + e.message + '</p>'
+                    + '<pre>' + e.stack + '</pre>'
+                    + '</div>';
+            }
+        }
     });
 })();
-// Trigger redeploy Sat Mar 28 11:15:21 PM EDT 2026
+// v20260329-debug
