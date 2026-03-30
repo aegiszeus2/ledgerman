@@ -1170,9 +1170,6 @@
                 case 'reports':
                     if (window.AdminReports) AdminReports.render(content);
                     break;
-                case 'tasks':
-                    if (window.WorkerTasksScreen) WorkerTasksScreen.render(content, worker);
-                    break;
                 case 'help':
                     if (window.AdminHelp) AdminHelp.render(content);
                     break;
