@@ -228,6 +228,7 @@ async function syncFromServer() {
             payments:    data.payments    || [],
             vendors:     data.vendors     || [],
             invites:     data.invites     || [],
+            estimates:   data.estimates   || [],
             auditLog:    data.auditLog    || [],
             daily_reports: data.daily_reports || [],
             punch_items: data.punch_items || [],
@@ -235,7 +236,7 @@ async function syncFromServer() {
         };
         // Mirror to localStorage as offline backup
         ['workers','projects','tasks','clients','subtasks','expenses','submissions',
-         'invoices','payments','vendors','invites','auditLog','daily_reports','punch_items'].forEach(function(key) {
+         'invoices','payments','vendors','invites','estimates','auditLog','daily_reports','punch_items'].forEach(function(key) {
             setData(key, _cache[key]);
         });
         setData('settings', _cache.settings);
@@ -256,6 +257,7 @@ async function syncFromServer() {
             payments:    getData('payments')    || [],
             vendors:     getData('vendors')     || [],
             invites:     getData('invites')     || [],
+            estimates:   getData('estimates')   || [],
             auditLog:    getData('auditLog')    || [],
             daily_reports: getData('daily_reports') || [],
             punch_items: getData('punch_items') || [],
@@ -755,6 +757,8 @@ window.AppData = {
     isFirstRun, markSetupDone,
     // Invites
     getInvites, getInvite, saveInvite, deleteInvite,
+    // Estimates
+    getEstimates, getEstimate, saveEstimate, deleteEstimate,
     // Backup
     exportAllData, importAllData, getLastBackupDate, setLastBackupDate, shouldRemindBackup
 };
