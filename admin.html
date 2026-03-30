@@ -554,6 +554,20 @@ async function openDetail(companyId) {
             </div>
 
             <div class="card" style="margin-bottom:12px">
+                <div class="card-title mb-1">Admin Password</div>
+                <div style="display:flex;gap:8px;align-items:flex-end">
+                    <div style="flex:1">
+                        <div class="text-sm text-muted" style="margin-bottom:6px">Update company admin password</div>
+                        <div class="password-field-wrap">
+                            <input type="password" id="companyPassword_${d.id}" placeholder="New password" style="padding-right:40px">
+                            <button type="button" class="password-toggle" data-toggle="companyPassword_${d.id}">Show</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="updateCompanyPassword('${d.id}')">Update</button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:12px">
                 <div class="card-title mb-1">Workers (${d.workers.length})</div>
                 ${d.workers.length ? d.workers.map(w => `
                     <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
@@ -603,6 +617,34 @@ async function deleteCompany(id, name) {
         loadOverview();
     } catch(e) {
         toast('Delete failed: ' + e.message, 'error');
+    }
+}
+
+async function updateCompanyPassword(id) {
+    const fieldId = 'companyPassword_' + id;
+    const pwdField = document.getElementById(fieldId);
+    if (!pwdField) {
+        toast('Password field not found.', 'error');
+        return;
+    }
+
+    const newPassword = pwdField.value.trim();
+    if (!newPassword) {
+        toast('Enter a new password.', 'error');
+        return;
+    }
+
+    try {
+        await apiFetch('/api/superadmin/companies/' + id, {
+            method: 'PATCH',
+            body: { adminPassword: newPassword }
+        });
+        toast('Password updated.', 'success');
+        pwdField.value = '';
+        pwdField.type = 'password';
+        document.querySelector(`[data-toggle="${fieldId}"]`).textContent = 'Show';
+    } catch(e) {
+        toast('Password update failed: ' + e.message, 'error');
     }
 }
 
