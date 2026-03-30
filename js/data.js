@@ -711,6 +711,7 @@ window.AppData = {
     API_BASE: API_BASE,
     // Auth / session
     getJwt, setJwt, getCompanyId, setCompanyId, isApiMode,
+    getPersistentLogin, savePersistentLogin, clearPersistentLogin,
     apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin, apiVerify2FA,
     apiCreateInvite, apiGetInvite, apiUseInvite,
     syncFromServer, isCacheLoaded,
