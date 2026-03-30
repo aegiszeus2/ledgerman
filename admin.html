@@ -1027,24 +1027,21 @@ function esc(str) {
 
     <script>
 // ── Password Toggle Visibility ───────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-    const toggleButtons = document.querySelectorAll('.password-toggle');
-    toggleButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            const fieldId = this.getAttribute('data-toggle');
-            const field = document.getElementById(fieldId);
-            if (field) {
-                if (field.type === 'password') {
-                    field.type = 'text';
-                    this.textContent = 'Hide';
-                } else {
-                    field.type = 'password';
-                    this.textContent = 'Show';
-                }
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('password-toggle')) {
+        e.preventDefault();
+        const fieldId = e.target.getAttribute('data-toggle');
+        const field = document.getElementById(fieldId);
+        if (field) {
+            if (field.type === 'password') {
+                field.type = 'text';
+                e.target.textContent = 'Hide';
+            } else {
+                field.type = 'password';
+                e.target.textContent = 'Show';
             }
-        });
-    });
+        }
+    }
 });
     </script>
 </body>
