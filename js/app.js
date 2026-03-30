@@ -1310,12 +1310,9 @@
                     if (window.WorkerHistory) WorkerHistory.render(content, worker);
                     break;
                 case 'tasks':
-                    if (window.WorkerTasksScreen) WorkerTasksScreen.render(content, worker);
-                    break;
-                case 'help':
-                case 'tasks':
                     if (window.WorkerTasks) WorkerTasks.render(content, worker, params);
                     break;
+                case 'help':
                     if (window.WorkerHelp) WorkerHelp.render(content);
                     break;
                 default:
