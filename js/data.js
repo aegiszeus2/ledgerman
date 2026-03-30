@@ -447,6 +447,12 @@ function saveSubmission(s) { return save('submissions', s); }
 function deleteSubmission(id) { remove('submissions', id); }
 function getPendingSubmissions() { return getSubmissions().filter(function(s) { return s.status === 'Pending'; }); }
 function getWorkerSubmissions(workerId) { return getSubmissions().filter(function(s) { return s.workerId === workerId; }); }
+// ─── Estimates ─────────────────────────────────────────────────────────────
+function getEstimates() { return getAll('estimates'); }
+function getEstimate(id) { return getById('estimates', id); }
+function saveEstimate(e) { return save('estimates', e); }
+function deleteEstimate(id) { remove('estimates', id); }
+
 
 // ─── Invoices ──────────────────────────────────────────────────────────────
 function getInvoices(projectId) { return projectId ? getAll('invoices').filter(function(i) { return i.projectId === projectId; }) : getAll('invoices'); }

@@ -973,6 +973,9 @@
                         </a>
                         <a class="nav-item" data-route="invoices" data-tooltip="Invoices — create & track client invoices">
                             <span class="nav-icon">📄</span><span class="nav-label">Invoices</span>
+                        <a class="nav-item" data-route="estimates" data-tooltip="Estimates — bid estimates and project costing">
+                            <span class="nav-icon">💹</span><span class="nav-label">Bid Estimates</span>
+                        </a>
                         </a>
                         <a class="nav-item" data-route="expenses-review" data-tooltip="Expenses — review worker-submitted costs">
                             <span class="nav-icon">💰</span><span class="nav-label">Expenses</span>
@@ -1159,6 +1162,12 @@
                     if (window.AdminInvoices) AdminInvoices.renderDetail(content, params.invoiceId);
                     break;
                 case 'invoice-create':
+                case 'estimates':
+                    if (window.AdminEstimates) AdminEstimates.render(content, params);
+                    break;
+                case 'estimate-detail':
+                    if (window.AdminEstimates) AdminEstimates.renderDetail(content, params.estimateId, params);
+                    break;
                     if (window.AdminInvoices) AdminInvoices.renderCreate(content, params);
                     break;
                 case 'users':
