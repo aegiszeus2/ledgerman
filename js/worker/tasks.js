@@ -16,7 +16,7 @@ window.WorkerTasks = {
         const esc = Utils.escapeHtml;
 
         // Get all tasks, filter for ones assigned to this worker
-        const allTasks = AppData.getEntities('tasks') || [];
+        const allTasks = AppData.getTasks() || [];
         const myTasks = allTasks.filter(t => t.assigned_to_worker_id === worker.id || t.assigned_to === worker.id);
 
         // Apply status filter
@@ -116,14 +116,14 @@ window.WorkerTasks = {
             btn.addEventListener('click', async function(e) {
                 e.stopPropagation();
                 const taskId = btn.dataset.id;
-                const task = AppData.getEntity(taskId);
+                const task = AppData.getTask(taskId);
                 if (!task) return;
                 
                 const updated = {
                     ...task,
                     status: 'In Progress'
                 };
-                AppData.updateEntity(taskId, updated);
+                AppData.saveTask(updated);
                 Utils.showToast('Task started');
                 self._renderPage();
             });
@@ -134,7 +134,7 @@ window.WorkerTasks = {
             btn.addEventListener('click', async function(e) {
                 e.stopPropagation();
                 const taskId = btn.dataset.id;
-                const task = AppData.getEntity(taskId);
+                const task = AppData.getTask(taskId);
                 if (!task) return;
                 
                 const updated = {
@@ -142,7 +142,7 @@ window.WorkerTasks = {
                     status: 'Done',
                     completed_at: new Date().toISOString()
                 };
-                AppData.updateEntity(taskId, updated);
+                AppData.saveTask(updated);
                 Utils.showToast('Task completed! 🎉');
                 self._renderPage();
             });
@@ -159,7 +159,7 @@ window.WorkerTasks = {
     },
 
     _showTaskDetail(taskId) {
-        const task = AppData.getEntity(taskId);
+        const task = AppData.getTask(taskId);
         const project = AppData.getProject(task.projectId);
         const esc = Utils.escapeHtml;
 

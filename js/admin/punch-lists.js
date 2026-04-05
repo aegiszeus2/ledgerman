@@ -205,7 +205,7 @@ window.AdminPunchLists = {
                 e.preventDefault();
                 if (confirm('Delete this deficiency item?')) {
                     try {
-                        await AppData.deleteEntity('punch_items', btn.dataset.itemId);
+                        AppData.remove('punch_items', btn.dataset.itemId);
                         Utils.showToast('Item deleted', 'success');
                         self._renderList();
                     } catch(err) {
@@ -303,7 +303,7 @@ window.AdminPunchLists = {
             };
 
             try {
-                await AppData.saveEntity('punch_items', newItem);
+                AppData.save('punch_items', newItem);
                 Utils.showToast(isNew ? 'Deficiency created' : 'Deficiency updated', 'success');
                 self._renderList();
             } catch(err) {

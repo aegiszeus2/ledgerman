@@ -135,11 +135,11 @@ window.AdminTaskAssignment = {
         container.querySelectorAll('.delete-task').forEach(btn => {
             btn.addEventListener('click', async function(e) {
                 e.stopPropagation();
-                const task = AppData.getEntity(btn.dataset.id);
+                const task = AppData.getTask(btn.dataset.id);
                 if (!task) return;
                 const confirmed = await Utils.confirm(`Delete task "${task.title}"?`);
                 if (!confirmed) return;
-                AppData.deleteEntity(task.id);
+                AppData.deleteTask(task.id);
                 Utils.showToast('Task deleted');
                 self._renderList();
             });
@@ -148,7 +148,7 @@ window.AdminTaskAssignment = {
 
     _showTaskForm(taskId) {
         const self = this;
-        const task = taskId ? AppData.getEntity(taskId) : null;
+        const task = taskId ? AppData.getTask(taskId) : null;
         const isEdit = !!task;
         const projects = AppData.getProjects() || [];
         const workers = AppData.getWorkers().filter(w => w.status === 'Active') || [];
@@ -233,7 +233,7 @@ window.AdminTaskAssignment = {
                     id: task.id,
                     entity_type: 'tasks'
                 };
-                AppData.updateEntity(updated.id, updated);
+                AppData.saveTask(updated);
             } else {
                 // Create new task
                 const newTask = {
@@ -243,7 +243,7 @@ window.AdminTaskAssignment = {
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
-                AppData.addEntity(newTask);
+                AppData.saveTask(newTask);
             }
 
             Utils.showToast(isEdit ? 'Task updated' : 'Task created');
