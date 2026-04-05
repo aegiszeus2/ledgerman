@@ -970,6 +970,7 @@
                 item('clients',        '👥', 'Clients',      'Clients — your client address book'),
                 item('users',          '👷', 'Workers',      'Workers — manage team & PINs'),
                 item('equipment',     '🔧', 'Equipment',    'Equipment — manage tools & machinery rates'),
+                item('notifications', '🔔', 'Notifications','Notifications — service alerts', '<span class="nav-badge" id="notifBadge" style="display:none"></span>'),
                 item('photos',         '📸', 'Photos',       'Photos — job site photo log'),
                 item('reports',        '📈', 'Reports',      'Reports — cost, labour & invoice summaries'),
                 // ── Module-gated Tier 3 ────────────────────────────────────
@@ -1026,6 +1027,9 @@
 
             // Update approval badge
             this.updateApprovalBadge();
+
+            // Update notifications badge
+            if (window.AdminNotifications) AdminNotifications._updateBadge();
 
             // Get Started onboarding button
             const getStartedBtn = document.getElementById('getStartedBtn');
@@ -1163,6 +1167,9 @@
                 case 'equipment':
                     if (window.AdminEquipment) AdminEquipment.render(content, params);
                     break;
+                case 'notifications':
+                    if (window.AdminNotifications) AdminNotifications.render(content);
+                    break;
                 case 'photos':
                     if (window.AdminPhotos) AdminPhotos.render(content, params);
                     break;
@@ -1231,6 +1238,9 @@
 
             // Update approval badge
             this.updateApprovalBadge();
+
+            // Update notifications badge
+            if (window.AdminNotifications) AdminNotifications._updateBadge();
         },
 
         // ============ WORKER PORTAL ============

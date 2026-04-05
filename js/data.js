@@ -473,6 +473,14 @@ function getEquipmentLog(id) { return getById('equipmentLogs', id); }
 function saveEquipmentLog(l) { return save('equipmentLogs', l); }
 function deleteEquipmentLog(id) { remove('equipmentLogs', id); }
 
+// ─── Notifications ────────────────────────────────────────────────────────
+// Service alerts and system notifications.
+// Fields: id, type, title, message, equipmentId, equipmentName, resolved, emailSent, createdAt
+function getNotifications() { return getAll('notifications'); }
+function getNotification(id) { return getById('notifications', id); }
+function saveNotification(n) { return save('notifications', n); }
+function deleteNotification(id) { remove('notifications', id); }
+
 
 // ─── Invoices ──────────────────────────────────────────────────────────────
 function getInvoices(projectId) { return projectId ? getAll('invoices').filter(function(i) { return i.projectId === projectId; }) : getAll('invoices'); }
@@ -831,6 +839,8 @@ window.AppData = {
     getEquipment, getEquipmentItem, saveEquipment, deleteEquipment,
     // Equipment Logs
     getEquipmentLogs, getEquipmentLog, saveEquipmentLog, deleteEquipmentLog,
+    // Notifications
+    getNotifications, getNotification, saveNotification, deleteNotification,
     // Backup
     exportAllData, importAllData, getLastBackupDate, setLastBackupDate, shouldRemindBackup
 };

@@ -36,8 +36,15 @@ window.AdminEquipment = {
             return '<span style="font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:20px;' + cls + '">' + esc(status || 'Active') + '</span>';
         }
 
+        // Compute total hours per equipment from logs
+        const allLogs = AppData.getEquipmentLogs ? AppData.getEquipmentLogs() : [];
+        const hoursById = {};
+        allLogs.forEach(function(l) {
+            if (l.equipmentId) hoursById[l.equipmentId] = (hoursById[l.equipmentId] || 0) + (parseFloat(l.hours) || 0);
+        });
+
         var rows = filtered.length === 0
-            ? '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text2)">' +
+            ? '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text2)">' +
               (equipment.length === 0
                 ? 'No equipment yet. Click <strong>+ Add Equipment</strong> to get started.'
                 : 'No equipment matches your search.') +
@@ -50,14 +57,27 @@ window.AdminEquipment = {
                     ? '<span style="color:' + (margin >= 0 ? 'var(--success)' : 'var(--accent)') + '">' +
                       (margin >= 0 ? '+' : '') + '$' + margin.toFixed(2) + '/hr</span>'
                     : '—';
+                var totalHours = hoursById[e.id] || 0;
+                var interval = e.serviceIntervalHours ? parseInt(e.serviceIntervalHours) : null;
+                var serviceStr = '—';
+                var serviceAlert = false;
+                if (interval) {
+                    var pct = Math.min(100, Math.round(totalHours / interval * 100));
+                    serviceAlert = totalHours >= interval;
+                    serviceStr = (serviceAlert
+                        ? '<span style="color:var(--accent);font-weight:700">⚠ ' + totalHours.toFixed(1) + '/' + interval + ' hrs</span>'
+                        : '<span style="color:' + (pct >= 80 ? 'var(--amber,#f59e0b)' : 'var(--text2)') + '">' + totalHours.toFixed(1) + '/' + interval + ' hrs (' + pct + '%)</span>');
+                }
                 return '<tr>' +
-                    '<td style="font-weight:500">' + esc(e.name || '') + '</td>' +
+                    '<td style="font-weight:500">' + esc(e.name || '') + (serviceAlert ? ' <span style="color:var(--accent);font-size:.75rem">⚠ SERVICE DUE</span>' : '') + '</td>' +
                     '<td style="color:var(--text2)">' + esc(e.type || '—') + '</td>' +
                     '<td>' + statusBadge(e.status) + '</td>' +
                     '<td>' + fmtRate(e.costRate) + '</td>' +
                     '<td>' + fmtRate(e.chargeOutRate) + '</td>' +
                     '<td>' + marginStr + '</td>' +
+                    '<td>' + serviceStr + '</td>' +
                     '<td style="white-space:nowrap">' +
+                        (serviceAlert ? '<button class="btn btn-sm reset-service" data-id="' + esc(e.id) + '" style="color:var(--success);margin-right:4px;border:1px solid var(--success)">✓ Reset</button>' : '') +
                         '<button class="btn btn-secondary btn-sm edit-equipment" data-id="' + esc(e.id) + '" style="margin-right:4px">Edit</button>' +
                         '<button class="btn btn-sm delete-equipment" data-id="' + esc(e.id) + '" style="color:var(--accent)">Delete</button>' +
                     '</td>' +
@@ -87,6 +107,7 @@ window.AdminEquipment = {
                             '<th style="padding:8px 12px">Cost Rate</th>' +
                             '<th style="padding:8px 12px">Charge-Out Rate</th>' +
                             '<th style="padding:8px 12px">Margin</th>' +
+                            '<th style="padding:8px 12px">Service Hours</th>' +
                             '<th style="padding:8px 12px">Actions</th>' +
                         '</tr>' +
                     '</thead>' +
@@ -143,6 +164,32 @@ window.AdminEquipment = {
                 var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
                 AppData.addAuditLog(username, 'Equipment Deleted', item.name);
                 Utils.showToast('Equipment deleted');
+                self._renderList();
+            });
+        });
+
+        // Reset service — clears accumulated hour logs and alert flag for this equipment
+        container.querySelectorAll('.reset-service').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+                var item = AppData.getEquipmentItem(btn.dataset.id);
+                if (!item) return;
+                var confirmed = await Utils.confirm('Mark "' + item.name + '" as serviced? This resets the hour counter and clears the service alert.');
+                if (!confirmed) return;
+                // Delete all equipmentLogs for this equipment to reset counter
+                var logs = AppData.getEquipmentLogs ? AppData.getEquipmentLogs() : [];
+                logs.filter(function(l) { return l.equipmentId === item.id; })
+                    .forEach(function(l) { if (AppData.deleteEquipmentLog) AppData.deleteEquipmentLog(l.id); });
+                // Reset alert flag
+                item.alertSent = false;
+                item.lastServicedAt = new Date().toISOString();
+                AppData.saveEquipment(item);
+                // Dismiss any open notifications for this equipment
+                var notifs = AppData.getNotifications ? AppData.getNotifications() : [];
+                notifs.filter(function(n) { return n.equipmentId === item.id && !n.resolved; })
+                    .forEach(function(n) { n.resolved = true; if (AppData.saveNotification) AppData.saveNotification(n); });
+                var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+                AppData.addAuditLog(username, 'Equipment Serviced', item.name + ' — hour counter reset');
+                Utils.showToast('✓ Service logged. Hour counter reset for ' + item.name);
                 self._renderList();
             });
         });
@@ -222,6 +269,27 @@ window.AdminEquipment = {
                             '<strong>Charge-Out Rate</strong> — what you bill the client per unit of use.' +
                         '</p>' +
 
+                        '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;border-top:1px solid var(--border);padding-top:12px">Service Interval</div>' +
+                        '<div class="form-row" style="margin-bottom:4px">' +
+                            '<div class="form-group">' +
+                                '<label>Service Interval (hours)</label>' +
+                                '<input class="form-control" type="number" name="serviceIntervalHours" step="1" min="0" value="' + (item && item.serviceIntervalHours ? item.serviceIntervalHours : '') + '" placeholder="e.g. 250">' +
+                            '</div>' +
+                            '<div class="form-group">' +
+                                '<label>Assigned Supervisor</label>' +
+                                '<select class="form-control" name="supervisorId">' +
+                                    '<option value="">— None —</option>' +
+                                    AppData.getWorkers().filter(function(w) { return w.role === 'Supervisor' || w.role === 'Approver'; }).map(function(w) {
+                                        return opt(w.id, w.name + ' (' + w.role + ')', item && item.supervisorId === w.id);
+                                    }).join('') +
+                                '</select>' +
+                            '</div>' +
+                        '</div>' +
+                        '<p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">' +
+                            '<strong>Service Interval</strong> — total hours before a service alert is sent to the admin and assigned supervisor via email.<br>' +
+                            'Leave blank to disable automatic service alerts.' +
+                        '</p>' +
+
                         '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Notes</div>' +
                         '<div class="form-group" style="margin-bottom:0">' +
                             '<textarea class="form-control" name="notes" rows="2" placeholder="Serial number, license plate, maintenance notes…">' + esc(item ? item.notes || '' : '') + '</textarea>' +
@@ -255,16 +323,19 @@ window.AdminEquipment = {
             }
 
             var equipmentData = {
-                id:            isEdit ? item.id : AppData.generateId(),
-                name:          fd.name.trim(),
-                type:          fd.type || '',
-                status:        fd.status || 'Active',
-                unit:          fd.unit || 'hr',
-                costRate:      parseFloat(fd.costRate) || 0,
-                chargeOutRate: parseFloat(fd.chargeOutRate) || 0,
-                notes:         (fd.notes || '').trim(),
-                updatedAt:     new Date().toISOString(),
-                createdAt:     isEdit ? (item.createdAt || new Date().toISOString()) : new Date().toISOString()
+                id:                   isEdit ? item.id : AppData.generateId(),
+                name:                 fd.name.trim(),
+                type:                 fd.type || '',
+                status:               fd.status || 'Active',
+                unit:                 fd.unit || 'hr',
+                costRate:             parseFloat(fd.costRate) || 0,
+                chargeOutRate:        parseFloat(fd.chargeOutRate) || 0,
+                serviceIntervalHours: fd.serviceIntervalHours ? parseInt(fd.serviceIntervalHours) : null,
+                supervisorId:         fd.supervisorId || null,
+                alertSent:            isEdit ? (item.alertSent || false) : false,
+                notes:                (fd.notes || '').trim(),
+                updatedAt:            new Date().toISOString(),
+                createdAt:            isEdit ? (item.createdAt || new Date().toISOString()) : new Date().toISOString()
             };
 
             AppData.saveEquipment(equipmentData);

@@ -696,6 +696,61 @@ window.WorkerTimeEntry = {
                                 createdAt:     new Date().toISOString()
                             });
                         });
+
+                        // Check service interval thresholds for each piece of equipment logged
+                        if (AppData.getEquipmentItem && AppData.getEquipmentLogs) {
+                            // Get unique equipment IDs from this submission
+                            var eqIds = [...new Set(selectedEquipment.map(function(e) { return e.equipmentId; }))];
+                            eqIds.forEach(function(eqId) {
+                                var eqItem = AppData.getEquipmentItem(eqId);
+                                if (!eqItem || !eqItem.serviceIntervalHours || eqItem.alertSent) return;
+
+                                // Compute total cumulative hours across ALL logs for this equipment
+                                var totalHours = AppData.getEquipmentLogs()
+                                    .filter(function(l) { return l.equipmentId === eqId; })
+                                    .reduce(function(sum, l) { return sum + (parseFloat(l.hours) || 0); }, 0);
+
+                                if (totalHours >= eqItem.serviceIntervalHours) {
+                                    // Mark alertSent so we don't fire again until after service reset
+                                    eqItem.alertSent = true;
+                                    AppData.saveEquipment(eqItem);
+
+                                    // Fire alert to backend (creates notification + sends email)
+                                    fetch(AppData.API_BASE + '/api/service-alert', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': 'Bearer ' + (AppData.getJwt ? AppData.getJwt() : '')
+                                        },
+                                        body: JSON.stringify({
+                                            equipmentId:   eqId,
+                                            equipmentName: eqItem.name,
+                                            totalHours:    totalHours,
+                                            intervalHours: eqItem.serviceIntervalHours,
+                                            supervisorId:  eqItem.supervisorId || null
+                                        })
+                                    }).then(function(res) { return res.json(); }).then(function(resp) {
+                                        if (resp && resp.ok) {
+                                            // Sync the new notification into local state
+                                            if (AppData.saveNotification && resp.notificationId) {
+                                                AppData.saveNotification({
+                                                    id:            resp.notificationId,
+                                                    type:          'service_due',
+                                                    title:         'Service Due: ' + eqItem.name,
+                                                    message:       eqItem.name + ' has reached ' + totalHours.toFixed(1) + ' of ' + eqItem.serviceIntervalHours + ' hrs service interval.',
+                                                    equipmentId:   eqId,
+                                                    equipmentName: eqItem.name,
+                                                    resolved:      false,
+                                                    emailSent:     resp.emailSent || false,
+                                                    createdAt:     new Date().toISOString()
+                                                });
+                                                if (window.AdminNotifications) AdminNotifications._updateBadge();
+                                            }
+                                        }
+                                    }).catch(function(err) { console.warn('service-alert post failed:', err); });
+                                }
+                            });
+                        }
                     }
 
                     if (isWizardMode) AppData.setData('worker_wizard_done_' + worker.id, true);
