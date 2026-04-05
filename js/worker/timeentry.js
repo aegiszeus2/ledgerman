@@ -540,7 +540,6 @@ window.WorkerTimeEntry = {
                     // Upload photos
                     for (var p = 0; p < selectedPhotos.length; p++) {
                         var photo = selectedPhotos[p];
-                        var thumb = await Utils.createThumbnail(photo.file);
                         await AppData.savePhoto({
                             id: photo.id,
                             projectId: projectId,
@@ -548,7 +547,7 @@ window.WorkerTimeEntry = {
                             submissionId: submissionId,
                             date: dateValue,
                             blob: photo.file,
-                            thumbnail: thumb,
+                            thumbnail: null,
                             filename: photo.file.name || 'photo.jpg'
                         });
                         photoIds.push(photo.id);

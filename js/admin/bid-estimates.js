@@ -391,7 +391,7 @@ window.AdminEstimates = {
             }
 
             const newEstimate = {
-                id: estimate ? estimate.id : Utils.generateId(),
+                id: estimate ? estimate.id : AppData.generateId(),
                 clientName: clientName,
                 description: description,
                 taxRate: taxRate,
@@ -459,7 +459,7 @@ window.AdminEstimates = {
             }
 
             const newItem = {
-                id: item ? item.id : Utils.generateId(),
+                id: item ? item.id : AppData.generateId(),
                 description: description,
                 costs: item ? item.costs : [],
                 subtasks: item ? item.subtasks : []
@@ -567,7 +567,7 @@ window.AdminEstimates = {
 
             const amount = quantity * rate;
             const newCost = {
-                id: cost ? cost.id : Utils.generateId(),
+                id: cost ? cost.id : AppData.generateId(),
                 costType: costType,
                 description: description,
                 quantity: quantity,
@@ -655,49 +655,39 @@ window.AdminEstimates = {
     },
 
     async _sendEstimate(estimateId) {
-        try {
-            const response = await AppData._apiFetch(`/api/estimates/${estimateId}/send`, {
-                method: 'POST',
-                body: JSON.stringify({})
-            });
-            const estimate = AppData.getEstimate(estimateId);
-            if (estimate) {
-                estimate.status = 'sent';
-                AppData.saveEstimate(estimate);
-            }
+        const estimate = AppData.getEstimate(estimateId);
+        if (estimate) {
+            estimate.status = 'sent';
+            AppData.saveEstimate(estimate);
             Utils.showToast('Estimate sent');
-        } catch (err) {
-            Utils.showToast('Error sending estimate: ' + err.message, 'error');
         }
     },
 
     async _approveEstimate(estimateId) {
-        try {
-            const response = await AppData._apiFetch(`/api/estimates/${estimateId}/approve`, {
-                method: 'POST',
-                body: JSON.stringify({})
-            });
-            const estimate = AppData.getEstimate(estimateId);
-            if (estimate) {
-                estimate.status = 'approved';
-                AppData.saveEstimate(estimate);
-            }
+        const estimate = AppData.getEstimate(estimateId);
+        if (estimate) {
+            estimate.status = 'approved';
+            AppData.saveEstimate(estimate);
             Utils.showToast('Estimate approved');
-        } catch (err) {
-            Utils.showToast('Error approving estimate: ' + err.message, 'error');
         }
     },
 
     async _createProjectFromEstimate(estimateId) {
         try {
-            const response = await AppData._apiFetch(`/api/estimates/${estimateId}/create-project`, {
-                method: 'POST',
-                body: JSON.stringify({})
-            });
-            Utils.showToast('Project created from estimate');
-            this._viewingEstimateId = null;
-            // Sync to get the new project
-            await AppData.syncFromServer();
+            const estimate = AppData.getEstimate(estimateId);
+            if (estimate) {
+                const newProject = {
+                    id: AppData.generateId(),
+                    name: estimate.clientName + ' — ' + (estimate.description || 'Project'),
+                    clientName: estimate.clientName,
+                    status: 'Active',
+                    budget: estimate.subtotal || 0,
+                    created_at: new Date().toISOString()
+                };
+                AppData.saveProject(newProject);
+                Utils.showToast('Project created from estimate');
+                this._viewingEstimateId = null;
+            }
             this._renderList();
         } catch (err) {
             Utils.showToast('Error creating project: ' + err.message, 'error');
