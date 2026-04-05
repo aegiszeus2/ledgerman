@@ -78,7 +78,9 @@ window.AdminTaskAssignment = {
                             <tr style="border-bottom:2px solid var(--border)">
                                 <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Task</th>
                                 <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Project</th>
+                                <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Work Item</th>
                                 <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Assigned To</th>
+                                <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Start</th>
                                 <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Due Date</th>
                                 <th style="text-align:left;padding:12px;font-weight:600;color:var(--text2)">Status</th>
                                 <th style="text-align:right;padding:12px;font-weight:600;color:var(--text2)">Actions</th>
@@ -91,9 +93,11 @@ window.AdminTaskAssignment = {
                                 const dueDisplay = t.due_date ? (isOverdue ? '<span style="color:var(--accent);font-weight:600">' + esc(Utils.formatDate(t.due_date)) + ' (OVERDUE)</span>' : esc(Utils.formatDate(t.due_date))) : '—';
                                 return `
                                     <tr style="border-bottom:1px solid var(--border);padding:12px">
-                                        <td style="padding:12px"><strong>${esc(t.title || 'Untitled')}</strong></td>
+                                        <td style="padding:12px"><strong>${esc(t.title || t.name || 'Untitled')}</strong></td>
                                         <td style="padding:12px">${esc(t.projectName || '—')}</td>
+                                        <td style="padding:12px;font-size:.85rem;color:var(--text2)">${(() => { if (!t.workItemId) return '—'; const wi = AppData.getSubtask ? AppData.getSubtask(t.workItemId) : null; return wi ? esc(wi.name) : '—'; })()}</td>
                                         <td style="padding:12px">${esc(t.assigned_to_worker_name || '—')}</td>
+                                        <td style="padding:12px;font-size:.85rem">${t.startDate ? esc(Utils.formatDate(t.startDate)) : '—'}</td>
                                         <td style="padding:12px">${dueDisplay}</td>
                                         <td style="padding:12px"><span class="pstatus ${statusClass}">${esc(t.status || 'To Do')}</span></td>
                                         <td style="padding:12px;text-align:right;white-space:nowrap">
@@ -129,12 +133,15 @@ window.AdminTaskAssignment = {
         }
 
         container.querySelector('#tasksExportCsvBtn').addEventListener('click', function() {
-            var rows = [csvRow(['Title','Project','Assigned To','Due Date','Status'])];
+            var rows = [csvRow(['Title','Project','Work Item','Assigned To','Start Date','Due Date','Status'])];
             filtered.forEach(t => {
+                const wi = (t.workItemId && AppData.getSubtask) ? AppData.getSubtask(t.workItemId) : null;
                 rows.push(csvRow([
-                    t.title || '',
+                    t.title || t.name || '',
                     t.projectName || '',
+                    wi ? wi.name : '',
                     t.assigned_to_worker_name || '',
+                    t.startDate || '',
                     t.due_date || '',
                     t.status || 'To Do'
                 ]));
@@ -240,15 +247,33 @@ window.AdminTaskAssignment = {
 
                         <div class="form-row">
                             <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" name="startDate" value="${task && task.startDate ? task.startDate : ''}">
+                            </div>
+                            <div class="form-group">
                                 <label>Due Date</label>
                                 <input type="date" name="due_date" value="${task && task.due_date ? task.due_date : ''}">
                             </div>
+                        </div>
+
+                        <div class="form-row">
                             <div class="form-group">
                                 <label>Status</label>
                                 <select name="status">
                                     <option ${!task || task.status === 'To Do' ? 'selected' : ''}>To Do</option>
                                     <option ${task && task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
                                     <option ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Linked Work Item <span style="font-size:.75rem;color:var(--text2)">(optional)</span></label>
+                                <select name="workItemId">
+                                    <option value="">-- Not linked --</option>
+                                    ${(() => {
+                                        const pid = task ? task.projectId : '';
+                                        if (!pid || !AppData.getSubtasks) return '';
+                                        return AppData.getSubtasks(pid).map(wi => `<option value="${wi.id}" ${task && task.workItemId === wi.id ? 'selected' : ''}>${esc(wi.name)}</option>`).join('');
+                                    })()}
                                 </select>
                             </div>
                         </div>

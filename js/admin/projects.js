@@ -137,7 +137,7 @@ window.AdminProjects = {
             row.addEventListener('click', function(e) {
                 if (e.target.closest('.edit-project') || e.target.closest('.delete-project')) return;
                 self._viewingProjectId = row.dataset.id;
-                self._activeTab = 'subtasks';
+                self._activeTab = 'work-items';
                 self._renderDetail();
             });
         });
@@ -373,7 +373,8 @@ window.AdminProjects = {
             return;
         }
         const esc = Utils.escapeHtml;
-        const tabs = ['tasks', 'budget', 'subtasks', 'expenses', 'photos', 'invoices'];
+        const tabs = ['tasks', 'budget', 'work-items', 'expenses', 'photos', 'invoices'];
+        const tabLabels = { 'tasks': 'Tasks', 'budget': 'Budget', 'work-items': 'Work Items', 'expenses': 'Expenses', 'photos': 'Photos', 'invoices': 'Invoices' };
 
         container.innerHTML = `
             <div style="margin-bottom:16px">
@@ -395,7 +396,7 @@ window.AdminProjects = {
             <div class="tabs">
                 ${tabs.map(function(t) {
                     return '<button class="tab-btn' + (self._activeTab === t ? ' active' : '') + '" data-tab="' + t + '">' +
-                        t.charAt(0).toUpperCase() + t.slice(1) + '</button>';
+                        (tabLabels[t] || (t.charAt(0).toUpperCase() + t.slice(1))) + '</button>';
                 }).join('')}
             </div>
 
@@ -422,7 +423,7 @@ window.AdminProjects = {
         switch (self._activeTab) {
             case 'tasks': self._renderTasksTab(tabContent, project); break;
             case 'budget': self._renderBudgetTab(tabContent, project); break;
-            case 'subtasks': self._renderSubtasksTab(tabContent, project); break;
+            case 'work-items': self._renderSubtasksTab(tabContent, project); break;
             case 'expenses': self._renderExpensesTab(tabContent, project); break;
             case 'photos': self._renderPhotosTab(tabContent, project); break;
             case 'invoices': self._renderInvoicesTab(tabContent, project); break;
@@ -519,18 +520,36 @@ window.AdminProjects = {
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Status</label>
+                            <select name="status">
+                                <option value="Todo" ${(!task || task.status === 'Todo') ? 'selected' : ''}>Todo</option>
+                                <option value="Active" ${task && task.status === 'Active' ? 'selected' : ''}>Active</option>
+                                <option value="Done" ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Date</label>
+                            <input type="date" name="start_date" value="${task && task.startDate ? esc(task.startDate) : ''}">
+                        </div>
+                        <div class="form-group">
                             <label>Due Date</label>
                             <input type="date" name="due_date" value="${task && task.due_date ? esc(task.due_date) : ''}">
                         </div>
                     </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Status</label>
-                        <select name="status">
-                            <option value="Todo" ${(!task || task.status === 'Todo') ? 'selected' : ''}>Todo</option>
-                            <option value="Active" ${task && task.status === 'Active' ? 'selected' : ''}>Active</option>
-                            <option value="Done" ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
-                        </select>
-                    </div>
+                    ${(() => {
+                        const workItems = AppData.getSubtasks ? AppData.getSubtasks(projectId) : [];
+                        if (workItems.length === 0) return '';
+                        return '<div class="form-group" style="margin-bottom:12px">' +
+                            '<label>Linked Work Item <span style="font-size:.75rem;color:var(--text2)">(optional — links this task to a budget line)</span></label>' +
+                            '<select name="workItemId">' +
+                            '<option value="">-- Not linked --</option>' +
+                            workItems.map(function(wi) {
+                                return '<option value="' + wi.id + '" ' + (task && task.workItemId === wi.id ? 'selected' : '') + '>' + esc(wi.name) + '</option>';
+                            }).join('') +
+                            '</select></div>';
+                    })()}
                     <div class="form-actions">
                         <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'}</button>
                         <button type="button" class="btn-secondary modal-close">Cancel</button>
@@ -553,8 +572,10 @@ window.AdminProjects = {
                 name: fd.name.trim(),
                 description: (fd.description || '').trim(),
                 assigned_to: fd.assigned_to || null,
+                startDate: fd.start_date || null,
                 due_date: fd.due_date || null,
-                status: fd.status || 'Todo'
+                status: fd.status || 'Todo',
+                workItemId: fd.workItemId || null
             };
             AppData.saveTask(data);
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
@@ -565,6 +586,129 @@ window.AdminProjects = {
         });
     },
 
+    _renderBudgetTab(tabContent, project) {
+        const workItems = AppData.getSubtasks(project.id);
+        const expenses = AppData.getExpenses(project.id);
+        const allSubmissions = AppData.getSubmissions().filter(function(s) {
+            return s.projectId === project.id && (s.status || '').toLowerCase() === 'approved';
+        });
+        const workers = AppData.getWorkers();
+
+        // Project-level summary
+        const totalBudgeted = workItems.reduce(function(sum, wi) { return sum + (parseFloat(wi.budgetedCost) || 0); }, 0);
+        const totalExpenses = expenses.reduce(function(sum, e) { return sum + (parseFloat(e.amount) || 0); }, 0);
+
+        // Per-work-item labour from approved submissions (hours × worker costRate)
+        function labourCostForWorkItem(wiId) {
+            return allSubmissions
+                .filter(function(s) { return s.subtaskId === wiId; })
+                .reduce(function(sum, s) {
+                    const worker = workers.find(function(w) { return w.id === s.workerId; });
+                    const rate = (worker && worker.costRate) || (worker && worker.payRate) || (worker && worker.defaultRate) || parseFloat(s.rate) || 0;
+                    return sum + ((parseFloat(s.hours) || 0) * rate);
+                }, 0);
+        }
+
+        function expenseCostForWorkItem(wiId) {
+            return expenses
+                .filter(function(e) { return e.subtaskId === wiId; })
+                .reduce(function(sum, e) { return sum + (parseFloat(e.amount) || 0); }, 0);
+        }
+
+        function actualQtyForWorkItem(wiId) {
+            return allSubmissions
+                .filter(function(s) { return s.subtaskId === wiId; })
+                .reduce(function(sum, s) { return sum + (parseFloat(s.unitsCompleted) || 0); }, 0);
+        }
+
+        const totalLabour = workItems.reduce(function(sum, wi) { return sum + labourCostForWorkItem(wi.id); }, 0);
+        const totalActual = totalExpenses + totalLabour;
+        const projectBudget = parseFloat(project.budget) || 0;
+        const projectVariance = projectBudget - totalActual;
+
+        let html = '';
+
+        // Summary cards
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0">';
+        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Contract Value</div><div style="font-size:1.4em;font-weight:700;color:#333">' + Utils.formatCurrency(projectBudget || totalBudgeted) + '</div></div>';
+        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Budgeted (WIs)</div><div style="font-size:1.4em;font-weight:700;color:#333">' + Utils.formatCurrency(totalBudgeted) + '</div></div>';
+        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Labour (actual)</div><div style="font-size:1.4em;font-weight:700;color:#e67e00">' + Utils.formatCurrency(totalLabour) + '</div></div>';
+        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Materials (actual)</div><div style="font-size:1.4em;font-weight:700;color:#e74c3c">' + Utils.formatCurrency(totalExpenses) + '</div></div>';
+        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Total Actual</div><div style="font-size:1.4em;font-weight:700;color:#e74c3c">' + Utils.formatCurrency(totalActual) + '</div></div>';
+        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Variance</div><div style="font-size:1.4em;font-weight:700;color:' + (projectVariance >= 0 ? '#1a8a3a' : '#e74c3c') + '">' + (projectVariance >= 0 ? '+' : '') + Utils.formatCurrency(projectVariance) + '</div></div>';
+        html += '</div>';
+
+        if (workItems.length === 0) {
+            html += '<div class="card"><div class="empty"><h3>No Work Items</h3><p>Add Work Items on the Work Items tab to track budget vs. actual per scope item.</p></div></div>';
+        } else {
+            html += '<div class="card" style="overflow-x:auto">';
+            html += '<table style="width:100%;font-size:.88rem"><thead><tr style="background:#f5f5f5">';
+            html += '<th style="padding:10px;text-align:left">Work Item</th>';
+            html += '<th style="padding:10px;text-align:center">Unit</th>';
+            html += '<th style="padding:10px;text-align:right">Budgeted Qty</th>';
+            html += '<th style="padding:10px;text-align:right">Budgeted Cost</th>';
+            html += '<th style="padding:10px;text-align:right">Actual Qty</th>';
+            html += '<th style="padding:10px;text-align:right">Labour Cost</th>';
+            html += '<th style="padding:10px;text-align:right">Material Cost</th>';
+            html += '<th style="padding:10px;text-align:right">Total Actual</th>';
+            html += '<th style="padding:10px;text-align:right">Variance</th>';
+            html += '<th style="padding:10px;text-align:center">CO</th>';
+            html += '</tr></thead><tbody>';
+
+            workItems.forEach(function(wi) {
+                const labour = labourCostForWorkItem(wi.id);
+                const material = expenseCostForWorkItem(wi.id);
+                const actualQty = actualQtyForWorkItem(wi.id);
+                const actualTotal = labour + material;
+                const variance = (parseFloat(wi.budgetedCost) || 0) - actualTotal;
+                const varianceColor = variance >= 0 ? '#1a8a3a' : '#e74c3c';
+                const pct = wi.budgetedCost > 0 ? Math.min(100, (actualTotal / wi.budgetedCost * 100)).toFixed(0) : 0;
+                const barColor = pct >= 100 ? '#e74c3c' : (pct >= 80 ? '#e67e00' : '#1a8a3a');
+
+                html += '<tr style="border-bottom:1px solid #eee">';
+                html += '<td style="padding:10px"><strong>' + Utils.escapeHtml(wi.name) + '</strong>' +
+                    (wi.startDate ? '<div style="font-size:.75rem;color:#999">Start: ' + Utils.formatDate(wi.startDate) + (wi.endDate ? ' → ' + Utils.formatDate(wi.endDate) : '') + '</div>' : '') +
+                '</td>';
+                html += '<td style="padding:10px;text-align:center">' + Utils.escapeHtml(wi.unitOfMeasure || '—') + '</td>';
+                html += '<td style="padding:10px;text-align:right">' + (parseFloat(wi.budgetedQty) || 0) + '</td>';
+                html += '<td style="padding:10px;text-align:right">' + Utils.formatCurrency(wi.budgetedCost) + '</td>';
+                html += '<td style="padding:10px;text-align:right">' + actualQty.toFixed(1) + '</td>';
+                html += '<td style="padding:10px;text-align:right;color:#e67e00">' + Utils.formatCurrency(labour) + '</td>';
+                html += '<td style="padding:10px;text-align:right;color:#e74c3c">' + Utils.formatCurrency(material) + '</td>';
+                html += '<td style="padding:10px;text-align:right">' +
+                    '<div style="font-weight:600">' + Utils.formatCurrency(actualTotal) + '</div>' +
+                    '<div style="height:3px;background:#eee;border-radius:2px;margin-top:4px"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:2px"></div></div>' +
+                    '<div style="font-size:.7rem;color:#999">' + pct + '% of budget</div>' +
+                '</td>';
+                html += '<td style="padding:10px;text-align:right;font-weight:600;color:' + varianceColor + '">' + (variance >= 0 ? '+' : '') + Utils.formatCurrency(variance) + '</td>';
+                html += '<td style="padding:10px;text-align:center">' + (wi.changeOrder ? '<span style="color:#e67e00;font-weight:700;font-size:.8rem">CO</span>' : '') + '</td>';
+                html += '</tr>';
+            });
+
+            // Totals row
+            const totBudgetedCost = workItems.reduce(function(s, wi) { return s + (parseFloat(wi.budgetedCost) || 0); }, 0);
+            const totActual = workItems.reduce(function(s, wi) { return s + labourCostForWorkItem(wi.id) + expenseCostForWorkItem(wi.id); }, 0);
+            const totVariance = totBudgetedCost - totActual;
+            html += '<tr style="background:#f5f5f5;font-weight:700;border-top:2px solid #ddd">';
+            html += '<td style="padding:10px" colspan="3">TOTALS</td>';
+            html += '<td style="padding:10px;text-align:right">' + Utils.formatCurrency(totBudgetedCost) + '</td>';
+            html += '<td style="padding:10px"></td>';
+            html += '<td style="padding:10px;text-align:right;color:#e67e00">' + Utils.formatCurrency(workItems.reduce(function(s, wi) { return s + labourCostForWorkItem(wi.id); }, 0)) + '</td>';
+            html += '<td style="padding:10px;text-align:right;color:#e74c3c">' + Utils.formatCurrency(workItems.reduce(function(s, wi) { return s + expenseCostForWorkItem(wi.id); }, 0)) + '</td>';
+            html += '<td style="padding:10px;text-align:right">' + Utils.formatCurrency(totActual) + '</td>';
+            html += '<td style="padding:10px;text-align:right;color:' + (totVariance >= 0 ? '#1a8a3a' : '#e74c3c') + '">' + (totVariance >= 0 ? '+' : '') + Utils.formatCurrency(totVariance) + '</td>';
+            html += '<td></td>';
+            html += '</tr>';
+            html += '</tbody></table></div>';
+
+            html += '<div style="margin-top:12px;padding:10px 14px;background:#e8f4f8;border-left:4px solid #3498db;border-radius:4px;font-size:.85rem;color:#333">';
+            html += '<strong>Note:</strong> Labour cost uses each worker\'s Cost Rate. Set Cost Rate in the Workers module. Materials are from expenses linked to each Work Item.';
+            html += '</div>';
+        }
+
+        tabContent.innerHTML = html;
+    },
+
     _renderSubtasksTab(tabContent, project) {
         const self = this;
         const subtasks = AppData.getSubtasks(project.id);
@@ -573,11 +717,11 @@ window.AdminProjects = {
 
         tabContent.innerHTML = `
             <div style="margin-bottom:12px">
-                <button class="btn-primary btn-sm" id="addSubtaskBtn">+ Add Subtask</button>
+                <button class="btn-primary btn-sm" id="addSubtaskBtn">+ Add Work Item</button>
             </div>
             <div class="card">
                 ${subtasks.length === 0
-                    ? '<div class="empty"><h3>No Subtasks</h3><p>Add subtasks to break down the project scope and track progress.</p></div>'
+                    ? '<div class="empty"><h3>No Work Items</h3><p>Add Work Items to break down the project scope and track budget vs. actual.</p></div>'
                     : `<table>
                         <thead><tr>
                             <th>Subtask</th><th>Unit</th><th class="amount">Budgeted Qty</th><th class="amount">Budgeted Cost</th>
@@ -646,7 +790,7 @@ window.AdminProjects = {
         overlay.style.display = 'flex';
         overlay.innerHTML = `
             <div class="modal" style="max-width:500px">
-                <h3>${isEdit ? 'Edit Subtask' : 'Add Subtask'}</h3>
+                <h3>${isEdit ? 'Edit Work Item' : 'Add Work Item'}</h3>
                 <form id="subtaskForm" novalidate>
                     <div class="form-group" style="margin-bottom:12px">
                         <label>Subtask Name *</label>
@@ -679,6 +823,16 @@ window.AdminProjects = {
                             </select>
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Planned Start Date</label>
+                            <input type="date" name="startDate" value="${esc(st ? st.startDate || '' : '')}">
+                        </div>
+                        <div class="form-group">
+                            <label>Planned End Date</label>
+                            <input type="date" name="endDate" value="${esc(st ? st.endDate || '' : '')}">
+                        </div>
+                    </div>
                     <div class="form-actions">
                         <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'}</button>
                         <button type="button" class="btn-secondary modal-close">Cancel</button>
@@ -703,7 +857,9 @@ window.AdminProjects = {
                 unitOfMeasure: (fd.unitOfMeasure || '').trim(),
                 budgetedQty: parseFloat(fd.budgetedQty) || 0,
                 budgetedCost: parseFloat(fd.budgetedCost) || 0,
-                changeOrder: fd.changeOrder === 'yes'
+                changeOrder: fd.changeOrder === 'yes',
+                startDate: (fd.startDate || '').trim(),
+                endDate: (fd.endDate || '').trim()
             };
             AppData.saveSubtask(data);
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
@@ -1192,7 +1348,7 @@ window.AdminProjects = {
                     Utils.showToast('Project created!');
                     overlay.remove();
                     self._viewingProjectId = projectData.id;
-                    self._activeTab = 'subtasks';
+                    self._activeTab = 'work-items';
                     self._renderDetail();
                 }
             });
@@ -1224,7 +1380,7 @@ window.AdminProjects = {
     // Public method for external navigation
     showProject(projectId) {
         this._viewingProjectId = projectId;
-        this._activeTab = 'subtasks';
+        this._activeTab = 'work-items';
         if (this._container) this._renderDetail();
     }
 };
