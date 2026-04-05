@@ -25,7 +25,8 @@ window.LedgermanHelp = {
             'Click any project row to open the project detail view.',
             'In the detail view, you can log time, add expenses, view photos, and track tasks.',
             'Change project status (Active / On Hold / Complete) from the detail view.',
-            'Budget variance is calculated automatically once expenses are logged.'
+            'Budget variance is calculated automatically once expenses are logged.',
+            'Use the Export CSV button to download the full project list, or Print / PDF to generate a printable report.'
         ]
     },
 
@@ -47,11 +48,13 @@ window.LedgermanHelp = {
         intro: 'Create and assign tasks to workers on specific projects.',
         steps: [
             'Click "+ New Task" to create a task.',
-            'Fill in the task title, assign it to a worker, select the project, and set a due date.',
+            'Fill in the task title, assign it to a worker, select the project, set a start date and due date.',
+            'Setting start and due dates places the task accurately on the Project Timeline (Gantt chart).',
             'Set the initial status: To Do, In Progress, or Done.',
             'Use the filters at the top to view tasks by status, project, or assigned worker.',
             'Click Edit on any task to update it. Overdue tasks are highlighted automatically.',
-            'Workers see their assigned tasks in the Worker Portal under "My Tasks".'
+            'Workers see their assigned tasks in the Worker Portal under "My Tasks".',
+            'Use the Export CSV button to download the task list, or Print / PDF for a printable report.'
         ]
     },
 
@@ -59,11 +62,13 @@ window.LedgermanHelp = {
         title: 'Budget Tracking',
         intro: 'Monitor project budgets against actual spending in real time.',
         steps: [
-            'Select a project from the dropdown to load its budget summary.',
-            'The variance column shows how much is left (green) or overspent (red) per category.',
+            'All projects are listed with their budgeted vs. actual costs and variance.',
+            'The variance column shows how much is left (green) or overspent (red) per project.',
+            'Use the status filter tabs (All / Active / Completed / On Hold) to narrow the view.',
+            'Sort the table by budget, amount spent, variance, or % spent using the Sort By dropdown.',
             'Expenses logged by workers flow in automatically — no manual entry needed here.',
             'Click Refresh to pull the latest data.',
-            'Use the Reports module for exportable budget summaries.'
+            'Use the Export CSV button to download budget data, or Print / PDF to generate a printable report.'
         ]
     },
 
@@ -76,7 +81,8 @@ window.LedgermanHelp = {
             'Click "Review" on any report to open the full detail view.',
             'Mark reports as Reviewed or Approved using the buttons in the detail view.',
             'Filter reports by status or project using the dropdowns at the top.',
-            'Reports are sorted newest first by default.'
+            'Reports are sorted newest first by default.',
+            'Use the Export CSV button to download report data, or Print / PDF to generate a printable summary.'
         ]
     },
 
@@ -89,7 +95,8 @@ window.LedgermanHelp = {
             'Status workflow: Open → In Progress → Resolved → Signed Off.',
             'Edit any item to update its status as work progresses.',
             'Filter by project or status to focus on open items.',
-            'Items sorted by priority by default — Critical issues appear first.'
+            'Items sorted by priority by default — Critical issues appear first.',
+            'Use the Export CSV button to download the punch list, or Print / PDF to generate a printable deficiency report.'
         ]
     },
 
@@ -101,7 +108,9 @@ window.LedgermanHelp = {
             'Tasks appear as bars — bar length is the duration from start date to due date.',
             'Tasks without a start or due date default to a 7-day bar from today.',
             'Set start dates and due dates in Task Assignment to get accurate bars.',
-            'Use Task Assignment to add, edit, or reassign tasks.'
+            'Bar colours indicate status: Blue = Open, Orange = In Progress, Green = Completed.',
+            'Use Task Assignment to add, edit, or reassign tasks.',
+            'Click Refresh to reload the chart with the latest task data.'
         ]
     },
 
@@ -114,7 +123,8 @@ window.LedgermanHelp = {
             'Click "Approve" to accept the submission. It will be included in reports and invoices.',
             'Click "Reject" to send it back to the worker with a reason.',
             'Approved time flows into the Reports and Invoices modules automatically.',
-            'Switch between Pending, Approved, and Rejected tabs to review all submissions.'
+            'Switch between Pending, Approved, and Rejected tabs to review all submissions.',
+            'Use the Export CSV button to download submission data, or Print / PDF to generate a printable approvals report.'
         ]
     },
 
@@ -122,12 +132,13 @@ window.LedgermanHelp = {
         title: 'Invoices',
         intro: 'Create and track client invoices for completed work.',
         steps: [
-            'Before creating an invoice, make sure the project has expenses logged — invoices are built from billable expenses.',
+            'Before creating an invoice, make sure the project has expenses logged and marked Billable in Expenses Review.',
             'Click "+ Create Invoice" to launch the invoice wizard — only projects with uninvoiced billable expenses will appear.',
             'Work through the wizard: select project, choose expenses, set billing period, review totals, and save.',
             'HST and holdback are calculated automatically based on your company settings.',
             'Set the invoice status: Draft → Sent → Paid.',
-            'Record payments against an invoice using the "Record Payment" button — the outstanding balance updates automatically.'
+            'Record payments against an invoice using the "Record Payment" button — the outstanding balance updates automatically.',
+            'Use the Export CSV button to download the invoice list, or Print / PDF to generate a printable summary.'
         ]
     },
 
@@ -190,7 +201,8 @@ window.LedgermanHelp = {
             'Click "+ Add Client" to add a new client with contact info.',
             'Click any client to view or edit their details.',
             'Clients are linked to projects and invoices — set the client when creating a project.',
-            'Deleting a client does not delete their linked projects.'
+            'Deleting a client does not delete their linked projects.',
+            'Use the Export CSV button to download the client list, or Print / PDF for a printable directory.'
         ]
     },
 
@@ -201,7 +213,8 @@ window.LedgermanHelp = {
             'Click "+ Add Vendor" to add a new vendor — name, trade, and contact info.',
             'Click any vendor to view details or log notes.',
             'Vendors can be attached to expenses when workers log field costs.',
-            'Use the search bar to find vendors quickly.'
+            'Use the search bar to find vendors quickly.',
+            'Use the Export CSV button to download the vendor list, or Print / PDF for a printable directory.'
         ]
     },
 
@@ -225,7 +238,8 @@ window.LedgermanHelp = {
             'Click "+ Add Expense" to log an expense manually as an admin.',
             'Each expense has a project, category, amount, and optional receipt photo.',
             'Approved expenses feed into budget tracking and reports.',
-            'Expenses pending review appear in Expenses Review with approve/reject actions.'
+            'Expenses pending review appear in Expenses Review with approve/reject actions.',
+            'Use the Export CSV button to download expense data, or Print / PDF for a printable expense report.'
         ]
     },
 
@@ -249,7 +263,8 @@ window.LedgermanHelp = {
             'Set the worker\'s name, role, and a 4–6 digit PIN for field login.',
             'Workers log in from the Worker Portal using the company name, their name, and PIN — no email needed.',
             'Deactivate a worker to block their login without deleting their history.',
-            'Use "Send Invite" to invite workers who need email-based accounts.'
+            'Use "Send Invite" to invite workers who need email-based accounts.',
+            'Use the Export CSV button to download the worker list, or Print / PDF for a printable roster.'
         ]
     },
 
@@ -267,12 +282,14 @@ window.LedgermanHelp = {
 
     reports: {
         title: 'Reports',
-        intro: 'Summarized cost, labour, and invoice reports across all projects.',
+        intro: 'Summarized cost, labour, invoice, and field reports across all projects.',
         steps: [
-            'Select a report type from the tabs: Labour, Expenses, or Invoices.',
+            'Select a report type from the tabs: Labour, Expenses, Invoices, Payroll Summary, or Labor & Notes Report.',
             'Filter by project or date range to narrow the results.',
             'The totals row summarizes all visible data.',
-            'Use your browser\'s Print function (Ctrl+P) to print or save as PDF.'
+            'The Labor & Notes Report shows approved worker time entries with field notes and site photos — use it for job site documentation and client reporting.',
+            'Use the Export CSV button to download any report, or Print / PDF to generate a printable copy.',
+            'All reports pull only approved data — pending and rejected entries are excluded.'
         ]
     },
 
