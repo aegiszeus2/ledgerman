@@ -214,7 +214,7 @@ window.AdminApprovals = {
         }
 
         contentEl.innerHTML = '<div class="card"><table>' +
-            '<thead><tr><th>Date</th><th>Worker</th><th>Project</th><th>Description</th><th class="amount">Amount</th><th>Method</th><th>Status</th></tr></thead>' +
+            '<thead><tr><th>Date</th><th>Worker</th><th>Project</th><th>Description</th><th class="amount">Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>' +
             '<tbody>' +
             all.map(function(sub) {
                 const worker = AppData.getWorker(sub.workerId);
@@ -228,6 +228,9 @@ window.AdminApprovals = {
                 const statusStyle = sub.status === 'Approved'
                     ? 'background:rgba(46,204,113,.2);color:var(--success)'
                     : 'background:rgba(233,69,96,.2);color:var(--accent)';
+                const actionBtn = sub.status === 'Approved'
+                    ? '<button class="btn-secondary btn-sm unapprove-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px;white-space:nowrap">Unapprove</button>'
+                    : '';
                 return '<tr>' +
                     '<td>' + Utils.formatDate(sub.date) + '</td>' +
                     '<td>' + Utils.escapeHtml(worker ? worker.name : 'Unknown') + '</td>' +
@@ -238,9 +241,41 @@ window.AdminApprovals = {
                     '<td class="amount">' + Utils.formatCurrency(amount) + '</td>' +
                     '<td style="font-size:.78rem;white-space:nowrap">' + (sub.entryMethod === 'Clock In/Out' ? '<span style="color:var(--success)">⏱ Clock In/Out</span>' : '<span style="color:var(--text2)">✏️ Manual</span>') + '</td>' +
                     '<td><span style="font-size:.75rem;padding:2px 8px;border-radius:12px;' + statusStyle + '">' + sub.status + '</span></td>' +
+                    '<td>' + actionBtn + '</td>' +
                 '</tr>';
             }).join('') +
             '</tbody></table></div>';
+
+        // Unapprove buttons
+        contentEl.querySelectorAll('.unapprove-btn').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+                const sub = AppData.getSubmission(btn.dataset.id);
+                if (!sub) return;
+                const worker = AppData.getWorker(sub.workerId);
+                const confirmed = await Utils.confirm('Unapprove this entry for ' + (worker ? worker.name : 'this worker') + '? The linked expense will be removed and it will return to Pending.');
+                if (!confirmed) return;
+                self._unapproveSubmission(sub);
+                Utils.showToast('Submission unapproved — moved back to Pending');
+                self._renderContent();
+            });
+        });
+    },
+
+    _unapproveSubmission(sub) {
+        // Remove the linked expense created on approval
+        const allExpenses = AppData.getExpenses ? AppData.getExpenses() : [];
+        const linked = allExpenses.filter(function(e) { return e.submissionId === sub.id; });
+        linked.forEach(function(e) { AppData.deleteExpense(e.id); });
+
+        // Move back to Pending
+        sub.status = 'Pending';
+        sub.reviewedAt = null;
+        sub.reviewedBy = null;
+        AppData.saveSubmission(sub);
+
+        const worker = AppData.getWorker(sub.workerId);
+        const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+        AppData.addAuditLog(username, 'Submission Unapproved', (worker ? worker.name : 'Worker') + ' — returned to Pending');
     },
 
     _approveSubmission(sub) {

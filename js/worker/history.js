@@ -144,14 +144,17 @@ window.WorkerHistory = {
                     cardHTML += '<div style="font-size:.8rem;color:var(--text2);margin-top:4px">Submitted: ' + esc(Utils.formatDateTime(sub.submittedAt)) + '</div>';
                 }
 
-                // Rejection reason and resubmit button
+                // Rejection reason and action buttons
                 if (sub.status === 'Rejected') {
                     cardHTML +=
                         '<div style="margin-top:10px;padding:10px;background:rgba(233,69,96,.1);border-radius:var(--radius);border-left:3px solid var(--accent)">' +
                             '<div style="font-size:.85rem;font-weight:600;color:var(--accent);margin-bottom:4px">Rejection Reason:</div>' +
                             '<div style="font-size:.9rem;color:var(--accent)">' + esc(sub.rejectionReason || 'No reason provided.') + '</div>' +
                         '</div>' +
-                        '<button class="btn-primary resubmit-btn" style="margin-top:12px;padding:12px 20px;font-size:.95rem;width:100%" data-sub-id="' + esc(sub.id) + '">Resubmit This Entry</button>';
+                        '<div style="display:flex;gap:8px;margin-top:12px">' +
+                            '<button class="btn-primary resubmit-btn" style="flex:1;padding:12px 16px;font-size:.95rem" data-sub-id="' + esc(sub.id) + '">✏️ Edit &amp; Resubmit</button>' +
+                            '<button class="btn-danger delete-rejected-btn" style="padding:12px 16px;font-size:.95rem" data-sub-id="' + esc(sub.id) + '">Delete</button>' +
+                        '</div>';
                 }
 
                 card.innerHTML = cardHTML;
@@ -180,6 +183,22 @@ window.WorkerHistory = {
                         flatRate: sub.flatRate,
                         description: sub.description,
                         unitsCompleted: sub.unitsCompleted
+                    });
+                });
+            }
+
+            // Bind delete buttons on rejected entries
+            var deleteBtns = container.querySelectorAll('.delete-rejected-btn');
+            for (var j = 0; j < deleteBtns.length; j++) {
+                deleteBtns[j].addEventListener('click', function() {
+                    var subId = this.getAttribute('data-sub-id');
+                    if (!subId) return;
+                    Utils.confirm('Delete this rejected entry? This cannot be undone.').then(function(confirmed) {
+                        if (!confirmed) return;
+                        AppData.deleteSubmission(subId);
+                        Utils.showToast('Entry deleted.');
+                        allSubmissions = AppData.getWorkerSubmissions(worker.id);
+                        renderPage();
                     });
                 });
             }
