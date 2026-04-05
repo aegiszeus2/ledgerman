@@ -289,16 +289,16 @@ window.WorkerTimeEntry = {
                     '<input class="form-control" type="date" id="teDate" name="date" value="' + esc(defaultDate) + '" required>' +
                 '</div>';
 
-            // Subtask
+            // Work Item
             if (subtasks.length > 0) {
-                var stOptions = '<option value="">— No specific subtask —</option>';
+                var stOptions = '<option value="">— No specific work item —</option>';
                 subtasks.forEach(function(st) {
                     stOptions += '<option value="' + esc(st.id) + '" data-unit="' + esc(st.unitOfMeasure || '') + '"' +
                         (st.id === (defaults.subtaskId || '') ? ' selected' : '') + '>' + esc(st.name) + '</option>';
                 });
                 formHTML +=
                     '<div class="form-group">' +
-                        '<label class="form-label" for="teSubtask">Subtask</label>' +
+                        '<label class="form-label" for="teSubtask">Work Item</label>' +
                         '<select class="form-control" id="teSubtask" name="subtask">' + stOptions + '</select>' +
                     '</div>';
             }
