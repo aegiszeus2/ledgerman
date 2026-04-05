@@ -11,8 +11,8 @@ window.AdminGanttChart = {
 
         if (projects.length === 0) {
             container.innerHTML = `
-                <div style="padding:32px;text-align:center;color:#999">
-                    <h2>No projects to visualize</h2>
+                <div style="padding:32px;text-align:center;color:#333">
+                    <h2 style="color:#111">No projects to visualize</h2>
                     <p>Create projects first to view them on the Gantt chart.</p>
                 </div>
             `;
@@ -28,7 +28,7 @@ window.AdminGanttChart = {
         const selectedProject = AppData.getProject(selectedProjectId);
 
         if (!selectedProject) {
-            container.innerHTML = `<div style="padding:32px;text-align:center;color:#999">Project not found</div>`;
+            container.innerHTML = `<div style="padding:32px;text-align:center;color:#333;font-weight:600">Project not found</div>`;
             return;
         }
 
@@ -76,71 +76,79 @@ window.AdminGanttChart = {
         container.innerHTML = `
             <div style="margin-bottom:20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                    <h2>Project Timeline</h2>
+                    <h2 style="color:#111">Project Timeline</h2>
                     <button class="btn-secondary btn-sm" id="refreshGanttBtn">↻ Refresh</button>
                 </div>
-                <p style="color:#666;margin:0">Visual project schedule with task progress</p>
+                <p style="color:#333;margin:0">Visual project schedule with task progress</p>
             </div>
 
             <!-- Project Selector -->
-            <div style="margin-bottom:16px;padding:12px;background:#f5f5f5;border-radius:6px;display:flex;gap:12px;align-items:center">
-                <label style="font-weight:500">Project:</label>
-                <select id="projectSelector" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
+            <div style="margin-bottom:16px;padding:12px;background:#f0f0f0;border-radius:6px;display:flex;gap:12px;align-items:center">
+                <label style="font-weight:600;color:#111">Project:</label>
+                <select id="projectSelector" style="padding:6px 8px;border-radius:4px;border:1px solid #aaa;font-size:0.9em;color:#111;background:#fff">
                     ${AppData.getProjects().map(p => `
                         <option value="${p.id}" ${self._selectedProject === p.id ? 'selected' : ''}>
                             ${Utils.escapeHtml(p.name)}
                         </option>
                     `).join('')}
                 </select>
-                <div style="flex:1;border-left:1px solid #ddd;padding-left:12px">
-                    <strong>${Utils.escapeHtml(selectedProject.name)}</strong>
-                    <div style="font-size:0.85em;color:#666">
+                <div style="flex:1;border-left:2px solid #aaa;padding-left:12px">
+                    <strong style="color:#111">${Utils.escapeHtml(selectedProject.name)}</strong>
+                    <div style="font-size:0.85em;color:#333;margin-top:2px">
                         ${projectTasks.length} task${projectTasks.length !== 1 ? 's' : ''}
-                        • Status: ${selectedProject.status || 'Active'}
+                        &nbsp;•&nbsp; Status: ${selectedProject.status || 'Active'}
                     </div>
                 </div>
             </div>
 
             <!-- Gantt Chart -->
-            <div id="${chartId}" style="border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;margin-bottom:20px;background:#fff"></div>
+            <div id="${chartId}" style="border-radius:8px;overflow:hidden;border:2px solid #ccc;margin-bottom:20px;background:#fff"></div>
 
             <!-- Legend -->
-            <div style="padding:16px;background:#f9f9f9;border-radius:6px;border:1px solid #e0e0e0">
-                <h3 style="font-size:0.9em;margin-bottom:12px">Legend</h3>
+            <div style="padding:16px;background:#f0f0f0;border-radius:6px;border:1px solid #ccc">
+                <h3 style="font-size:0.95em;margin-bottom:12px;color:#111;font-weight:700">Legend</h3>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;font-size:0.85em">
-                            <div style="width:24px;height:12px;background:#4285F4;border-radius:2px"></div>
-                            <span>Open Task</span>
-                        </div>
+                    <div style="display:flex;align-items:center;gap:8px;font-size:0.9em;color:#111">
+                        <div style="width:24px;height:12px;background:#4285F4;border-radius:2px;flex-shrink:0"></div>
+                        <span>Open Task</span>
                     </div>
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;font-size:0.85em">
-                            <div style="width:24px;height:12px;background:#F4B400;border-radius:2px"></div>
-                            <span>In Progress (50%)</span>
-                        </div>
+                    <div style="display:flex;align-items:center;gap:8px;font-size:0.9em;color:#111">
+                        <div style="width:24px;height:12px;background:#e67e00;border-radius:2px;flex-shrink:0"></div>
+                        <span>In Progress (50%)</span>
                     </div>
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;font-size:0.85em">
-                            <div style="width:24px;height:12px;background:#34A853;border-radius:2px"></div>
-                            <span>Completed (100%)</span>
-                        </div>
+                    <div style="display:flex;align-items:center;gap:8px;font-size:0.9em;color:#111">
+                        <div style="width:24px;height:12px;background:#1a8a3a;border-radius:2px;flex-shrink:0"></div>
+                        <span>Completed (100%)</span>
                     </div>
                 </div>
             </div>
 
             <!-- Info -->
-            <div style="margin-top:16px;padding:12px;background:#e8f4f8;border-radius:6px;border-left:4px solid #3498db;font-size:0.9em">
+            <div style="margin-top:16px;padding:12px;background:#d6eaf8;border-radius:6px;border-left:4px solid #1a6fa8;font-size:0.9em;color:#111">
                 <strong>💡 Tip:</strong> Tasks are displayed with their duration based on start and due dates.
-                Set task dates to see them on the timeline. Task progress is based on status (Open/In Progress/Completed).
+                Set task dates in Task Assignment to see them here. Progress is based on status (Open / In Progress / Completed).
             </div>
 
             <style>
-                .gantt-container svg { max-width: 100%; }
-                .task-open { fill: #4285F4; }
-                .task-in-progress { fill: #F4B400; }
-                .task-completed { fill: #34A853; }
-                .task-dummy { fill: #ccc; opacity: 0.5; }
+                /* ── Frappe-Gantt text overrides ── */
+                .gantt-container svg { max-width:100%; }
+                .gantt .upper-text,
+                .gantt .lower-text { fill:#111 !important; font-weight:600 !important; font-size:12px !important; }
+                .gantt text { fill:#111 !important; }
+                .gantt .bar-label { fill:#fff !important; font-weight:600 !important; font-size:11px !important; }
+                .gantt .bar-label.big { fill:#111 !important; }
+                .gantt .grid-header { fill:#e8e8e8 !important; }
+                .gantt .grid-row { fill:#fff !important; }
+                .gantt .grid-row:nth-child(even) { fill:#f8f8f8 !important; }
+                .gantt .row-line { stroke:#ddd !important; }
+                .gantt .tick { stroke:#ccc !important; }
+                .gantt .today-highlight { fill:#fff3e0 !important; opacity:0.5; }
+                /* ── Task bar colors ── */
+                .task-open .bar { fill:#4285F4 !important; }
+                .task-in-progress .bar { fill:#e67e00 !important; }
+                .task-completed .bar { fill:#1a8a3a !important; }
+                .task-dummy .bar { fill:#aaa !important; }
+                .bar-progress { opacity:0.4; }
             </style>
         `;
 
@@ -165,14 +173,14 @@ window.AdminGanttChart = {
                 } catch(err) {
                     console.error('Gantt chart initialization failed:', err);
                     document.getElementById(chartId).innerHTML = `
-                        <div style="padding:32px;text-align:center;color:#e74c3c">
+                        <div style="padding:32px;text-align:center;color:#c0392b;font-weight:600">
                             <p>Failed to render Gantt chart: ${err.message}</p>
                         </div>
                     `;
                 }
             } else {
                 document.getElementById(chartId).innerHTML = `
-                    <div style="padding:32px;text-align:center;color:#999">
+                    <div style="padding:32px;text-align:center;color:#333;font-weight:600">
                         <p>Gantt chart library not loaded. Please refresh the page.</p>
                     </div>
                 `;
