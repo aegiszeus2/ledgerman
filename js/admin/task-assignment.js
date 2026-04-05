@@ -14,7 +14,7 @@ window.AdminTaskAssignment = {
     _renderList() {
         const self = this;
         const container = self._container;
-        const tasks = AppData.getEntities('tasks') || [];
+        const tasks = AppData.getTasks() || [];
         const projects = AppData.getProjects() || [];
         const workers = AppData.getWorkers() || [];
 
