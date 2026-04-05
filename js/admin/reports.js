@@ -16,6 +16,7 @@ window.AdminReports = {
             { id: 'labor', label: 'Labor Report' },
             { id: 'expense', label: 'Expense Summary' },
             { id: 'invoice', label: 'Invoice Summary' },
+            { id: 'equipment', label: 'Equipment Report' },
             { id: 'labor-notes', label: 'Labor & Notes Report' }
         ];
 
@@ -56,6 +57,7 @@ window.AdminReports = {
             case 'labor': self._renderLaborReport(content); break;
             case 'expense': self._renderExpenseSummary(content); break;
             case 'invoice': self._renderInvoiceSummary(content); break;
+            case 'equipment': self._renderEquipmentReport(content); break;
             case 'labor-notes': self._renderLaborNotesReport(content); break;
         }
     },
@@ -129,6 +131,45 @@ window.AdminReports = {
                 categories[cat] += parseFloat(e.amount) || 0;
             });
 
+            // Equipment cost/revenue for this project
+            const eqLogs = AppData.getEquipmentLogs ? AppData.getEquipmentLogs(projectId) : [];
+            const eqByItem = {};
+            let totalEqCost = 0, totalEqRevenue = 0, totalEqHours = 0;
+            eqLogs.forEach(function(l) {
+                const key = l.equipmentId || l.equipmentName;
+                if (!eqByItem[key]) eqByItem[key] = { name: l.equipmentName || 'Unknown', hours: 0, cost: 0, revenue: 0 };
+                eqByItem[key].hours   += parseFloat(l.hours) || 0;
+                eqByItem[key].cost    += parseFloat(l.cost) || 0;
+                eqByItem[key].revenue += parseFloat(l.revenue) || 0;
+                totalEqCost    += parseFloat(l.cost) || 0;
+                totalEqRevenue += parseFloat(l.revenue) || 0;
+                totalEqHours   += parseFloat(l.hours) || 0;
+            });
+
+            const eqTableHtml = Object.keys(eqByItem).length === 0
+                ? '<p style="color:var(--text2)">No equipment hours logged for this project yet.</p>'
+                : '<table><thead><tr>' +
+                  '<th>Equipment</th><th class="amount">Hours</th>' +
+                  '<th class="amount">Cost</th><th class="amount">Revenue</th><th class="amount">Margin</th>' +
+                  '</tr></thead><tbody>' +
+                  Object.values(eqByItem).map(function(eq) {
+                      var margin = eq.revenue - eq.cost;
+                      return '<tr>' +
+                          '<td>' + esc(eq.name) + '</td>' +
+                          '<td class="amount">' + eq.hours.toFixed(1) + '</td>' +
+                          '<td class="amount">' + Utils.formatCurrency(eq.cost) + '</td>' +
+                          '<td class="amount">' + Utils.formatCurrency(eq.revenue) + '</td>' +
+                          '<td class="amount" style="color:' + (margin >= 0 ? 'var(--success,green)' : 'var(--accent,red)') + '">' + Utils.formatCurrency(margin) + '</td>' +
+                      '</tr>';
+                  }).join('') +
+                  '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
+                  '<td>TOTAL</td>' +
+                  '<td class="amount">' + totalEqHours.toFixed(1) + '</td>' +
+                  '<td class="amount">' + Utils.formatCurrency(totalEqCost) + '</td>' +
+                  '<td class="amount">' + Utils.formatCurrency(totalEqRevenue) + '</td>' +
+                  '<td class="amount" style="color:' + (totalEqRevenue - totalEqCost >= 0 ? 'var(--success,green)' : 'var(--accent,red)') + '">' + Utils.formatCurrency(totalEqRevenue - totalEqCost) + '</td>' +
+                  '</tr></tbody></table>';
+
             body.innerHTML = '<div class="card" style="margin-bottom:16px">' +
                 '<h3 style="margin-bottom:12px">Cost Report: ' + esc(project.name) + '</h3>' +
                 '<table><thead><tr>' +
@@ -146,7 +187,7 @@ window.AdminReports = {
                 '<td class="amount" style="color:' + (totalVariance >= 0 ? 'var(--success,green)' : 'var(--accent,red)') + '">' + Utils.formatCurrency(totalVariance) + '</td>' +
                 '<td></td></tr>' +
                 '</tbody></table></div>' +
-                '<div class="card"><h3 style="margin-bottom:12px">Totals by Category</h3>' +
+                '<div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:12px">Totals by Category</h3>' +
                 (Object.keys(categories).length === 0
                     ? '<p style="color:var(--text2)">No expenses recorded yet.</p>'
                     : '<table><thead><tr><th>Category</th><th class="amount">Total</th><th class="amount">% of Total</th></tr></thead><tbody>' +
@@ -160,6 +201,9 @@ window.AdminReports = {
                         Utils.formatCurrency(Object.values(categories).reduce(function(a, b) { return a + b; }, 0)) +
                         '</td><td class="amount">100%</td></tr></tbody></table>'
                 ) +
+                '</div>' +
+                '<div class="card"><h3 style="margin-bottom:12px">🔧 Equipment Cost vs. Revenue</h3>' +
+                eqTableHtml +
                 '</div>';
         });
     },
@@ -405,10 +449,11 @@ window.AdminReports = {
     _exportCsv() {
         var self = this;
         switch (self._activeTab) {
-            case 'cost':    self._exportCostCsv();    break;
-            case 'labor':   self._exportLaborCsv();   break;
-            case 'expense': self._exportExpenseCsv(); break;
-            case 'invoice': self._exportInvoiceCsv(); break;
+            case 'cost':      self._exportCostCsv();      break;
+            case 'labor':     self._exportLaborCsv();     break;
+            case 'expense':   self._exportExpenseCsv();   break;
+            case 'invoice':   self._exportInvoiceCsv();   break;
+            case 'equipment': self._exportEquipmentCsv(); break;
         }
     },
 
@@ -794,5 +839,167 @@ window.AdminReports = {
                 document.head.appendChild(style);
             }
         });
+    },
+
+    // ── Equipment Report ─────────────────────────────────────────────────────────
+
+    _renderEquipmentReport(content) {
+        const self = this;
+        const projects = AppData.getProjects();
+        const esc = Utils.escapeHtml;
+
+        content.innerHTML =
+            '<div class="card" style="margin-bottom:16px">' +
+                '<div class="form-row">' +
+                    '<div class="form-group">' +
+                        '<label>Start Date</label>' +
+                        '<input type="date" id="eqStartDate">' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>End Date</label>' +
+                        '<input type="date" id="eqEndDate">' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>Project (optional)</label>' +
+                        '<select id="eqProjectFilter">' +
+                            '<option value="">All Projects</option>' +
+                            projects.map(function(p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('') +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="form-group" style="display:flex;align-items:flex-end">' +
+                        '<button class="btn-primary btn-sm" id="eqGenerateBtn">Generate</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div id="eqReportBody"></div>';
+
+        content.querySelector('#eqGenerateBtn').addEventListener('click', function() {
+            const startDate = content.querySelector('#eqStartDate').value;
+            const endDate   = content.querySelector('#eqEndDate').value;
+            const projectId = content.querySelector('#eqProjectFilter').value;
+            const body      = content.querySelector('#eqReportBody');
+
+            let logs = AppData.getEquipmentLogs ? AppData.getEquipmentLogs(projectId || undefined) : [];
+            if (startDate) logs = logs.filter(function(l) { return l.date >= startDate; });
+            if (endDate)   logs = logs.filter(function(l) { return l.date <= endDate; });
+
+            if (logs.length === 0) {
+                body.innerHTML = '<div class="card"><div class="empty"><h3>No Equipment Logs</h3>' +
+                    '<p>No equipment utilization has been logged for the selected filters. Workers log equipment on their time entries.</p></div></div>';
+                return;
+            }
+
+            // Group by project
+            const byProject = {};
+            logs.forEach(function(l) {
+                const pid = l.projectId || 'unassigned';
+                if (!byProject[pid]) {
+                    const proj = AppData.getProject(pid);
+                    byProject[pid] = { name: proj ? proj.name : 'Unassigned', logs: [] };
+                }
+                byProject[pid].logs.push(l);
+            });
+
+            let grandHours = 0, grandCost = 0, grandRevenue = 0;
+            let html = '';
+
+            Object.keys(byProject).forEach(function(pid) {
+                const group = byProject[pid];
+                let projHours = 0, projCost = 0, projRevenue = 0;
+
+                const rows = group.logs.map(function(l) {
+                    const hrs  = parseFloat(l.hours) || 0;
+                    const cost = parseFloat(l.cost)  || 0;
+                    const rev  = parseFloat(l.revenue) || 0;
+                    const margin = rev - cost;
+                    projHours   += hrs;
+                    projCost    += cost;
+                    projRevenue += rev;
+                    return '<tr>' +
+                        '<td>' + esc(l.date || '') + '</td>' +
+                        '<td>' + esc(l.workerName || '') + '</td>' +
+                        '<td style="font-weight:500">' + esc(l.equipmentName || '') + '</td>' +
+                        '<td class="amount">' + hrs.toFixed(2) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(l.costRate || 0) + '/hr</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(l.chargeOutRate || 0) + '/hr</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(cost) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(rev) + '</td>' +
+                        '<td class="amount" style="color:' + (margin >= 0 ? 'var(--success,green)' : 'var(--accent,red)') + '">' + Utils.formatCurrency(margin) + '</td>' +
+                    '</tr>';
+                }).join('');
+
+                grandHours   += projHours;
+                grandCost    += projCost;
+                grandRevenue += projRevenue;
+
+                html += '<div class="card" style="margin-bottom:16px">' +
+                    '<h3 style="margin-bottom:12px">📋 ' + esc(group.name) + '</h3>' +
+                    '<div style="overflow-x:auto">' +
+                    '<table><thead><tr>' +
+                    '<th>Date</th><th>Worker</th><th>Equipment</th>' +
+                    '<th class="amount">Hours</th><th class="amount">Cost Rate</th><th class="amount">Charge-Out</th>' +
+                    '<th class="amount">Cost</th><th class="amount">Revenue</th><th class="amount">Margin</th>' +
+                    '</tr></thead><tbody>' +
+                    rows +
+                    '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
+                    '<td colspan="3">Project Total</td>' +
+                    '<td class="amount">' + projHours.toFixed(2) + '</td>' +
+                    '<td colspan="2"></td>' +
+                    '<td class="amount">' + Utils.formatCurrency(projCost) + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(projRevenue) + '</td>' +
+                    '<td class="amount" style="color:' + (projRevenue - projCost >= 0 ? 'var(--success,green)' : 'var(--accent,red)') + '">' + Utils.formatCurrency(projRevenue - projCost) + '</td>' +
+                    '</tr></tbody></table>' +
+                    '</div></div>';
+            });
+
+            // Grand summary card
+            html += '<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;text-align:center">' +
+                '<div><div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;font-weight:600;margin-bottom:4px">Total Hours</div>' +
+                    '<div style="font-size:1.5rem;font-weight:700">' + grandHours.toFixed(1) + '</div></div>' +
+                '<div><div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;font-weight:600;margin-bottom:4px">Total Cost</div>' +
+                    '<div style="font-size:1.5rem;font-weight:700;color:var(--accent)">' + Utils.formatCurrency(grandCost) + '</div></div>' +
+                '<div><div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;font-weight:600;margin-bottom:4px">Total Revenue</div>' +
+                    '<div style="font-size:1.5rem;font-weight:700;color:var(--success)">' + Utils.formatCurrency(grandRevenue) + '</div></div>' +
+                '<div><div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;font-weight:600;margin-bottom:4px">Net Margin</div>' +
+                    '<div style="font-size:1.5rem;font-weight:700;color:' + (grandRevenue - grandCost >= 0 ? 'var(--success)' : 'var(--accent)') + '">' + Utils.formatCurrency(grandRevenue - grandCost) + '</div></div>' +
+            '</div>';
+
+            body.innerHTML = html;
+        });
+    },
+
+    _exportEquipmentCsv() {
+        var self = this;
+        var container = self._container;
+        var startDate = (container.querySelector('#eqStartDate') || {}).value || '';
+        var endDate   = (container.querySelector('#eqEndDate')   || {}).value || '';
+        var projectId = (container.querySelector('#eqProjectFilter') || {}).value || '';
+
+        var logs = AppData.getEquipmentLogs ? AppData.getEquipmentLogs(projectId || undefined) : [];
+        if (startDate) logs = logs.filter(function(l) { return l.date >= startDate; });
+        if (endDate)   logs = logs.filter(function(l) { return l.date <= endDate; });
+
+        var headers = ['Date', 'Project', 'Worker', 'Equipment', 'Hours', 'Cost Rate ($/hr)', 'Charge-Out Rate ($/hr)', 'Cost ($)', 'Revenue ($)', 'Margin ($)'];
+        var lines = [self._csvRow(headers)];
+
+        logs.forEach(function(l) {
+            var proj = AppData.getProject(l.projectId);
+            var cost = parseFloat(l.cost) || 0;
+            var rev  = parseFloat(l.revenue) || 0;
+            lines.push(self._csvRow([
+                l.date || '',
+                proj ? proj.name : (l.projectId || ''),
+                l.workerName || '',
+                l.equipmentName || '',
+                (parseFloat(l.hours) || 0).toFixed(2),
+                (parseFloat(l.costRate) || 0).toFixed(2),
+                (parseFloat(l.chargeOutRate) || 0).toFixed(2),
+                cost.toFixed(2),
+                rev.toFixed(2),
+                (rev - cost).toFixed(2)
+            ]));
+        });
+
+        self._downloadCsv(lines.join('\n'), 'equipment');
     }
 };
