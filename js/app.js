@@ -974,7 +974,7 @@
                 // ── Module-gated Tier 3 ────────────────────────────────────
                 on('task_assignment',  false) ? item('task-assignment', '☑️',  'Task Assignment',  'Task Assignment — assign tasks to workers') : '',
                 on('budget_tracking',  false) ? item('budget-tracking', '💹',  'Budget Tracking',  'Budget Tracking — project budgets vs actual spending') : '',
-                on('daily_reports',    false) ? item('daily-reports',   '📋',  'Daily Reports',    'Daily Reports — crew summaries and site conditions') : '',
+                on('daily_reports',    false) ? item('daily-reports',   '📋',  'Supervisor Reports', 'Supervisor Reports — crew summaries and site conditions') : '',
                 on('punch_lists',      false) ? item('punch-lists',     '📌',  'Punch Lists',      'Punch Lists — deficiency tracking and sign-off') : '',
                 on('gantt_chart',      false) ? item('gantt-chart',     '📅',  'Project Timeline', 'Project Timeline — visual schedule of tasks and milestones') : '',
                 // ── Always-on last ─────────────────────────────────────────

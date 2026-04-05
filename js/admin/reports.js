@@ -15,7 +15,8 @@ window.AdminReports = {
             { id: 'cost', label: 'Cost Report' },
             { id: 'labor', label: 'Labor Report' },
             { id: 'expense', label: 'Expense Summary' },
-            { id: 'invoice', label: 'Invoice Summary' }
+            { id: 'invoice', label: 'Invoice Summary' },
+            { id: 'labor-notes', label: 'Labor & Notes Report' }
         ];
 
         container.innerHTML = `
@@ -55,6 +56,7 @@ window.AdminReports = {
             case 'labor': self._renderLaborReport(content); break;
             case 'expense': self._renderExpenseSummary(content); break;
             case 'invoice': self._renderInvoiceSummary(content); break;
+            case 'labor-notes': self._renderLaborNotesReport(content); break;
         }
     },
 
@@ -606,5 +608,174 @@ window.AdminReports = {
             '<td class="amount">' + Utils.formatCurrency(totalOutstanding) + '</td>' +
             '<td></td></tr>' +
             '</tbody></table></div>';
+    },
+
+    _renderLaborNotesReport(content) {
+        const self = this;
+        const esc = Utils.escapeHtml;
+        const projects = AppData.getProjects();
+        const settings = AppData.getSettings() || {};
+        const logoUrl = settings.logoUrl || settings.logo || '';
+        const companyName = settings.companyName || 'My Company';
+        const companyAddress = [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ');
+        const hstNumber = settings.hstNumber ? 'HST# ' + settings.hstNumber : '';
+
+        // Filters UI
+        content.innerHTML =
+            '<div class="card" style="margin-bottom:16px">' +
+            '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">' +
+            '<div class="form-group" style="margin:0;flex:1;min-width:160px"><label>Project</label>' +
+            '<select id="lnrProject"><option value="">All Projects</option>' +
+            projects.map(function(p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('') +
+            '</select></div>' +
+            '<div class="form-group" style="margin:0"><label>From</label><input type="date" id="lnrFrom"></div>' +
+            '<div class="form-group" style="margin:0"><label>To</label><input type="date" id="lnrTo"></div>' +
+            '<button class="btn-primary" id="lnrRun">Generate Report</button>' +
+            '<button class="btn-secondary" id="lnrPrint" style="display:none">🖨 Print / Save PDF</button>' +
+            '</div></div>' +
+            '<div id="lnrBody"></div>';
+
+        // Set default date range: current month
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        content.querySelector('#lnrFrom').value = y + '-' + m + '-01';
+        content.querySelector('#lnrTo').value = now.toISOString().slice(0, 10);
+
+        content.querySelector('#lnrPrint').addEventListener('click', function() { window.print(); });
+
+        content.querySelector('#lnrRun').addEventListener('click', function() {
+            const projectId = content.querySelector('#lnrProject').value;
+            const fromDate = content.querySelector('#lnrFrom').value;
+            const toDate = content.querySelector('#lnrTo').value;
+            const body = content.querySelector('#lnrBody');
+            content.querySelector('#lnrPrint').style.display = '';
+
+            // Gather data
+            const allSubmissions = AppData.getSubmissions().filter(function(s) {
+                if (s.status !== 'approved') return false;
+                const d = (s.date || s.createdAt || '').slice(0, 10);
+                if (fromDate && d < fromDate) return false;
+                if (toDate && d > toDate) return false;
+                if (projectId && s.projectId !== projectId) return false;
+                return true;
+            });
+
+            const allExpenses = AppData.getExpenses();
+            const allWorkers = AppData.getWorkers();
+            const allPhotos = AppData.getPhotos ? AppData.getPhotos() : [];
+
+            // Group: project → date → submissions
+            const grouped = {};
+            allSubmissions.forEach(function(s) {
+                const pid = s.projectId || '';
+                const date = (s.date || s.createdAt || '').slice(0, 10);
+                if (!grouped[pid]) grouped[pid] = {};
+                if (!grouped[pid][date]) grouped[pid][date] = [];
+                grouped[pid][date].push(s);
+            });
+
+            if (!Object.keys(grouped).length) {
+                body.innerHTML = '<div class="empty-state"><p>No approved submissions found for the selected range.</p></div>';
+                return;
+            }
+
+            // Build report HTML
+            let html = '';
+
+            // ── Printable header (hidden on screen, shown on print) ──
+            html += '<div class="print-header" style="display:none">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a3a5c;padding-bottom:12px;margin-bottom:20px">' +
+                (logoUrl ? '<img src="' + esc(logoUrl) + '" style="max-height:64px;max-width:180px;object-fit:contain">' : '<div style="width:180px"></div>') +
+                '<div style="text-align:right">' +
+                '<div style="font-size:1.3rem;font-weight:700;color:#1a3a5c">' + esc(companyName) + '</div>' +
+                (companyAddress ? '<div style="font-size:.85rem;color:#555">' + esc(companyAddress) + '</div>' : '') +
+                (hstNumber ? '<div style="font-size:.8rem;color:#555">' + esc(hstNumber) + '</div>' : '') +
+                '</div></div>' +
+                '<div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;margin-bottom:4px">Labor & Notes Report</div>' +
+                '<div style="font-size:.85rem;color:#555;margin-bottom:16px">Period: ' + esc(fromDate) + ' to ' + esc(toDate) + '</div>' +
+                '</div>';
+
+            Object.keys(grouped).forEach(function(pid) {
+                const project = projects.find(function(p) { return p.id === pid; }) || { name: 'Unknown Project' };
+                html += '<div class="card" style="margin-bottom:20px;break-inside:avoid">' +
+                    '<h3 style="color:#1a3a5c;border-bottom:2px solid #1a3a5c;padding-bottom:8px;margin-bottom:12px">📁 ' + esc(project.name) + '</h3>';
+
+                const dates = Object.keys(grouped[pid]).sort();
+                dates.forEach(function(date) {
+                    html += '<div style="margin-bottom:16px">' +
+                        '<div style="font-weight:700;font-size:.95rem;color:#333;background:#f5f7fa;padding:6px 10px;border-radius:4px;margin-bottom:10px">📅 ' + Utils.formatDate(date) + '</div>';
+
+                    grouped[pid][date].forEach(function(s) {
+                        const worker = allWorkers.find(function(w) { return w.id === s.workerId; });
+                        const workerName = worker ? worker.name : (s.workerName || 'Unknown Worker');
+                        const hours = parseFloat(s.hours || 0).toFixed(1);
+                        const notes = s.notes || s.description || '';
+
+                        // Expenses linked to this submission
+                        const subExpenses = allExpenses.filter(function(e) {
+                            return e.submissionId === s.id || (e.projectId === pid && (e.date || '').slice(0, 10) === date && e.workerId === s.workerId);
+                        });
+
+                        // Photos linked to submission
+                        const subPhotos = allPhotos.filter(function(ph) { return ph.submissionId === s.id; });
+
+                        html += '<div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:8px">' +
+                            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+                            '<strong style="color:#1a3a5c">👷 ' + esc(workerName) + '</strong>' +
+                            '<span style="font-size:.85rem;color:#555">⏱ ' + hours + ' hrs</span>' +
+                            '</div>';
+
+                        if (notes) {
+                            html += '<div style="font-size:.9rem;color:#333;margin-bottom:8px;padding:6px 8px;background:#fafafa;border-radius:4px;border-left:3px solid #1a3a5c">' +
+                                '<strong>Notes:</strong> ' + esc(notes) + '</div>';
+                        }
+
+                        if (subExpenses.length) {
+                            html += '<div style="margin-bottom:8px"><strong style="font-size:.85rem;color:#555">Expenses:</strong>' +
+                                '<table style="width:100%;font-size:.85rem;margin-top:4px"><thead><tr>' +
+                                '<th style="text-align:left;padding:2px 4px;color:#555">Description</th>' +
+                                '<th style="text-align:left;padding:2px 4px;color:#555">Category</th>' +
+                                '<th style="text-align:right;padding:2px 4px;color:#555">Amount</th></tr></thead><tbody>';
+                            subExpenses.forEach(function(e) {
+                                html += '<tr><td style="padding:2px 4px">' + esc(e.description || e.vendor || '—') + '</td>' +
+                                    '<td style="padding:2px 4px">' + esc(e.category || '—') + '</td>' +
+                                    '<td style="text-align:right;padding:2px 4px">' + Utils.formatCurrency(e.amount || 0) + '</td></tr>';
+                            });
+                            const expTotal = subExpenses.reduce(function(sum, e) { return sum + parseFloat(e.amount || 0); }, 0);
+                            html += '<tr style="font-weight:700;border-top:1px solid #e5e7eb"><td colspan="2" style="padding:2px 4px">Total</td>' +
+                                '<td style="text-align:right;padding:2px 4px">' + Utils.formatCurrency(expTotal) + '</td></tr>' +
+                                '</tbody></table></div>';
+                        }
+
+                        if (subPhotos.length) {
+                            html += '<div style="margin-top:6px"><strong style="font-size:.85rem;color:#555">Site Photos (' + subPhotos.length + '):</strong>' +
+                                '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+                            subPhotos.slice(0, 6).forEach(function(ph) {
+                                const src = ph.dataUrl || ph.url || ph.thumbnail || '';
+                                if (src) html += '<img src="' + src + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb">';
+                            });
+                            html += '</div></div>';
+                        }
+
+                        html += '</div>'; // submission card
+                    });
+
+                    html += '</div>'; // date group
+                });
+
+                html += '</div>'; // project card
+            });
+
+            body.innerHTML = html;
+
+            // Inject print CSS once
+            if (!document.getElementById('lnrPrintStyle')) {
+                const style = document.createElement('style');
+                style.id = 'lnrPrintStyle';
+                style.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,#pageHelpBtn,.tabs { display:none!important; } .print-header { display:block!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(style);
+            }
+        });
     }
 };

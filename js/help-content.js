@@ -68,7 +68,7 @@ window.LedgermanHelp = {
     },
 
     'daily-reports': {
-        title: 'Daily Crew Reports',
+        title: 'Supervisor Reports',
         intro: 'Review daily site summaries submitted by your workers.',
         steps: [
             'Reports appear here once workers submit them from the Worker Portal.',
