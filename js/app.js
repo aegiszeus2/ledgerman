@@ -1004,6 +1004,7 @@
                         </div>
                         <div class="header-right">
                             <span class="user-name">Logged in as: <strong>${Utils.escapeHtml(this.currentUser.name)}</strong></span>
+                            <button class="btn btn-sm" id="getStartedBtn" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;font-weight:600">Get Started</button>
                             <button class="btn btn-secondary btn-sm" id="adminLogout">Logout</button>
                         </div>
                     </header>
@@ -1024,6 +1025,14 @@
 
             // Update approval badge
             this.updateApprovalBadge();
+
+            // Get Started onboarding button
+            const getStartedBtn = document.getElementById('getStartedBtn');
+            if (getStartedBtn && window.LedgermanOnboarding) {
+                getStartedBtn.addEventListener('click', function() {
+                    window.LedgermanOnboarding.show();
+                });
+            }
 
             // Sidebar navigation
             document.querySelectorAll('.nav-item').forEach(item => {
