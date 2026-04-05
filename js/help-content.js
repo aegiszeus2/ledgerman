@@ -257,10 +257,12 @@ window.LedgermanHelp = {
 
     users: {
         title: 'Workers',
-        intro: 'Manage your field crew accounts and PINs.',
+        intro: 'Manage your field crew — personal details, rates, and login credentials.',
         steps: [
             'Click "+ Add Worker" to create a new worker account.',
-            'Set the worker\'s name, role, and a 4–6 digit PIN for field login.',
+            'Enter personal info: name, phone number, date of birth, home address, and SIN (stored securely, admin-only).',
+            'Set the worker\'s role and a 4–6 digit PIN for field login.',
+            'Set Pay Rate (what the worker earns per hour — applied to project labour cost tracking) and Cost Rate (billable rate charged to the client on invoices).',
             'Workers log in from the Worker Portal using the company name, their name, and PIN — no email needed.',
             'Deactivate a worker to block their login without deleting their history.',
             'Use "Send Invite" to invite workers who need email-based accounts.',

@@ -47,7 +47,7 @@ window.AdminUsers = {
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card" style="overflow-x:auto">
                 ${filtered.length === 0
                     ? '<div class="empty"><h3>No Workers Found</h3><p>' + (workers.length === 0 ? 'Add your first worker to get started.' : 'No workers match your search.') + '</p></div>'
                     : `<table>
@@ -55,27 +55,33 @@ window.AdminUsers = {
                             <tr>
                                 <th>Name</th>
                                 <th>Role</th>
-                                <th>Email</th>
+                                <th>Phone</th>
                                 <th>PIN</th>
                                 <th>Status</th>
-                                <th class="amount">Default Rate</th>
+                                <th class="amount">Pay Rate</th>
+                                <th class="amount">Cost Rate</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${filtered.map(function(w) {
                                 const statusClass = w.status === 'Active' ? 'active-s' : 'completed-s';
+                                const payRate = w.payRate || w.defaultRate || 0;
+                                const costRate = w.costRate || 0;
                                 return '<tr>' +
-                                    '<td><strong>' + Utils.escapeHtml(w.name) + '</strong></td>' +
+                                    '<td><strong>' + Utils.escapeHtml(w.name) + '</strong>' +
+                                        (w.email ? '<div style="font-size:.78rem;color:var(--text2)">' + Utils.escapeHtml(w.email) + '</div>' : '') +
+                                    '</td>' +
                                     '<td>' + Utils.escapeHtml(w.role || 'Worker') + '</td>' +
-                                    '<td style="font-size:.85rem;color:var(--text2)">' + (w.email ? '<a href="mailto:' + Utils.escapeHtml(w.email) + '" style="color:var(--text2)">' + Utils.escapeHtml(w.email) + '</a>' : '<span style="color:var(--border)">—</span>') + '</td>' +
+                                    '<td style="font-size:.85rem;color:var(--text2)">' + (w.phone ? Utils.escapeHtml(w.phone) : '<span style="color:var(--border)">—</span>') + '</td>' +
                                     '<td style="white-space:nowrap">' +
                                         '<span class="pin-masked" data-id="' + w.id + '">' + '\u2022'.repeat((w.pin || '').length || 4) + '</span>' +
                                         '<span class="pin-revealed" data-id="' + w.id + '" style="display:none">' + Utils.escapeHtml(w.pin || '') + '</span>' +
                                         ' <button class="btn-ghost btn-sm reveal-pin" data-id="' + w.id + '" title="Reveal PIN" style="font-size:.75rem;padding:2px 6px">Show</button>' +
                                     '</td>' +
                                     '<td><span class="pstatus ' + statusClass + '">' + Utils.escapeHtml(w.status || 'Active') + '</span></td>' +
-                                    '<td class="amount">' + (w.defaultRate ? Utils.formatCurrency(w.defaultRate) + '/hr' : '-') + '</td>' +
+                                    '<td class="amount">' + (payRate ? Utils.formatCurrency(payRate) + '/hr' : '—') + '</td>' +
+                                    '<td class="amount">' + (costRate ? Utils.formatCurrency(costRate) + '/hr' : '—') + '</td>' +
                                     '<td style="white-space:nowrap">' +
                                         '<button class="btn-ghost btn-sm edit-worker" data-id="' + w.id + '">Edit</button>' +
                                         '<button class="btn-ghost btn-sm invite-worker" data-id="' + w.id + '" style="color:var(--success)">Invite</button>' +
@@ -109,14 +115,17 @@ window.AdminUsers = {
         }
 
         container.querySelector('#usersExportCsvBtn').addEventListener('click', function() {
-            var rows = [csvRow(['Name','Role','Email','Status','Default Rate'])];
+            var rows = [csvRow(['Name','Role','Email','Phone','Date of Birth','Status','Pay Rate','Cost Rate'])];
             filtered.forEach(function(w) {
                 rows.push(csvRow([
                     w.name || '',
                     w.role || 'Worker',
                     w.email || '',
+                    w.phone || '',
+                    w.dob || '',
                     w.status || 'Active',
-                    w.defaultRate || ''
+                    w.payRate || w.defaultRate || '',
+                    w.costRate || ''
                 ]));
             });
             downloadCsv(rows.join('\n'), 'workers');
@@ -225,23 +234,29 @@ window.AdminUsers = {
         overlay.className = 'modal-overlay active';
         overlay.style.display = 'flex';
         overlay.innerHTML = `
-            <div class="modal" style="max-width:600px">
+            <div class="modal" style="max-width:640px">
                 <div class="modal-header">
                     <h3 style="margin:0">${isEdit ? 'Edit Worker' : 'Add Worker'}</h3>
                 </div>
                 <div class="modal-body">
                     <form id="workerModalForm" novalidate>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Worker Name *</label>
-                            <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
-                        </div>
-                        <div class="form-row">
+
+                        <!-- Personal Information -->
+                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Personal Information</div>
+                        <div class="form-row" style="margin-bottom:12px">
                             <div class="form-group">
-                                <label>Role *</label>
-                                <select class="form-control" name="role">
-                                    <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
-                                    <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
-                                </select>
+                                <label>Worker Name *</label>
+                                <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input class="form-control" type="tel" name="phone" value="${esc(worker ? worker.phone || '' : '')}" placeholder="e.g. 905-555-0100">
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-bottom:12px">
+                            <div class="form-group">
+                                <label>Date of Birth</label>
+                                <input class="form-control" type="date" name="dob" value="${esc(worker ? worker.dob || '' : '')}">
                             </div>
                             <div class="form-group">
                                 <label>Status</label>
@@ -252,8 +267,32 @@ window.AdminUsers = {
                             </div>
                         </div>
                         <div class="form-group" style="margin-bottom:12px">
-                            <label>Email Address</label>
-                            <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
+                            <label>Home Address</label>
+                            <input class="form-control" name="address" value="${esc(worker ? worker.address || '' : '')}" placeholder="Street, City, Province, Postal Code">
+                        </div>
+                        <div class="form-group" style="margin-bottom:16px">
+                            <label>Social Insurance Number (SIN)</label>
+                            <div style="position:relative">
+                                <input class="form-control" name="sin" id="workerSinInput" type="password" value="${esc(worker ? worker.sin || '' : '')}" placeholder="9-digit SIN" maxlength="9" inputmode="numeric" style="padding-right:50px">
+                                <button type="button" id="toggleSinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                            </div>
+                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Stored securely. Visible only to admins. Never shared with workers.</p>
+                        </div>
+
+                        <!-- Account & Access -->
+                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Account &amp; Access</div>
+                        <div class="form-row" style="margin-bottom:12px">
+                            <div class="form-group">
+                                <label>Role *</label>
+                                <select class="form-control" name="role">
+                                    <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
+                                    <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
+                            </div>
                         </div>
                         <div class="form-group" style="margin-bottom:12px">
                             <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
@@ -262,22 +301,35 @@ window.AdminUsers = {
                             </label>
                             <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>PIN (4-6 digits) *</label>
-                                <div style="position:relative">
-                                    <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="${esc(worker ? worker.pin : '')}" required style="padding-right:50px">
-                                    <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Default Hourly Rate ($)</label>
-                                <input class="form-control" type="number" name="defaultRate" step="0.01" min="0" value="${worker ? worker.defaultRate || '' : ''}" placeholder="Optional">
+                        <div class="form-group" style="margin-bottom:16px">
+                            <label>PIN (4-6 digits) *</label>
+                            <div style="position:relative;max-width:200px">
+                                <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="${esc(worker ? worker.pin : '')}" required style="padding-right:50px">
+                                <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
                             </div>
                         </div>
+
+                        <!-- Rates -->
+                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Rates</div>
+                        <div class="form-row" style="margin-bottom:4px">
+                            <div class="form-group">
+                                <label>Pay Rate ($/hr)</label>
+                                <input class="form-control" type="number" name="payRate" step="0.01" min="0" value="${worker ? (worker.payRate || worker.defaultRate || '') : ''}" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Cost Rate ($/hr)</label>
+                                <input class="form-control" type="number" name="costRate" step="0.01" min="0" value="${worker ? worker.costRate || '' : ''}" placeholder="0.00">
+                            </div>
+                        </div>
+                        <p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">
+                            <strong>Pay Rate</strong> — what the worker earns; applied to project labour cost tracking.<br>
+                            <strong>Cost Rate</strong> — billable rate charged to the client on invoices.
+                        </p>
+
+                        <!-- Project Assignment -->
                         ${projects.length > 0 ? `
+                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Project Assignment</div>
                         <div class="form-group" style="margin-bottom:12px">
-                            <label>Assign to Projects</label>
                             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
                                 ${projects.map(function(p) {
                                     const checked = assignedProjects.includes(p.id) ? ' checked' : '';
@@ -288,6 +340,7 @@ window.AdminUsers = {
                                 }).join('')}
                             </div>
                         </div>` : ''}
+
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -306,6 +359,18 @@ window.AdminUsers = {
                 this.textContent = 'Hide';
             } else {
                 pinInput.type = 'password';
+                this.textContent = 'Show';
+            }
+        });
+
+        // Toggle SIN visibility
+        overlay.querySelector('#toggleSinVisibility').addEventListener('click', function() {
+            const sinInput = overlay.querySelector('#workerSinInput');
+            if (sinInput.type === 'password') {
+                sinInput.type = 'text';
+                this.textContent = 'Hide';
+            } else {
+                sinInput.type = 'password';
                 this.textContent = 'Show';
             }
         });
@@ -344,8 +409,14 @@ window.AdminUsers = {
                 role: fd.role || 'Worker',
                 pin: fd.pin,
                 status: fd.status || 'Active',
-                defaultRate: parseFloat(fd.defaultRate) || 0,
                 email: (fd.email || '').trim() || (isEdit ? worker.email || '' : ''),
+                phone: (fd.phone || '').trim(),
+                dob: (fd.dob || '').trim(),
+                address: (fd.address || '').trim(),
+                sin: (fd.sin || '').trim(),
+                payRate: parseFloat(fd.payRate) || 0,
+                costRate: parseFloat(fd.costRate) || 0,
+                defaultRate: parseFloat(fd.payRate) || 0, // backward compat
                 twoFAEnabled: isEdit ? worker.twoFAEnabled || false : false,
                 totpSecret: isEdit ? worker.totpSecret || '' : '',
                 email2FAEnabled: fd.email2FA === 'on' && !!((fd.email || '').trim() || (isEdit ? worker.email || '' : ''))
@@ -480,12 +551,15 @@ window.AdminUsers = {
                     '<option value="Worker"' + (overlay._wizData.role !== 'Approver' ? ' selected' : '') + '>Worker</option>' +
                     '<option value="Approver"' + (overlay._wizData.role === 'Approver' ? ' selected' : '') + '>Approver</option></select></div>';
             } else if (step === 1) {
-                html += '<p style="color:var(--text2);margin-bottom:12px">Set a PIN for this worker to log in with. This should be 4 to 6 digits.</p>' +
+                html += '<p style="color:var(--text2);margin-bottom:12px">Set a PIN for this worker to log in with, and enter their hourly rates.</p>' +
                     '<div class="form-group" style="margin-bottom:12px"><label>PIN (4-6 digits) *</label>' +
-                    '<div style="position:relative"><input id="wiz-pin" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="' + esc(overlay._wizData.pin || '') + '" style="padding-right:50px">' +
+                    '<div style="position:relative;max-width:200px"><input id="wiz-pin" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="' + esc(overlay._wizData.pin || '') + '" style="padding-right:50px">' +
                     '<button type="button" id="wiz-toggle-pin" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button></div></div>' +
-                    '<div class="form-group" style="margin-bottom:12px"><label>Default Hourly Rate ($)</label>' +
-                    '<input type="number" id="wiz-rate" step="0.01" min="0" value="' + (overlay._wizData.defaultRate || '') + '" placeholder="Optional"></div>';
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px">' +
+                    '<div class="form-group"><label>Pay Rate ($/hr)</label><input type="number" id="wiz-payrate" step="0.01" min="0" value="' + (overlay._wizData.payRate || '') + '" placeholder="0.00"></div>' +
+                    '<div class="form-group"><label>Cost Rate ($/hr)</label><input type="number" id="wiz-costrate" step="0.01" min="0" value="' + (overlay._wizData.costRate || '') + '" placeholder="0.00"></div>' +
+                    '</div>' +
+                    '<p style="font-size:.75rem;color:var(--text2);margin:0 0 12px">Pay Rate = worker\'s hourly pay. Cost Rate = billable rate charged to the client.</p>';
             } else if (step === 2) {
                 html += '<p style="color:var(--text2);margin-bottom:12px">Assign this worker to projects (optional).</p>';
                 if (projects.length === 0) {
@@ -566,7 +640,9 @@ window.AdminUsers = {
                         role: d.role || 'Worker',
                         pin: d.pin,
                         status: 'Active',
-                        defaultRate: parseFloat(d.defaultRate) || 0
+                        payRate: parseFloat(d.payRate) || 0,
+                        costRate: parseFloat(d.costRate) || 0,
+                        defaultRate: parseFloat(d.payRate) || 0
                     };
                     AppData.saveWorker(workerData);
 
@@ -598,7 +674,8 @@ window.AdminUsers = {
                 overlay._wizData.role = overlay.querySelector('#wiz-role').value;
             } else if (step === 1) {
                 overlay._wizData.pin = overlay.querySelector('#wiz-pin').value;
-                overlay._wizData.defaultRate = overlay.querySelector('#wiz-rate').value;
+                overlay._wizData.payRate = overlay.querySelector('#wiz-payrate').value;
+                overlay._wizData.costRate = overlay.querySelector('#wiz-costrate').value;
             } else if (step === 2) {
                 overlay._wizData.projects = [];
                 overlay.querySelectorAll('.wiz-project:checked').forEach(function(cb) {
