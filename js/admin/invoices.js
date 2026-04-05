@@ -1157,6 +1157,111 @@ window.AdminInvoices = {
                 });
             });
         }
+
+        container.querySelector('#editInvoiceBtn').addEventListener('click', function() {
+            self._showEditModal(inv.id, function() {
+                self.renderDetail(container, invoiceId);
+            });
+        });
+    },
+
+    // ============ EDIT INVOICE MODAL ============
+
+    _showEditModal(invoiceId, onComplete) {
+        var self = this;
+        var inv = AppData.getInvoice(invoiceId);
+        if (!inv) { Utils.showToast('Invoice not found', 'error'); return; }
+        var esc = Utils.escapeHtml;
+
+        var overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.display = 'flex';
+        overlay.innerHTML =
+            '<div class="modal" style="max-width:520px">' +
+                '<h3>Edit Invoice</h3>' +
+                '<form id="editInvoiceForm" novalidate>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Invoice Number</label>' +
+                            '<input type="text" name="invoiceNumber" value="' + esc(inv.invoiceNumber || '') + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Status</label>' +
+                            '<select name="status">' +
+                                '<option value="Draft"' + (inv.status === 'Draft' ? ' selected' : '') + '>Draft</option>' +
+                                '<option value="Sent"' + (inv.status === 'Sent' ? ' selected' : '') + '>Sent</option>' +
+                                '<option value="Paid"' + (inv.status === 'Paid' ? ' selected' : '') + '>Paid</option>' +
+                                '<option value="Partially Paid"' + (inv.status === 'Partially Paid' ? ' selected' : '') + '>Partially Paid</option>' +
+                                '<option value="Overdue"' + (inv.status === 'Overdue' ? ' selected' : '') + '>Overdue</option>' +
+                            '</select>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Invoice Date</label>' +
+                            '<input type="date" name="invoiceDate" value="' + esc(inv.invoiceDate || inv.date || '') + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Due Date</label>' +
+                            '<input type="date" name="dueDate" value="' + esc(inv.dueDate || '') + '">' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Billing Period Start</label>' +
+                            '<input type="date" name="billingPeriodStart" value="' + esc(inv.billingPeriodStart || inv.billingStart || '') + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Billing Period End</label>' +
+                            '<input type="date" name="billingPeriodEnd" value="' + esc(inv.billingPeriodEnd || inv.billingEnd || '') + '">' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-group" style="margin-bottom:12px">' +
+                        '<label>Payment Terms</label>' +
+                        '<input type="text" name="paymentTerms" value="' + esc(inv.paymentTerms || '') + '" placeholder="e.g. Net 30">' +
+                    '</div>' +
+                    '<div class="form-group" style="margin-bottom:12px">' +
+                        '<label>Contract / Authority Reference</label>' +
+                        '<input type="text" name="contractReference" value="' + esc(inv.contractReference || inv.contractNumber || '') + '">' +
+                    '</div>' +
+                    '<div class="form-group" style="margin-bottom:12px">' +
+                        '<label>Notes</label>' +
+                        '<textarea name="notes" rows="3">' + esc(inv.notes || '') + '</textarea>' +
+                    '</div>' +
+                    '<div class="form-actions">' +
+                        '<button type="submit" class="btn-primary">Save Changes</button>' +
+                        '<button type="button" class="btn-secondary modal-close">Cancel</button>' +
+                    '</div>' +
+                '</form>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+
+        overlay.querySelector('#editInvoiceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = Utils.getFormData(this);
+            inv.invoiceNumber = fd.invoiceNumber || inv.invoiceNumber;
+            inv.status = fd.status || inv.status;
+            inv.invoiceDate = fd.invoiceDate || inv.invoiceDate;
+            inv.date = fd.invoiceDate || inv.date;
+            inv.dueDate = fd.dueDate || inv.dueDate;
+            inv.billingPeriodStart = fd.billingPeriodStart || inv.billingPeriodStart;
+            inv.billingStart = fd.billingPeriodStart || inv.billingStart;
+            inv.billingPeriodEnd = fd.billingPeriodEnd || inv.billingPeriodEnd;
+            inv.billingEnd = fd.billingPeriodEnd || inv.billingEnd;
+            inv.paymentTerms = fd.paymentTerms;
+            inv.contractReference = fd.contractReference;
+            inv.notes = fd.notes;
+            AppData.saveInvoice(inv);
+
+            var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            AppData.addAuditLog(username, 'Invoice Edited', 'Invoice ' + inv.invoiceNumber + ' updated');
+            Utils.showToast('Invoice updated');
+            overlay.remove();
+            if (onComplete) onComplete();
+        });
     },
 
     // ============ PAYMENT MODAL ============
