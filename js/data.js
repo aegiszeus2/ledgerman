@@ -492,6 +492,21 @@ function getPayments(invoiceId) { return invoiceId ? getAll('payments').filter(f
 function savePayment(p) { return save('payments', p); }
 
 // ─── Invoice number ────────────────────────────────────────────────────────
+// ─── Project Number ────────────────────────────────────────────────────────
+// Auto-generates YYYY-NNNN based on the year and existing project numbers.
+function getNextProjectNumber(year) {
+    year = year || new Date().getFullYear();
+    var prefix = String(year) + '-';
+    var maxNum = getProjects().reduce(function(max, p) {
+        if (p.projectNumber && p.projectNumber.startsWith(prefix)) {
+            var num = parseInt(p.projectNumber.slice(prefix.length));
+            if (!isNaN(num) && num > max) return num;
+        }
+        return max;
+    }, 0);
+    return prefix + String(maxNum + 1).padStart(4, '0');
+}
+
 function getNextInvoiceNumber() {
     var year = new Date().getFullYear();
     var prefix = (getSettings().invoicePrefix || 'INV').toUpperCase();
@@ -822,6 +837,7 @@ window.AppData = {
     getSubmissions, getSubmission, saveSubmission, deleteSubmission,
     getPendingSubmissions, getWorkerSubmissions,
     // Invoices
+    getNextProjectNumber,
     getInvoices, getInvoice, saveInvoice, getNextInvoiceNumber,
     // Payments
     getPayments, savePayment,

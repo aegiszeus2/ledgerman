@@ -55,10 +55,11 @@ window.AdminProjects = {
                 ${filtered.length === 0
                     ? '<div class="empty"><h3>No Projects</h3><p>Create your first project to start tracking expenses and invoices.</p></div>'
                     : `<table>
-                        <thead><tr><th>Project Name</th><th>Client</th><th>Start Date</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Project #</th><th>Project Name</th><th>Client</th><th>Start Date</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody>${filtered.map(function(p) {
                             const statusClass = p.status === 'Active' ? 'active-s' : (p.status === 'Completed' ? 'completed-s' : '');
                             return '<tr style="cursor:pointer" class="project-row" data-id="' + p.id + '">' +
+                                '<td style="font-size:.82rem;color:var(--text2);white-space:nowrap;font-family:monospace">' + Utils.escapeHtml(p.projectNumber || '—') + '</td>' +
                                 '<td><strong>' + Utils.escapeHtml(p.name) + '</strong></td>' +
                                 '<td>' + Utils.escapeHtml(p.clientName || p.client || '') + '</td>' +
                                 '<td>' + Utils.formatDate(p.startDate) + '</td>' +
@@ -93,9 +94,10 @@ window.AdminProjects = {
         }
 
         container.querySelector('#projectsExportCsvBtn').addEventListener('click', function() {
-            var rows = [csvRow(['Name','Client','Status','Start Date','Budget'])];
+            var rows = [csvRow(['Project #','Name','Client','Status','Start Date','Budget'])];
             filtered.forEach(function(p) {
                 rows.push(csvRow([
+                    p.projectNumber || '',
                     p.name || '',
                     p.clientName || p.client || '',
                     p.status || '',
@@ -189,9 +191,15 @@ window.AdminProjects = {
                 </div>
                 <div class="modal-body">
                     <form id="projectModalForm" novalidate>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Project Name *</label>
-                            <input name="name" value="${esc(project ? project.name : '')}" required>
+                        <div class="form-row" style="margin-bottom:12px">
+                            <div class="form-group" style="flex:0 0 160px">
+                                <label>Project # <span style="font-size:.75rem;color:var(--text2)">(auto)</span></label>
+                                <input name="projectNumber" value="${esc(project ? (project.projectNumber || '') : AppData.getNextProjectNumber ? AppData.getNextProjectNumber(new Date().getFullYear()) : '')}" style="font-family:monospace">
+                            </div>
+                            <div class="form-group">
+                                <label>Project Name *</label>
+                                <input name="name" value="${esc(project ? project.name : '')}" required>
+                            </div>
                         </div>
 
                         <div class="form-group" style="margin-bottom:12px">
@@ -335,8 +343,16 @@ window.AdminProjects = {
             });
             const clientSelect = overlay.querySelector('#projectClientSelect');
 
+            // Auto-generate project number if blank on new project
+            var projectNumber = (fd.projectNumber || '').trim();
+            if (!projectNumber && !isEdit) {
+                var startYear = fd.startDate ? parseInt(fd.startDate.slice(0, 4)) : new Date().getFullYear();
+                projectNumber = AppData.getNextProjectNumber ? AppData.getNextProjectNumber(startYear) : '';
+            }
+
             const projectData = {
                 id: isEdit ? project.id : AppData.generateId(),
+                projectNumber: projectNumber || (project ? project.projectNumber || '' : ''),
                 name: fd.name.trim(),
                 clientId: clientSelect.value || (project ? project.clientId : ''),
                 clientName: (fd.clientName || '').trim(),
@@ -381,6 +397,7 @@ window.AdminProjects = {
                 <button class="btn-ghost btn-sm" id="backToProjects" style="margin-bottom:8px">&larr; Back to Projects</button>
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
                     <div>
+                        ${project.projectNumber ? '<div style="font-size:.8rem;color:var(--text2);font-family:monospace;margin-bottom:2px">' + esc(project.projectNumber) + '</div>' : ''}
                         <h2>${esc(project.name)}</h2>
                         <p style="color:var(--text2);font-size:.9rem;margin-top:4px">
                             ${esc(project.clientName || project.client || 'No client')}
