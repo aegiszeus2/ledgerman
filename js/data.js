@@ -3,7 +3,7 @@
 // Legacy mode: falls back to localStorage/IndexedDB (no backend / offline)
 
 // ─── API Config ────────────────────────────────────────────────────────────
-const API_BASE = (window.LEDGERMAN_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgerman-backend.onrender.com'));
+const API_BASE = (window.LEDGERMAN_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://app.ledgerman.org'));
 
 // ─── In-Memory Cache ───────────────────────────────────────────────────────
 // null = not loaded; populated after syncFromServer()
