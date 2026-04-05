@@ -551,6 +551,17 @@ async function _blobToBase64(blob) {
     });
 }
 
+function _base64ToBlob(dataUrl) {
+    // Handles full data URLs (data:image/png;base64,...) or raw base64
+    var parts = dataUrl.split(',');
+    var mimeMatch = parts[0].match(/:(.*?);/);
+    var mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    var raw = atob(parts[1] || parts[0]);
+    var arr = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+}
+
 async function savePhoto(photoData) {
     // 1. Save to IndexedDB
     var db = await openDB();
@@ -627,22 +638,61 @@ async function deletePhoto(id) {
         tx.onerror = function() { reject(tx.error); };
     });
     if (isApiMode() && getJwt()) {
-        _apiFetch('/api/photos/' + id, { method: 'DELETE' })
-            .catch(function(e) { console.warn('[API] deletePhoto:', e.message); });
+        if (id === 'company_logo') {
+            _apiFetch('/api/logo', { method: 'DELETE' })
+                .catch(function(e) { console.warn('[API] deleteLogo:', e.message); });
+        } else {
+            _apiFetch('/api/photos/' + id, { method: 'DELETE' })
+                .catch(function(e) { console.warn('[API] deletePhoto:', e.message); });
+        }
     }
 }
 
 async function saveLogo(blob) {
+    // Save to IndexedDB for immediate use
     var db = await openDB();
-    return new Promise(function(resolve, reject) {
+    await new Promise(function(resolve, reject) {
         var tx = db.transaction(STORE_PHOTOS, 'readwrite');
         tx.objectStore(STORE_PHOTOS).put({ id: 'company_logo', blob: blob, type: 'logo' });
         tx.oncomplete = function() { resolve(); };
         tx.onerror = function() { reject(tx.error); };
     });
+    // Also upload to server so it persists across sessions and devices
+    if (isApiMode() && getJwt()) {
+        try {
+            var b64 = await _blobToBase64(blob);
+            await _apiFetch('/api/logo', { method: 'PUT', body: JSON.stringify({ data: b64 }) });
+        } catch(e) {
+            console.warn('[Logo] Server upload failed:', e.message);
+        }
+    }
 }
 
-async function getLogo() { return getPhoto('company_logo'); }
+async function getLogo() {
+    // Try IndexedDB first (fastest)
+    var local = await getPhoto('company_logo');
+    if (local && local.blob) return local;
+    // Fall back to server
+    if (isApiMode() && getJwt()) {
+        try {
+            var resp = await _apiFetch('/api/logo');
+            if (resp && resp.data) {
+                var blob = _base64ToBlob(resp.data);
+                // Cache in IndexedDB
+                var db2 = await openDB();
+                await new Promise(function(resolve) {
+                    var tx = db2.transaction(STORE_PHOTOS, 'readwrite');
+                    tx.objectStore(STORE_PHOTOS).put({ id: 'company_logo', blob: blob, type: 'logo' });
+                    tx.oncomplete = resolve;
+                });
+                return { id: 'company_logo', blob: blob, type: 'logo' };
+            }
+        } catch(e) {
+            // No logo on server
+        }
+    }
+    return null;
+}
 
 async function getAllPhotos() {
     var db = await openDB();
