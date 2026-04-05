@@ -56,7 +56,11 @@ window.AdminPunchLists = {
             <div style="margin-bottom:20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                     <h2>Punch Lists & Deficiencies</h2>
-                    <button class="btn-primary" id="addItemBtn">+ Add Deficiency</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-secondary btn-sm" id="punchListsExportCsvBtn">Export CSV</button>
+                        <button class="btn-secondary btn-sm" id="punchListsPrintBtn">Print / PDF</button>
+                        <button class="btn-primary" id="addItemBtn">+ Add Deficiency</button>
+                    </div>
                 </div>
                 <p style="color:#666;margin:0">Track project deficiencies from identification to sign-off completion</p>
             </div>
@@ -172,6 +176,50 @@ window.AdminPunchLists = {
                 <strong>💡 Workflow:</strong> Open → In Progress (work being done) → Resolved (work complete) → Signed Off (superintendent approval)
             </div>
         `;
+
+        // CSV helpers
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('punchListsExportCsvBtn').onclick = () => {
+            var rows = [csvRow(['Project','Description','Priority','Status','Reported Date'])];
+            sorted.forEach(item => {
+                const project = AppData.getProject(item.projectId);
+                rows.push(csvRow([
+                    project ? project.name : '',
+                    item.description || '',
+                    item.priority || '',
+                    item.status || '',
+                    item.created_at ? item.created_at.slice(0,10) : ''
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'punch-lists');
+        };
+
+        document.getElementById('punchListsPrintBtn').onclick = () => {
+            if (!document.getElementById('punchListsPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'punchListsPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        };
 
         // Event handlers
         document.getElementById('projectFilter').onchange = (e) => {

@@ -44,7 +44,11 @@ window.AdminVendors = {
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">' +
             '<h2>Vendors</h2>' +
+            '<div style="display:flex;gap:8px">' +
+            '<button class="btn-secondary btn-sm" id="vendorsExportCsvBtn">Export CSV</button>' +
+            '<button class="btn-secondary btn-sm" id="vendorsPrintBtn">Print / PDF</button>' +
             '<button class="btn btn-primary btn-sm" id="vendorAddBtn">+ Add Vendor</button>' +
+            '</div>' +
             '</div>';
 
         if (vendors.length === 0) {
@@ -80,6 +84,55 @@ window.AdminVendors = {
         }
 
         self._container.innerHTML = html;
+
+        // CSV helpers
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        var exportCsvBtn = self._container.querySelector('#vendorsExportCsvBtn');
+        if (exportCsvBtn) {
+            exportCsvBtn.addEventListener('click', function() {
+                var rows = [csvRow(['Name','Trade','Phone','Email','Address'])];
+                vendors.forEach(function(v) {
+                    rows.push(csvRow([
+                        v.name || '',
+                        v.category || v.trade || '',
+                        v.phone || '',
+                        v.email || '',
+                        v.address || ''
+                    ]));
+                });
+                downloadCsv(rows.join('\n'), 'vendors');
+            });
+        }
+
+        var printBtn = self._container.querySelector('#vendorsPrintBtn');
+        if (printBtn) {
+            printBtn.addEventListener('click', function() {
+                if (!document.getElementById('vendorsPrintStyle')) {
+                    var s = document.createElement('style');
+                    s.id = 'vendorsPrintStyle';
+                    s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                    document.head.appendChild(s);
+                }
+                window.print();
+            });
+        }
 
         // Add vendor
         var addBtn = self._container.querySelector('#vendorAddBtn');

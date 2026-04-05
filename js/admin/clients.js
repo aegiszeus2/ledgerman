@@ -25,7 +25,11 @@ window.AdminClients = {
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Client Address Book</h2>
-                <button class="btn btn-primary" id="addClientBtn">+ Add Client</button>
+                <div style="display:flex;gap:8px">
+                    <button class="btn-secondary btn-sm" id="clientsExportCsvBtn">Export CSV</button>
+                    <button class="btn-secondary btn-sm" id="clientsPrintBtn">Print / PDF</button>
+                    <button class="btn btn-primary" id="addClientBtn">+ Add Client</button>
+                </div>
             </div>
 
             <div class="card" style="margin-bottom:16px">
@@ -65,6 +69,48 @@ window.AdminClients = {
                 }
             </div>
         `;
+
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        container.querySelector('#clientsExportCsvBtn').addEventListener('click', function() {
+            var rows = [csvRow(['Name','Contact','Phone','Email','Address'])];
+            filtered.forEach(function(c) {
+                rows.push(csvRow([
+                    c.name || '',
+                    c.contactPerson || '',
+                    c.phone || '',
+                    c.email || '',
+                    c.address || ''
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'clients');
+        });
+
+        container.querySelector('#clientsPrintBtn').addEventListener('click', function() {
+            if (!document.getElementById('clientsPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'clientsPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        });
 
         container.querySelector('#addClientBtn').addEventListener('click', function() {
             self._showModal(null);

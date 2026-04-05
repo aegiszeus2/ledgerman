@@ -40,7 +40,11 @@ window.AdminTaskAssignment = {
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Task Assignment</h2>
-                <button class="btn-primary" id="addTaskBtn">+ New Task</button>
+                <div style="display:flex;gap:8px">
+                    <button class="btn-secondary btn-sm" id="tasksExportCsvBtn">Export CSV</button>
+                    <button class="btn-secondary btn-sm" id="tasksPrintBtn">Print / PDF</button>
+                    <button class="btn-primary" id="addTaskBtn">+ New Task</button>
+                </div>
             </div>
 
             <div class="card" style="margin-bottom:16px;padding:16px">
@@ -104,6 +108,49 @@ window.AdminTaskAssignment = {
                 }
             </div>
         `;
+
+        // CSV helpers
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        container.querySelector('#tasksExportCsvBtn').addEventListener('click', function() {
+            var rows = [csvRow(['Title','Project','Assigned To','Due Date','Status'])];
+            filtered.forEach(t => {
+                rows.push(csvRow([
+                    t.title || '',
+                    t.projectName || '',
+                    t.assigned_to_worker_name || '',
+                    t.due_date || '',
+                    t.status || 'To Do'
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'tasks');
+        });
+
+        container.querySelector('#tasksPrintBtn').addEventListener('click', function() {
+            if (!document.getElementById('tasksPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'tasksPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        });
 
         // Filter listeners
         container.querySelector('#statusFilter').addEventListener('change', function(e) {

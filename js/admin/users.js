@@ -34,6 +34,8 @@ window.AdminUsers = {
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Worker Management</h2>
                 <div style="display:flex;gap:8px">
+                    <button class="btn-secondary btn-sm" id="usersExportCsvBtn">Export CSV</button>
+                    <button class="btn-secondary btn-sm" id="usersPrintBtn">Print / PDF</button>
                     <button class="btn-secondary btn-sm" id="workerWizardBtn">Walk me through it</button>
                     <button class="btn-primary" id="addWorkerBtn">+ Add Worker</button>
                 </div>
@@ -87,6 +89,48 @@ window.AdminUsers = {
                 }
             </div>
         `;
+
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        container.querySelector('#usersExportCsvBtn').addEventListener('click', function() {
+            var rows = [csvRow(['Name','Role','Email','Status','Default Rate'])];
+            filtered.forEach(function(w) {
+                rows.push(csvRow([
+                    w.name || '',
+                    w.role || 'Worker',
+                    w.email || '',
+                    w.status || 'Active',
+                    w.defaultRate || ''
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'workers');
+        });
+
+        container.querySelector('#usersPrintBtn').addEventListener('click', function() {
+            if (!document.getElementById('usersPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'usersPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        });
 
         container.querySelector('#addWorkerBtn').addEventListener('click', function() {
             self._showModal(null);

@@ -17,7 +17,7 @@ window.AdminExpenses = {
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Expenses</h2>
-                <div style="display:flex;gap:8px;align-items:center">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <label style="font-size:.85rem;color:var(--text2)">Project:</label>
                     <select class="form-control" id="expenseProjectSelect" style="width:auto;min-width:200px">
                         ${projects.length === 0 ? '<option value="">No projects</option>' : ''}
@@ -26,6 +26,8 @@ window.AdminExpenses = {
                         }).join('')}
                     </select>
                     <button class="btn-primary btn-sm" id="addExpenseBtn" ${!self._projectId ? 'disabled' : ''}>+ Add Expense</button>
+                    <button class="btn-secondary btn-sm" id="expensesExportCsvBtn">Export CSV</button>
+                    <button class="btn-secondary btn-sm" id="expensesPrintBtn">Print / PDF</button>
                 </div>
             </div>
             <div id="expenseContent"></div>
@@ -39,6 +41,53 @@ window.AdminExpenses = {
         container.querySelector('#addExpenseBtn').addEventListener('click', function() {
             if (!self._projectId) return;
             self._showTypeSelector();
+        });
+
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        container.querySelector('#expensesExportCsvBtn').addEventListener('click', function() {
+            var allExpenses = self._projectId ? AppData.getExpenses(self._projectId) : AppData.getExpenses();
+            var rows = [csvRow(['Date','Project','Category','Description','Amount','Vendor','Billable','Invoiced'])];
+            allExpenses.forEach(function(e) {
+                var proj = AppData.getProject(e.projectId);
+                rows.push(csvRow([
+                    e.date || '',
+                    proj ? proj.name : '',
+                    e.category || '',
+                    e.description || '',
+                    e.amount || '',
+                    e.vendorName || e.vendor || '',
+                    e.billable ? 'Yes' : 'No',
+                    e.invoiceStatus || ''
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'expenses');
+        });
+
+        container.querySelector('#expensesPrintBtn').addEventListener('click', function() {
+            if (!document.getElementById('expensesPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'expensesPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
         });
 
         self._renderExpenses();

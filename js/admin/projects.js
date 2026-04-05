@@ -37,6 +37,8 @@ window.AdminProjects = {
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Projects</h2>
                 <div style="display:flex;gap:8px">
+                    <button class="btn-secondary btn-sm" id="projectsExportCsvBtn">Export CSV</button>
+                    <button class="btn-secondary btn-sm" id="projectsPrintBtn">Print / PDF</button>
                     <button class="btn-secondary btn-sm" id="projectWizardBtn">Walk me through it</button>
                     <button class="btn-primary" id="addProjectBtn">+ New Project</button>
                 </div>
@@ -71,6 +73,48 @@ window.AdminProjects = {
                 }
             </div>
         `;
+
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        container.querySelector('#projectsExportCsvBtn').addEventListener('click', function() {
+            var rows = [csvRow(['Name','Client','Status','Start Date','Budget'])];
+            filtered.forEach(function(p) {
+                rows.push(csvRow([
+                    p.name || '',
+                    p.clientName || p.client || '',
+                    p.status || '',
+                    p.startDate || '',
+                    p.budget || ''
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'projects');
+        });
+
+        container.querySelector('#projectsPrintBtn').addEventListener('click', function() {
+            if (!document.getElementById('projectsPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'projectsPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        });
 
         // Status filter tabs
         container.querySelectorAll('.tab-btn[data-status]').forEach(function(tab) {

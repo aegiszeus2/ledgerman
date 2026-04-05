@@ -56,6 +56,8 @@ window.AdminInvoices = {
                         }).join('') +
                     '</select>' +
                     '<button class="btn-primary" id="newInvoiceBtn">+ Create Invoice</button>' +
+                    '<button class="btn-secondary btn-sm" id="invoicesExportCsvBtn">Export CSV</button>' +
+                    '<button class="btn-secondary btn-sm" id="invoicesPrintBtn">Print / PDF</button>' +
                 '</div>' +
             '</div>' +
             '<div class="card">' +
@@ -85,6 +87,52 @@ window.AdminInvoices = {
                         }).join('') + '</tbody>' +
                     '</table>') +
             '</div>';
+
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        container.querySelector('#invoicesExportCsvBtn').addEventListener('click', function() {
+            var rows = [csvRow(['Invoice #','Project','Client','Date','Due Date','Total','Paid','Balance','Status'])];
+            filtered.forEach(function(inv) {
+                rows.push(csvRow([
+                    inv.invoiceNumber || '',
+                    inv.projectName || '',
+                    inv.clientName || inv.client || '',
+                    inv.date || inv.invoiceDate || '',
+                    inv.dueDate || '',
+                    inv.total || '',
+                    inv.totalPaid || '',
+                    inv.balance || '',
+                    inv.computedStatus || ''
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'invoices');
+        });
+
+        container.querySelector('#invoicesPrintBtn').addEventListener('click', function() {
+            if (!document.getElementById('invoicesPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'invoicesPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        });
 
         container.querySelector('#invoiceStatusFilter').addEventListener('change', function() {
             self._statusFilter = this.value;
@@ -939,6 +987,7 @@ window.AdminInvoices = {
                 '<button class="btn-ghost btn-sm" id="backToInvoices">&larr; Back to Invoices</button>' +
                 '<button class="btn-primary btn-sm" id="printInvoice">Print / Export PDF</button>' +
                 '<button class="btn-secondary btn-sm" id="emailInvoice">Email Invoice</button>' +
+                '<button class="btn-sm" id="editInvoiceBtn" style="background:#1a3a5c;color:#fff">Edit Invoice</button>' +
                 (balance > 0.01 ? '<button class="btn-sm" id="recordPaymentBtn" style="background:var(--success);color:#fff">Record Payment</button>' : '') +
             '</div>' +
 
@@ -956,20 +1005,20 @@ window.AdminInvoices = {
                         '<div>' +
                             '<div id="invoiceLogoArea"></div>' +
                             '<div class="company">' + esc(inv.companyName || settings.companyName) + '</div>' +
-                            '<div style="color:#888;font-size:.85rem;margin-top:4px">' +
+                            '<div style="color:#444444;font-size:.85rem;margin-top:4px">' +
                                 (inv.companyAddress || [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ')) +
                             '</div>' +
                             (function() {
                                 var phone = inv.companyPhone || settings.phone;
                                 var email = inv.companyEmail || settings.email;
                                 var hst = inv.hstNumber || settings.hstNumber;
-                                return (phone ? '<div style="color:#888;font-size:.85rem">' + esc(phone) + '</div>' : '') +
-                                    (email ? '<div style="color:#888;font-size:.85rem">' + esc(email) + '</div>' : '') +
-                                    (hst ? '<div style="color:#888;font-size:.85rem">HST: ' + esc(hst) + '</div>' : '');
+                                return (phone ? '<div style="color:#444444;font-size:.85rem">' + esc(phone) + '</div>' : '') +
+                                    (email ? '<div style="color:#444444;font-size:.85rem">' + esc(email) + '</div>' : '') +
+                                    (hst ? '<div style="color:#444444;font-size:.85rem">HST: ' + esc(hst) + '</div>' : '');
                             })() +
                         '</div>' +
                         '<div style="text-align:right">' +
-                            '<h2>INVOICE</h2>' +
+                            '<h2 style="color:#1a1a2e;font-weight:800;margin:0 0 4px">INVOICE</h2>' +
                             '<div style="font-size:1.1rem;color:#e94560;font-weight:700">' + esc(inv.invoiceNumber) + '</div>' +
                             '<div style="font-size:.9rem;color:#555;margin-top:4px">Date: ' + Utils.formatDate(invoiceDate) + '</div>' +
                             (billingStart && billingEnd ? '<div style="font-size:.85rem;color:#555">Period: ' + Utils.formatDate(billingStart) + ' - ' + Utils.formatDate(billingEnd) + '</div>' : '') +

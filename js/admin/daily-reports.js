@@ -56,7 +56,11 @@ window.AdminDailyReports = {
             <div style="margin-bottom:20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                     <h2>Daily Crew Reports</h2>
-                    <button class="btn-secondary btn-sm" id="refreshReportsBtn">↻ Refresh</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-secondary btn-sm" id="dailyReportsExportCsvBtn">Export CSV</button>
+                        <button class="btn-secondary btn-sm" id="dailyReportsPrintBtn">Print / PDF</button>
+                        <button class="btn-secondary btn-sm" id="refreshReportsBtn">↻ Refresh</button>
+                    </div>
                 </div>
                 <p style="color:#666;margin:0">Site summaries submitted by workers (crew count, hours, expenses, issues, photos)</p>
             </div>
@@ -170,6 +174,53 @@ window.AdminDailyReports = {
                 Reviews can include photos, issue tracking, and crew information.
             </div>
         `;
+
+        // CSV helpers
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('dailyReportsExportCsvBtn').onclick = () => {
+            var rows = [csvRow(['Date','Project','Worker','Crew Count','Hours','Weather','Issues','Notes','Status'])];
+            sorted.forEach(r => {
+                rows.push(csvRow([
+                    r.date || r.created_at || '',
+                    r.projectName || '',
+                    r.workerName || '',
+                    r.crewCount || '',
+                    r.totalHours || '',
+                    r.weather || '',
+                    r.issues || '',
+                    r.notes || '',
+                    r.status || 'Submitted'
+                ]));
+            });
+            downloadCsv(rows.join('\n'), 'daily-reports');
+        };
+
+        document.getElementById('dailyReportsPrintBtn').onclick = () => {
+            if (!document.getElementById('dailyReportsPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'dailyReportsPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        };
 
         // Event handlers
         document.getElementById('statusFilter').onchange = (e) => {

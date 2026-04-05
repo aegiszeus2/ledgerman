@@ -19,7 +19,11 @@ window.AdminApprovals = {
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Approvals</h2>
-                ${pending.length > 1 ? '<button class="btn btn-primary btn-sm" id="bulkApproveBtn">Approve All (' + pending.length + ')</button>' : ''}
+                <div style="display:flex;gap:8px">
+                    ${pending.length > 1 ? '<button class="btn btn-primary btn-sm" id="bulkApproveBtn">Approve All (' + pending.length + ')</button>' : ''}
+                    <button class="btn-secondary btn-sm" id="approvalsExportCsvBtn">Export CSV</button>
+                    <button class="btn-secondary btn-sm" id="approvalsPrintBtn">Print / PDF</button>
+                </div>
             </div>
 
             <div class="tabs">
@@ -51,6 +55,59 @@ window.AdminApprovals = {
                 }
                 Utils.showToast(pending.length + ' submissions approved');
                 self._renderContent();
+            });
+        }
+
+        // CSV helpers
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        var exportCsvBtn = container.querySelector('#approvalsExportCsvBtn');
+        if (exportCsvBtn) {
+            exportCsvBtn.addEventListener('click', function() {
+                var allSubs = AppData.getSubmissions();
+                var rows = [csvRow(['Worker','Project','Date','Hours','Status','Notes'])];
+                allSubs.forEach(function(sub) {
+                    var worker = AppData.getWorker(sub.workerId);
+                    var project = AppData.getProject(sub.projectId);
+                    rows.push(csvRow([
+                        worker ? worker.name : '',
+                        project ? project.name : '',
+                        sub.date || '',
+                        sub.hours || '',
+                        sub.status || '',
+                        sub.description || ''
+                    ]));
+                });
+                downloadCsv(rows.join('\n'), 'approvals');
+            });
+        }
+
+        var printBtn = container.querySelector('#approvalsPrintBtn');
+        if (printBtn) {
+            printBtn.addEventListener('click', function() {
+                if (!document.getElementById('approvalsPrintStyle')) {
+                    var s = document.createElement('style');
+                    s.id = 'approvalsPrintStyle';
+                    s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                    document.head.appendChild(s);
+                }
+                window.print();
             });
         }
 

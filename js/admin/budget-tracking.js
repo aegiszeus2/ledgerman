@@ -58,7 +58,11 @@ window.AdminBudgetTracking = {
             <div style="margin-bottom:20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                     <h2>Budget Tracking & Variance Analysis</h2>
-                    <button class="btn-secondary btn-sm" id="refreshBudgetBtn">↻ Refresh</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-secondary btn-sm" id="budgetExportCsvBtn">Export CSV</button>
+                        <button class="btn-secondary btn-sm" id="budgetPrintBtn">Print / PDF</button>
+                        <button class="btn-secondary btn-sm" id="refreshBudgetBtn">↻ Refresh</button>
+                    </div>
                 </div>
                 <p style="color:#666;margin:0">Monitor project budgets vs. actual spending. Projects without budgets show $0.</p>
             </div>
@@ -166,6 +170,43 @@ window.AdminBudgetTracking = {
                 This table calculates spending from all expenses assigned to each project.
             </div>
         `;
+
+        // CSV helpers
+        function csvEscape(val) {
+            if (val === null || val === undefined) return '';
+            var s = String(val);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+                return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function csvRow(fields) { return fields.map(csvEscape).join(','); }
+        function downloadCsv(content, name) {
+            var today = new Date().toISOString().slice(0,10);
+            var blob = new Blob([content], {type:'text/csv'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'ledgerman-' + name + '-' + today + '.csv';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('budgetExportCsvBtn').onclick = () => {
+            var rows = [csvRow(['Project','Status','Budgeted Cost','Actual Cost','Variance','% Spent'])];
+            sorted.forEach(d => {
+                rows.push(csvRow([d.name, d.status, d.budget.toFixed(2), d.spent.toFixed(2), d.variance.toFixed(2), d.percentSpent + '%']));
+            });
+            downloadCsv(rows.join('\n'), 'budget-tracking');
+        };
+
+        document.getElementById('budgetPrintBtn').onclick = () => {
+            if (!document.getElementById('budgetPrintStyle')) {
+                var s = document.createElement('style');
+                s.id = 'budgetPrintStyle';
+                s.textContent = '@media print { .admin-nav,.worker-nav,#adminSidebar,.btn-primary,.btn-secondary,.tab-btn,#pageHelpBtn { display:none!important; } body { font-size:11pt; } .card { box-shadow:none; border:1px solid #ddd; } }';
+                document.head.appendChild(s);
+            }
+            window.print();
+        };
 
         // Event handlers
         document.querySelectorAll('[data-status]').forEach(btn => {
