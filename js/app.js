@@ -950,6 +950,39 @@
 
         // ============ ADMIN PANEL ============
 
+        _buildNavHtml() {
+            const m = (AppData.getSettings().modules) || {};
+            const on = (key, def) => (m[key] !== undefined ? m[key] : def);
+            const item = (route, icon, label, tooltip, extra) =>
+                `<a class="nav-item" data-route="${route}" data-tooltip="${tooltip}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${extra || ''}</a>`;
+
+            return [
+                // ── Always-on core ─────────────────────────────────────────
+                item('dashboard',      '📊', 'Dashboard',    'Dashboard — overview & quick actions'),
+                item('projects',       '🏗️', 'Projects',     'Projects — manage active jobs'),
+                item('approvals',      '✅', 'Approvals',    'Approvals — review worker time submissions', '<span class="nav-badge" id="approvalBadge" style="display:none"></span>'),
+                // ── Module-gated accounting ────────────────────────────────
+                on('invoicing',     true)  ? item('invoices',  '📄', 'Invoices',     'Invoices — create & track client invoices') : '',
+                on('bid_estimates', false) ? item('estimates', '💹', 'Bid Estimates','Estimates — bid estimates and project costing') : '',
+                // ── Always-on operations ───────────────────────────────────
+                item('expenses-review','💰', 'Expenses',     'Expenses — review worker-submitted costs'),
+                item('vendors',        '🏢', 'Vendors',      'Vendors — suppliers & subcontractors'),
+                item('clients',        '👥', 'Clients',      'Clients — your client address book'),
+                item('users',          '👷', 'Workers',      'Workers — manage team & PINs'),
+                item('photos',         '📸', 'Photos',       'Photos — job site photo log'),
+                item('reports',        '📈', 'Reports',      'Reports — cost, labour & invoice summaries'),
+                // ── Module-gated Tier 3 ────────────────────────────────────
+                on('task_assignment',  false) ? item('task-assignment', '☑️',  'Task Assignment',  'Task Assignment — assign tasks to workers') : '',
+                on('budget_tracking',  false) ? item('budget-tracking', '💹',  'Budget Tracking',  'Budget Tracking — project budgets vs actual spending') : '',
+                on('daily_reports',    false) ? item('daily-reports',   '📋',  'Daily Reports',    'Daily Reports — crew summaries and site conditions') : '',
+                on('punch_lists',      false) ? item('punch-lists',     '📌',  'Punch Lists',      'Punch Lists — deficiency tracking and sign-off') : '',
+                on('gantt_chart',      false) ? item('gantt-chart',     '📅',  'Project Timeline', 'Project Timeline — visual schedule of tasks and milestones') : '',
+                // ── Always-on last ─────────────────────────────────────────
+                item('settings', '⚙️', 'Settings', 'Settings — company info, modules, password & backups'),
+                item('help',     '❓', 'Help',      'Help — how to use Ledgerman'),
+            ].join('\n');
+        },
+
         startAdminPanel() {
             Utils.startSessionTimer(() => this.logout());
             const app = document.getElementById('app');
@@ -960,63 +993,7 @@
                         <div class="brand-icon" id="sidebarLogo">L</div>
                         <span class="brand-text">${AppData.getCompanyName()}</span>
                     </div>
-                    <nav>
-                        <a class="nav-item active" data-route="dashboard" data-tooltip="Dashboard — overview & quick actions">
-                            <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
-                        </a>
-                        <a class="nav-item" data-route="projects" data-tooltip="Projects — manage active jobs">
-                            <span class="nav-icon">🏗️</span><span class="nav-label">Projects</span>
-                        </a>
-                        <a class="nav-item" data-route="approvals" data-tooltip="Approvals — review worker time submissions">
-                            <span class="nav-icon">✅</span><span class="nav-label">Approvals</span>
-                            <span class="nav-badge" id="approvalBadge" style="display:none"></span>
-                        </a>
-                        <a class="nav-item" data-route="invoices" data-tooltip="Invoices — create & track client invoices">
-                            <span class="nav-icon">📄</span><span class="nav-label">Invoices</span>
-                        <a class="nav-item" data-route="estimates" data-tooltip="Estimates — bid estimates and project costing">
-                            <span class="nav-icon">💹</span><span class="nav-label">Bid Estimates</span>
-                        </a>
-                        </a>
-                        <a class="nav-item" data-route="expenses-review" data-tooltip="Expenses — review worker-submitted costs">
-                            <span class="nav-icon">💰</span><span class="nav-label">Expenses</span>
-                        </a>
-                        <a class="nav-item" data-route="vendors" data-tooltip="Vendors — suppliers & subcontractors">
-                            <span class="nav-icon">🏢</span><span class="nav-label">Vendors</span>
-                        </a>
-                        <a class="nav-item" data-route="clients" data-tooltip="Clients — your client address book">
-                            <span class="nav-icon">👥</span><span class="nav-label">Clients</span>
-                        </a>
-                        <a class="nav-item" data-route="users" data-tooltip="Workers — manage team & PINs">
-                            <span class="nav-icon">👷</span><span class="nav-label">Workers</span>
-                        </a>
-                        <a class="nav-item" data-route="photos" data-tooltip="Photos — job site photo log">
-                            <span class="nav-icon">📸</span><span class="nav-label">Photos</span>
-                        </a>
-                        <a class="nav-item" data-route="reports" data-tooltip="Reports — cost, labour & invoice summaries">
-                            <span class="nav-icon">📈</span><span class="nav-label">Reports</span>
-                        </a>
-                        <a class="nav-item" data-route="settings" data-tooltip="Settings — company info, password & backups">
-                            <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
-                        </a>
-                        <a class="nav-item" data-route="help" data-tooltip="Help — how to use Ledgerman">
-                            <span class="nav-icon">❓</span><span class="nav-label">Help</span>
-                        </a>
-                        <a class="nav-item" data-route="task-assignment" data-tooltip="Task Assignment — assign tasks to workers">
-                            <span class="nav-icon">✓</span><span class="nav-label">Task Assignment</span>
-                        </a>
-                        <a class="nav-item" data-route="budget-tracking" data-tooltip="Budget Tracking — project budgets vs actual spending">
-                            <span class="nav-icon">💰</span><span class="nav-label">Budget Tracking</span>
-                        </a>
-                        <a class="nav-item" data-route="daily-reports" data-tooltip="Daily Reports — crew summaries and site conditions">
-                            <span class="nav-icon">📋</span><span class="nav-label">Daily Reports</span>
-                        </a>
-                        <a class="nav-item" data-route="punch-lists" data-tooltip="Punch Lists — deficiency tracking and sign-off">
-                            <span class="nav-icon">✓</span><span class="nav-label">Punch Lists</span>
-                        </a>
-                        <a class="nav-item" data-route="gantt-chart" data-tooltip="Project Timeline — visual schedule of tasks and milestones">
-                            <span class="nav-icon">📊</span><span class="nav-label">Project Timeline</span>
-                        </a>
-                    </nav>
+                    <nav id="adminNav">${this._buildNavHtml()}</nav>
                 </div>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
                 <div class="admin-main">

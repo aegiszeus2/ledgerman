@@ -184,6 +184,16 @@ window.AdminSettings = {
               </div>
             </div>
 
+            <div class="card" id="settingsModules">
+              <div class="card-body">
+                <h3 class="section-title">Feature Modules</h3>
+                <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px">
+                    Enable or disable features for your company. Changes take effect immediately — the sidebar updates on next page load.
+                </p>
+                <div id="modulesContainer"></div>
+              </div>
+            </div>
+
             <div class="card" id="settingsStep7">
               <div class="card-body">
                 <h3 class="section-title">Data Backup &amp; Restore</h3>
@@ -397,6 +407,112 @@ window.AdminSettings = {
         if (params.wizard) {
             setTimeout(function() { self._startWizard(container); }, 300);
         }
+
+        // Render module toggles
+        self._renderModules(container);
+    },
+
+    _MODULE_DEFS: [
+        // ── Project Management ──────────────────────────────────────────────
+        { key: 'task_assignment',   name: 'Task Assignment',           category: 'Project Management', desc: 'Assign tasks to workers, track progress and completion',                       built: true  },
+        { key: 'budget_tracking',   name: 'Budget Tracking',           category: 'Project Management', desc: 'Per-project budgets, variance alerts, cost progress bars',                    built: true  },
+        { key: 'gantt_chart',       name: 'Project Timeline (Gantt)',  category: 'Project Management', desc: 'Visual project schedule with task bars and milestones',                       built: true  },
+        { key: 'change_orders',     name: 'Change Orders',             category: 'Project Management', desc: 'Track scope changes, client approvals, and budget impacts',                   built: false },
+        { key: 'rfis',              name: 'RFIs',                      category: 'Project Management', desc: 'Request for Information log — route, respond, and track design questions',   built: false },
+        { key: 'submittals',        name: 'Submittals',                category: 'Project Management', desc: 'Submittal log, review workflow, and spec compliance tracking',               built: false },
+        { key: 'scope_management',  name: 'Scope Management',          category: 'Project Management', desc: 'Change requests, scope creep tracking, and approval workflows',              built: true  },
+        { key: 'risk_management',   name: 'Risk Management',           category: 'Project Management', desc: 'Risk register, mitigation tracking, and impact scoring',                     built: true  },
+        { key: 'resource_planning', name: 'Resource Planning',         category: 'Project Management', desc: 'Team assignments, capacity planning, and skill-based allocation',            built: true  },
+        // ── Accounting ─────────────────────────────────────────────────────
+        { key: 'invoicing',         name: 'Invoice Generation',        category: 'Accounting',         desc: 'Create and manage client invoices',                                          built: true  },
+        { key: 'bid_estimates',     name: 'Bid Estimates',             category: 'Accounting',         desc: 'Estimate templates with costs, markups, and project conversion',             built: true  },
+        { key: 'ap_ar_tracking',    name: 'AP/AR Tracking',            category: 'Accounting',         desc: 'Vendor payments, customer invoicing, and payment history',                   built: true  },
+        { key: 'cost_allocation',   name: 'Cost Allocation',           category: 'Accounting',         desc: 'Labour costs by project/phase, equipment tracking, burden allocation',       built: true  },
+        { key: 'financial_tracking',name: 'Financial Tracking',        category: 'Accounting',         desc: 'Budget vs. actual analysis, cost forecasting, and margin tracking',          built: true  },
+        { key: 'progress_billing',  name: 'Progress Billing / SOV',    category: 'Accounting',         desc: 'Schedule of Values, draw requests, and certified progress billing',          built: false },
+        { key: 'certified_payroll', name: 'Certified Payroll',         category: 'Accounting',         desc: 'Union and prevailing wage tracking with certified payroll reports',          built: false },
+        // ── Field Operations ───────────────────────────────────────────────
+        { key: 'daily_reports',     name: 'Daily Reports',             category: 'Field Operations',   desc: 'Crew daily summaries, site conditions, and sign-off workflow',               built: true  },
+        { key: 'punch_lists',       name: 'Punch Lists',               category: 'Field Operations',   desc: 'Deficiency tracking, priority levels, and resolution sign-off',              built: true  },
+        { key: 'photo_ocr',         name: 'Photo OCR',                 category: 'Field Operations',   desc: 'OCR scanning on field photos and receipts',                                  built: true  },
+        { key: 'gps_tracking',      name: 'GPS Tracking',              category: 'Field Operations',   desc: 'GPS coordinates on clock-in/out for crew location tracking',                 built: false },
+        { key: 'subcontractor_mgmt',name: 'Subcontractor Management',  category: 'Field Operations',   desc: 'Subcontracts, insurance tracking, and compliance document management',       built: false },
+        // ── Quality & Safety ───────────────────────────────────────────────
+        { key: 'quality_assurance', name: 'Quality Assurance',         category: 'Quality & Safety',   desc: 'Quality gates, inspection checklists, and defect tracking',                  built: true  },
+        { key: 'safety',            name: 'Safety & Incidents',        category: 'Quality & Safety',   desc: 'Incident reporting, toolbox talks, JSAs, and WSIB/OSHA compliance',         built: false },
+        // ── Reporting & Security ───────────────────────────────────────────
+        { key: 'advanced_reporting',name: 'Advanced Reporting',        category: 'Reporting',          desc: 'Custom analytics, exports, and data visualization dashboards',               built: true  },
+        { key: 'two_fa',            name: 'Two-Factor Authentication', category: 'Security',           desc: 'Enable 2FA for worker and admin login',                                      built: true  },
+    ],
+
+    _renderModules(container) {
+        const self = this;
+        const settings = AppData.getSettings();
+        const savedModules = settings.modules || {};
+        const el = container.querySelector('#modulesContainer');
+        if (!el) return;
+
+        // Group by category
+        const groups = {};
+        self._MODULE_DEFS.forEach(function(mod) {
+            if (!groups[mod.category]) groups[mod.category] = [];
+            groups[mod.category].push(mod);
+        });
+
+        // Default enabled state: use saved value, fallback to built=true → false, built=false → false
+        function isEnabled(key) {
+            if (savedModules[key] !== undefined) return savedModules[key];
+            const def = self._MODULE_DEFS.find(function(m) { return m.key === key; });
+            return def ? false : false; // all default to off unless saved
+        }
+
+        let html = '';
+        Object.keys(groups).forEach(function(cat) {
+            html += '<div style="margin-bottom:20px">';
+            html += '<div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:10px">' + Utils.escapeHtml(cat) + '</div>';
+            groups[cat].forEach(function(mod) {
+                const enabled = isEnabled(mod.key);
+                const soon = !mod.built;
+                html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">';
+                // Toggle
+                html += '<label class="module-toggle" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">';
+                html += '<input type="checkbox" data-module-key="' + mod.key + '" ' + (enabled ? 'checked' : '') + (soon ? ' disabled' : '') + ' style="opacity:0;width:0;height:0">';
+                html += '<span style="position:absolute;cursor:' + (soon ? 'not-allowed' : 'pointer') + ';top:0;left:0;right:0;bottom:0;background:' + (enabled ? 'var(--primary)' : 'var(--border)') + ';border-radius:22px;transition:.2s" class="module-slider" data-key="' + mod.key + '"></span>';
+                html += '<span style="position:absolute;content:\'\';height:16px;width:16px;left:' + (enabled ? '21px' : '3px') + ';bottom:3px;background:white;border-radius:50%;transition:.2s" class="module-knob" data-key="' + mod.key + '"></span>';
+                html += '</label>';
+                // Text
+                html += '<div style="flex:1;min-width:0">';
+                html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+                html += '<span style="font-size:.875rem;font-weight:500' + (soon ? ';color:var(--text2)' : '') + '">' + Utils.escapeHtml(mod.name) + '</span>';
+                if (soon) html += '<span style="font-size:.7rem;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:1px 8px;color:var(--text2)">Coming Soon</span>';
+                html += '</div>';
+                html += '<div style="font-size:.78rem;color:var(--text2);margin-top:2px">' + Utils.escapeHtml(mod.desc) + '</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        });
+
+        el.innerHTML = html;
+
+        // Toggle interaction
+        el.querySelectorAll('input[data-module-key]').forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                const key = this.getAttribute('data-module-key');
+                const val = this.checked;
+                // Update slider + knob visuals
+                const slider = el.querySelector('.module-slider[data-key="' + key + '"]');
+                const knob   = el.querySelector('.module-knob[data-key="' + key + '"]');
+                if (slider) slider.style.background = val ? 'var(--primary)' : 'var(--border)';
+                if (knob)   knob.style.left = val ? '21px' : '3px';
+                // Persist
+                const current = AppData.getSettings();
+                const modules = Object.assign({}, current.modules || {});
+                modules[key] = val;
+                AppData.saveSettings(Object.assign({}, current, { modules: modules }));
+                Utils.showToast((val ? 'Enabled' : 'Disabled') + ': ' + key.replace(/_/g, ' '));
+            });
+        });
     },
 
     _startWizard(container) {
