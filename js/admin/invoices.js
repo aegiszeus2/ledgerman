@@ -1165,7 +1165,7 @@ window.AdminInvoices = {
         });
     },
 
-    // ============ EDIT INVOICE MODAL ============
+    // ============ EDIT INVOICE MODAL (FULL) ============
 
     _showEditModal(invoiceId, onComplete) {
         var self = this;
@@ -1173,63 +1173,71 @@ window.AdminInvoices = {
         if (!inv) { Utils.showToast('Invoice not found', 'error'); return; }
         var esc = Utils.escapeHtml;
 
+        // Working copy of line items
+        var editItems = JSON.parse(JSON.stringify(inv.lineItems || inv.items || []));
+        var originalExpenseIds = editItems.map(function(i) { return i.expenseId || i.id || null; }).filter(Boolean);
+
+        var hstEnabled = inv.hstEnabled !== false;
+        var hstRate = parseFloat(inv.hstRate) || 13;
+        var holdbackEnabled = inv.holdbackEnabled || false;
+        var holdbackRate = parseFloat(inv.holdbackRate) || 10;
+
         var overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
         overlay.style.display = 'flex';
         overlay.innerHTML =
-            '<div class="modal" style="max-width:520px">' +
-                '<h3>Edit Invoice</h3>' +
+            '<div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">' +
+                '<h3 style="margin-bottom:16px">Edit Invoice</h3>' +
                 '<form id="editInvoiceForm" novalidate>' +
+                    '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:12px">Invoice Details</h4>' +
                     '<div class="form-row">' +
-                        '<div class="form-group">' +
-                            '<label>Invoice Number</label>' +
-                            '<input type="text" name="invoiceNumber" value="' + esc(inv.invoiceNumber || '') + '">' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label>Status</label>' +
-                            '<select name="status">' +
-                                '<option value="Draft"' + (inv.status === 'Draft' ? ' selected' : '') + '>Draft</option>' +
-                                '<option value="Sent"' + (inv.status === 'Sent' ? ' selected' : '') + '>Sent</option>' +
-                                '<option value="Paid"' + (inv.status === 'Paid' ? ' selected' : '') + '>Paid</option>' +
-                                '<option value="Partially Paid"' + (inv.status === 'Partially Paid' ? ' selected' : '') + '>Partially Paid</option>' +
-                                '<option value="Overdue"' + (inv.status === 'Overdue' ? ' selected' : '') + '>Overdue</option>' +
-                            '</select>' +
-                        '</div>' +
+                        '<div class="form-group"><label>Invoice Number</label><input type="text" name="invoiceNumber" value="' + esc(inv.invoiceNumber || '') + '"></div>' +
+                        '<div class="form-group"><label>Status</label><select name="status">' +
+                            ['Draft','Sent','Unpaid','Partially Paid','Paid','Overdue'].map(function(s) {
+                                return '<option value="' + s + '"' + (inv.status === s ? ' selected' : '') + '>' + s + '</option>';
+                            }).join('') +
+                        '</select></div>' +
                     '</div>' +
                     '<div class="form-row">' +
-                        '<div class="form-group">' +
-                            '<label>Invoice Date</label>' +
-                            '<input type="date" name="invoiceDate" value="' + esc(inv.invoiceDate || inv.date || '') + '">' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label>Due Date</label>' +
-                            '<input type="date" name="dueDate" value="' + esc(inv.dueDate || '') + '">' +
-                        '</div>' +
+                        '<div class="form-group"><label>Invoice Date</label><input type="date" name="invoiceDate" value="' + esc(inv.invoiceDate || inv.date || '') + '"></div>' +
+                        '<div class="form-group"><label>Due Date</label><input type="date" name="dueDate" value="' + esc(inv.dueDate || '') + '"></div>' +
                     '</div>' +
                     '<div class="form-row">' +
-                        '<div class="form-group">' +
-                            '<label>Billing Period Start</label>' +
-                            '<input type="date" name="billingPeriodStart" value="' + esc(inv.billingPeriodStart || inv.billingStart || '') + '">' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label>Billing Period End</label>' +
-                            '<input type="date" name="billingPeriodEnd" value="' + esc(inv.billingPeriodEnd || inv.billingEnd || '') + '">' +
-                        '</div>' +
+                        '<div class="form-group"><label>Billing Period Start</label><input type="date" name="billingPeriodStart" value="' + esc(inv.billingPeriodStart || inv.billingStart || '') + '"></div>' +
+                        '<div class="form-group"><label>Billing Period End</label><input type="date" name="billingPeriodEnd" value="' + esc(inv.billingPeriodEnd || inv.billingEnd || '') + '"></div>' +
                     '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Payment Terms</label>' +
-                        '<input type="text" name="paymentTerms" value="' + esc(inv.paymentTerms || '') + '" placeholder="e.g. Net 30">' +
+                    '<div class="form-group" style="margin-bottom:8px"><label>Payment Terms</label><input type="text" name="paymentTerms" value="' + esc(inv.paymentTerms || '') + '" placeholder="e.g. Net 30"></div>' +
+                    '<div class="form-group" style="margin-bottom:8px"><label>Contract / Authority Reference</label><input type="text" name="contractReference" value="' + esc(inv.contractReference || inv.contractNumber || '') + '"></div>' +
+                    '<div class="form-group" style="margin-bottom:16px"><label>Notes</label><textarea name="notes" rows="2">' + esc(inv.notes || '') + '</textarea></div>' +
+
+                    '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:12px">Line Items</h4>' +
+                    '<table style="width:100%;border-collapse:collapse;margin-bottom:8px">' +
+                        '<thead><tr style="background:#f3f4f6">' +
+                            '<th style="padding:7px 6px;text-align:left;font-size:.82rem;font-weight:600">Description</th>' +
+                            '<th style="padding:7px 6px;text-align:left;font-size:.82rem;font-weight:600;width:115px">Category</th>' +
+                            '<th style="padding:7px 6px;text-align:right;font-size:.82rem;font-weight:600;width:100px">Amount</th>' +
+                            '<th style="padding:7px 6px;width:36px"></th>' +
+                        '</tr></thead>' +
+                        '<tbody id="editLineItemsBody"></tbody>' +
+                    '</table>' +
+                    '<button type="button" id="addCustomItem" style="background:#f9fafb;border:1px dashed #9ca3af;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:.85rem;color:#374151;margin-bottom:20px">+ Add Custom Line Item</button>' +
+
+                    '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:10px">Add from Project Expenses</h4>' +
+                    '<div id="availableExpensesSection" style="margin-bottom:20px"></div>' +
+
+                    '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:12px">Tax & Holdback</h4>' +
+                    '<div class="form-row" style="align-items:center">' +
+                        '<div class="form-group"><div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="editHst"' + (hstEnabled ? ' checked' : '') + '><span class="slider"></span></label><span style="font-size:.9rem">Apply HST</span></div></div>' +
+                        '<div class="form-group"><label>HST Rate (%)</label><input type="number" id="editHstRate" step="0.01" min="0" max="100" value="' + hstRate + '" style="width:80px"></div>' +
                     '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Contract / Authority Reference</label>' +
-                        '<input type="text" name="contractReference" value="' + esc(inv.contractReference || inv.contractNumber || '') + '">' +
+                    '<div class="form-row" style="align-items:center">' +
+                        '<div class="form-group"><div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="editHoldback"' + (holdbackEnabled ? ' checked' : '') + '><span class="slider"></span></label><span style="font-size:.9rem">Statutory Holdback</span></div></div>' +
+                        '<div class="form-group"><label>Holdback Rate (%)</label><input type="number" id="editHoldbackRate" step="0.1" min="0" max="100" value="' + holdbackRate + '" style="width:80px"></div>' +
                     '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Notes</label>' +
-                        '<textarea name="notes" rows="3">' + esc(inv.notes || '') + '</textarea>' +
-                    '</div>' +
+                    '<div id="editTotals" style="background:#f8f9fa;padding:12px;border-radius:6px;text-align:right;font-size:.9rem;margin-bottom:20px;border:1px solid #e5e7eb"></div>' +
+
                     '<div class="form-actions">' +
-                        '<button type="submit" class="btn-primary">Save Changes</button>' +
+                        '<button type="submit" class="btn-primary">Save Invoice</button>' +
                         '<button type="button" class="btn-secondary modal-close">Cancel</button>' +
                     '</div>' +
                 '</form>' +
@@ -1239,26 +1247,243 @@ window.AdminInvoices = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
+        function calcTotals() {
+            var subtotal = editItems.reduce(function(s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
+            var hstAmt = hstEnabled ? subtotal * (hstRate / 100) : 0;
+            var total = subtotal + hstAmt;
+            var hbAmt = holdbackEnabled ? subtotal * (holdbackRate / 100) : 0;
+            var net = total - hbAmt;
+            return { subtotal: subtotal, hstAmt: hstAmt, total: total, hbAmt: hbAmt, net: net };
+        }
+
+        function renderTotals() {
+            var t = calcTotals();
+            var el = overlay.querySelector('#editTotals');
+            if (!el) return;
+            var html = '<div style="color:#374151"><strong>Subtotal:</strong> ' + Utils.formatCurrency(t.subtotal) + '</div>';
+            if (hstEnabled) html += '<div style="color:#374151">HST (' + hstRate + '%): ' + Utils.formatCurrency(t.hstAmt) + '</div>';
+            html += '<div style="color:#111111"><strong>Total:</strong> ' + Utils.formatCurrency(t.total) + '</div>';
+            if (holdbackEnabled) {
+                html += '<div style="color:#374151">Holdback (' + holdbackRate + '%): &minus;' + Utils.formatCurrency(t.hbAmt) + '</div>';
+                html += '<div style="font-weight:700;font-size:1rem;color:#e94560;margin-top:4px">Net Payable: ' + Utils.formatCurrency(t.net) + '</div>';
+            } else {
+                html += '<div style="font-weight:700;font-size:1rem;color:#e94560;margin-top:4px">Total Due: ' + Utils.formatCurrency(t.total) + '</div>';
+            }
+            el.innerHTML = html;
+        }
+
+        function renderLineItems() {
+            var tbody = overlay.querySelector('#editLineItemsBody');
+            if (!tbody) return;
+            if (editItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:16px;font-size:.85rem">No line items. Add from project expenses or add a custom item.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = editItems.map(function(item, idx) {
+                return '<tr data-idx="' + idx + '" style="border-bottom:1px solid #f0f0f0">' +
+                    '<td style="padding:5px 4px"><input type="text" class="li-desc" style="width:100%;border:1px solid #d1d5db;padding:5px 6px;font-size:.85rem;border-radius:3px;color:#111" value="' + esc(item.description || '') + '"></td>' +
+                    '<td style="padding:5px 4px"><select class="li-cat" style="border:1px solid #d1d5db;padding:5px 4px;font-size:.85rem;border-radius:3px;color:#111;width:100%">' +
+                        ['Labor','Equipment','Material'].map(function(c) {
+                            return '<option value="' + c + '"' + (item.category === c ? ' selected' : '') + '>' + c + '</option>';
+                        }).join('') +
+                    '</select></td>' +
+                    '<td style="padding:5px 4px"><input type="number" class="li-amt" step="0.01" min="0" style="width:95px;border:1px solid #d1d5db;padding:5px 6px;font-size:.85rem;border-radius:3px;text-align:right;color:#111" value="' + (parseFloat(item.amount) || 0).toFixed(2) + '"></td>' +
+                    '<td style="padding:5px 4px;text-align:center"><button type="button" class="li-remove" data-idx="' + idx + '" style="background:#fee2e2;color:#dc2626;border:none;width:26px;height:26px;border-radius:3px;cursor:pointer;font-size:.85rem;line-height:1">✕</button></td>' +
+                '</tr>';
+            }).join('');
+
+            tbody.querySelectorAll('tr[data-idx]').forEach(function(row) {
+                var idx = parseInt(row.dataset.idx);
+                row.querySelector('.li-desc').addEventListener('input', function() { editItems[idx].description = this.value; });
+                row.querySelector('.li-cat').addEventListener('change', function() { editItems[idx].category = this.value; });
+                row.querySelector('.li-amt').addEventListener('input', function() {
+                    editItems[idx].amount = parseFloat(this.value) || 0;
+                    renderTotals();
+                });
+                row.querySelector('.li-remove').addEventListener('click', function() {
+                    editItems.splice(idx, 1);
+                    renderLineItems();
+                    renderTotals();
+                    renderUnusedExpenses();
+                });
+            });
+        }
+
+        function getAvailableExpenses() {
+            if (!inv.projectId) return [];
+            var expenses = AppData.getExpenses(inv.projectId);
+            var currentExpenseIds = editItems.map(function(i) { return i.expenseId || i.id || null; }).filter(Boolean);
+            return expenses.filter(function(e) {
+                if (currentExpenseIds.indexOf(e.id) !== -1) return false;
+                return !e.invoiced || e.invoiceId === invoiceId;
+            });
+        }
+
+        function renderUnusedExpenses() {
+            var el = overlay.querySelector('#availableExpensesSection');
+            if (!el) return;
+            var available = getAvailableExpenses();
+            if (available.length === 0) {
+                el.innerHTML = '<p style="color:#888;font-size:.85rem;padding:8px 0">All project expenses are already on this invoice, or there are no uninvoiced expenses.</p>';
+                return;
+            }
+            el.innerHTML = '<table style="width:100%;font-size:.85rem;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:4px">' +
+                '<thead><tr style="background:#f3f4f6">' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600">Date</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600">Description</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600">Cat</th>' +
+                    '<th style="padding:6px 8px;text-align:right;font-weight:600">Amount</th>' +
+                    '<th style="padding:6px 8px"></th>' +
+                '</tr></thead><tbody>' +
+                available.map(function(e) {
+                    var desc = '';
+                    if (e.category === 'Labor') {
+                        var worker = e.workerId ? AppData.getWorker(e.workerId) : null;
+                        desc = (worker ? esc(worker.name) + ' &ndash; ' : '') + esc(e.description || '');
+                    } else {
+                        var vd = e.vendorName || e.vendor || '';
+                        desc = (vd ? esc(vd) + ' &ndash; ' : '') + esc(e.description || '');
+                    }
+                    return '<tr style="border-top:1px solid #f0f0f0">' +
+                        '<td style="padding:6px 8px;color:#374151">' + Utils.formatDate(e.date) + '</td>' +
+                        '<td style="padding:6px 8px;color:#111111">' + desc + '</td>' +
+                        '<td style="padding:6px 8px;color:#374151">' + (e.category || 'Material') + '</td>' +
+                        '<td style="padding:6px 8px;text-align:right;color:#111111">' + Utils.formatCurrency(e.amount) + '</td>' +
+                        '<td style="padding:6px 8px"><button type="button" class="add-exp-btn" data-id="' + e.id + '" style="background:#1a3a5c;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.8rem;white-space:nowrap">+ Add</button></td>' +
+                    '</tr>';
+                }).join('') +
+                '</tbody></table>';
+
+            el.querySelectorAll('.add-exp-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var expId = btn.dataset.id;
+                    var exps = AppData.getExpenses(inv.projectId);
+                    var exp = null;
+                    for (var i = 0; i < exps.length; i++) { if (exps[i].id === expId) { exp = exps[i]; break; } }
+                    if (!exp) return;
+                    var worker = exp.workerId ? AppData.getWorker(exp.workerId) : null;
+                    var desc = '';
+                    if (exp.category === 'Labor') {
+                        desc = (worker ? worker.name + ' - ' : '') + (exp.description || '');
+                    } else {
+                        desc = ((exp.vendorName || exp.vendor || '') ? (exp.vendorName || exp.vendor) + ' - ' : '') + (exp.description || '');
+                    }
+                    editItems.push({
+                        expenseId: exp.id,
+                        description: desc,
+                        category: exp.category || 'Material',
+                        amount: parseFloat(exp.amount) || 0,
+                        hours: exp.hours || null,
+                        rate: exp.rate || null,
+                        rateType: exp.rateType || null,
+                        workerId: exp.workerId || '',
+                        vendor: exp.vendor || exp.vendorName || '',
+                        isChangeOrder: exp.changeOrder || false
+                    });
+                    renderLineItems();
+                    renderTotals();
+                    renderUnusedExpenses();
+                });
+            });
+        }
+
+        // Initial render
+        renderLineItems();
+        renderTotals();
+        renderUnusedExpenses();
+
+        // Add custom line item
+        overlay.querySelector('#addCustomItem').addEventListener('click', function() {
+            editItems.push({ expenseId: null, description: '', category: 'Material', amount: 0 });
+            renderLineItems();
+            renderTotals();
+        });
+
+        // Tax toggles
+        overlay.querySelector('#editHst').addEventListener('change', function() { hstEnabled = this.checked; renderTotals(); });
+        overlay.querySelector('#editHstRate').addEventListener('input', function() { hstRate = parseFloat(this.value) || 0; renderTotals(); });
+        overlay.querySelector('#editHoldback').addEventListener('change', function() { holdbackEnabled = this.checked; renderTotals(); });
+        overlay.querySelector('#editHoldbackRate').addEventListener('input', function() { holdbackRate = parseFloat(this.value) || 0; renderTotals(); });
+
+        // Save
         overlay.querySelector('#editInvoiceForm').addEventListener('submit', function(e) {
             e.preventDefault();
             var fd = Utils.getFormData(this);
+            var t = calcTotals();
+
+            var newExpenseIds = editItems.map(function(i) { return i.expenseId || null; }).filter(Boolean);
+
+            // Unmark expenses removed from this invoice
+            originalExpenseIds.forEach(function(eid) {
+                if (newExpenseIds.indexOf(eid) === -1) {
+                    var exps = AppData.getExpenses(inv.projectId);
+                    for (var i = 0; i < exps.length; i++) {
+                        if (exps[i].id === eid) {
+                            exps[i].invoiced = false;
+                            exps[i].invoiceId = null;
+                            AppData.saveExpense(exps[i]);
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // Mark newly added expenses as invoiced
+            newExpenseIds.forEach(function(eid) {
+                if (originalExpenseIds.indexOf(eid) === -1) {
+                    var exps = AppData.getExpenses(inv.projectId);
+                    for (var i = 0; i < exps.length; i++) {
+                        if (exps[i].id === eid) {
+                            exps[i].invoiced = true;
+                            exps[i].invoiceId = invoiceId;
+                            AppData.saveExpense(exps[i]);
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // Compute due date
+            var dueDate = fd.dueDate || '';
+            if (!dueDate && fd.paymentTerms && fd.invoiceDate) {
+                var netDays = parseInt((fd.paymentTerms || '').replace(/[^0-9]/g, ''));
+                if (netDays) {
+                    var d = new Date(fd.invoiceDate + 'T00:00:00');
+                    d.setDate(d.getDate() + netDays);
+                    dueDate = d.toISOString().split('T')[0];
+                }
+            }
+
             inv.invoiceNumber = fd.invoiceNumber || inv.invoiceNumber;
             inv.status = fd.status || inv.status;
             inv.invoiceDate = fd.invoiceDate || inv.invoiceDate;
             inv.date = fd.invoiceDate || inv.date;
-            inv.dueDate = fd.dueDate || inv.dueDate;
-            inv.billingPeriodStart = fd.billingPeriodStart || inv.billingPeriodStart;
-            inv.billingStart = fd.billingPeriodStart || inv.billingStart;
-            inv.billingPeriodEnd = fd.billingPeriodEnd || inv.billingPeriodEnd;
-            inv.billingEnd = fd.billingPeriodEnd || inv.billingEnd;
-            inv.paymentTerms = fd.paymentTerms;
-            inv.contractReference = fd.contractReference;
-            inv.notes = fd.notes;
+            inv.dueDate = dueDate;
+            inv.billingPeriodStart = fd.billingPeriodStart || '';
+            inv.billingStart = fd.billingPeriodStart || '';
+            inv.billingPeriodEnd = fd.billingPeriodEnd || '';
+            inv.billingEnd = fd.billingPeriodEnd || '';
+            inv.paymentTerms = fd.paymentTerms || '';
+            inv.contractReference = fd.contractReference || '';
+            inv.notes = fd.notes || '';
+            inv.lineItems = editItems;
+            inv.items = editItems;
+            inv.subtotal = t.subtotal;
+            inv.hstEnabled = hstEnabled;
+            inv.hstRate = hstRate;
+            inv.hstAmount = t.hstAmt;
+            inv.hst = t.hstAmt;
+            inv.holdbackEnabled = holdbackEnabled;
+            inv.holdbackRate = holdbackRate;
+            inv.holdbackAmount = t.hbAmt;
+            inv.holdback = t.hbAmt;
+            inv.total = t.total;
+            inv.netPayable = t.net;
             AppData.saveInvoice(inv);
 
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
-            AppData.addAuditLog(username, 'Invoice Edited', 'Invoice ' + inv.invoiceNumber + ' updated');
-            Utils.showToast('Invoice updated');
+            AppData.addAuditLog(username, 'Invoice Edited', 'Invoice ' + inv.invoiceNumber + ' — ' + editItems.length + ' items, total ' + Utils.formatCurrency(t.total));
+            Utils.showToast('Invoice saved');
             overlay.remove();
             if (onComplete) onComplete();
         });
