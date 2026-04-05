@@ -1201,6 +1201,40 @@
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
             }
 
+            // Inject "? How To" help button after every page render
+            if (route !== 'help' && window.LedgermanHelp && window.LedgermanHelp[route]) {
+                const helpBtn = document.createElement('button');
+                helpBtn.id = 'pageHelpBtn';
+                helpBtn.title = 'How to use this page';
+                helpBtn.innerHTML = '? How To';
+                helpBtn.style.cssText = [
+                    'position:fixed',
+                    'bottom:24px',
+                    'right:24px',
+                    'z-index:888',
+                    'background:var(--primary,#0066cc)',
+                    'color:#fff',
+                    'border:none',
+                    'border-radius:20px',
+                    'padding:9px 18px',
+                    'font-size:.85rem',
+                    'font-weight:600',
+                    'cursor:pointer',
+                    'box-shadow:0 4px 12px rgba(0,102,204,.35)',
+                    'transition:opacity .2s'
+                ].join(';');
+                helpBtn.onmouseenter = () => helpBtn.style.opacity = '.85';
+                helpBtn.onmouseleave = () => helpBtn.style.opacity = '1';
+                helpBtn.onclick = () => Utils.showHelpModal(route);
+                // Remove old button if present, then append
+                const old = document.getElementById('pageHelpBtn');
+                if (old) old.remove();
+                document.body.appendChild(helpBtn);
+            } else {
+                const old = document.getElementById('pageHelpBtn');
+                if (old) old.remove();
+            }
+
             // Scroll to top
             content.scrollTop = 0;
 
@@ -1323,6 +1357,35 @@
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
+            }
+
+            // Inject "? How To" help button for worker pages
+            if (route !== 'help' && window.LedgermanHelp && window.LedgermanHelp[route]) {
+                const helpBtn = document.createElement('button');
+                helpBtn.id = 'pageHelpBtn';
+                helpBtn.innerHTML = '? How To';
+                helpBtn.style.cssText = [
+                    'position:fixed',
+                    'bottom:70px',
+                    'right:16px',
+                    'z-index:888',
+                    'background:var(--primary,#0066cc)',
+                    'color:#fff',
+                    'border:none',
+                    'border-radius:20px',
+                    'padding:9px 18px',
+                    'font-size:.85rem',
+                    'font-weight:600',
+                    'cursor:pointer',
+                    'box-shadow:0 4px 12px rgba(0,102,204,.35)'
+                ].join(';');
+                helpBtn.onclick = () => Utils.showHelpModal(route);
+                const old = document.getElementById('pageHelpBtn');
+                if (old) old.remove();
+                document.body.appendChild(helpBtn);
+            } else {
+                const old = document.getElementById('pageHelpBtn');
+                if (old) old.remove();
             }
 
             content.scrollTop = 0;
