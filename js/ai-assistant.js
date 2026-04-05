@@ -264,7 +264,7 @@ window.AIAssistant = (function () {
         fab.title = 'AI Assistant PM';
         fab.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span style="font-size:.8rem;font-weight:600;margin-left:5px">AI PM</span>';
         fab.style.cssText = [
-            'position:fixed', 'bottom:24px', 'right:24px', 'z-index:9000',
+            'position:fixed', 'bottom:80px', 'right:24px', 'z-index:9000',
             'display:flex', 'align-items:center', 'padding:10px 16px',
             'border-radius:24px', 'border:none', 'cursor:pointer',
             'background:var(--primary,#1a6b3a)', 'color:#fff',
@@ -280,9 +280,9 @@ window.AIAssistant = (function () {
         var panel = document.createElement('div');
         panel.id = 'aiAssistantWidget';
         panel.style.cssText = [
-            'position:fixed', 'bottom:80px', 'right:24px', 'z-index:8999',
+            'position:fixed', 'bottom:148px', 'right:24px', 'z-index:8999',
             'width:380px', 'max-width:calc(100vw - 32px)',
-            'height:520px', 'max-height:calc(100vh - 100px)',
+            'height:520px', 'max-height:calc(100vh - 160px)',
             'display:none', 'flex-direction:column',
             'background:var(--surface,#fff)', 'border-radius:16px',
             'box-shadow:0 8px 40px rgba(0,0,0,.2)', 'border:1px solid var(--border,#dde4e0)',
@@ -390,7 +390,7 @@ window.AIAssistant = (function () {
             fab.title = 'AI Assistant PM';
             fab.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span style="font-size:.8rem;font-weight:600;margin-left:5px">AI PM</span>';
             fab.style.cssText = [
-                'position:fixed', 'bottom:24px', 'right:24px', 'z-index:9000',
+                'position:fixed', 'bottom:80px', 'right:24px', 'z-index:9000',
                 'display:flex', 'align-items:center', 'padding:10px 16px',
                 'border-radius:24px', 'border:none', 'cursor:pointer',
                 'background:var(--primary,#1a6b3a)', 'color:#fff',
