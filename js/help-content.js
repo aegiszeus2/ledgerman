@@ -21,40 +21,46 @@ window.LedgermanHelp = {
         title: 'Projects',
         intro: 'Track all your construction projects from start to finish.',
         steps: [
-            'Click "+ New Project" to create a project — enter the name, client, start date, and budget.',
+            'Click "+ New Project" to create a project — enter the name, client, job site address, start/end dates, and contract value.',
             'Click any project row to open the project detail view.',
-            'In the detail view, you can log time, add expenses, view photos, and track tasks.',
-            'Change project status (Active / On Hold / Complete) from the detail view.',
-            'Budget variance is calculated automatically once expenses are logged.',
-            'Use the Export CSV button to download the full project list, or Print / PDF to generate a printable report.'
+            'The detail view has six tabs: Tasks, Budget, Work Items, Expenses, Photos, and Invoices.',
+            'Tasks tab: assign work to workers with start and due dates — drives the Project Timeline (Gantt).',
+            'Work Items tab: define scope line items with unit, budgeted qty, budgeted cost, and change order flag.',
+            'Budget tab: live comparison of budgeted vs. actual cost per Work Item, broken down by labour and materials.',
+            'Change project status (Active / On Hold / Completed) using "Edit Project".',
+            'Use the Export CSV button to download the project list, or Print / PDF to generate a printable report.'
         ]
     },
 
     'project-detail': {
         title: 'Project Detail',
-        intro: 'Full view of a single project — time, expenses, tasks, and photos in one place.',
+        intro: 'Full view of a single project — schedule, budget, work items, expenses, photos, and invoices in one place.',
         steps: [
-            'The summary bar shows total hours, expenses, and budget variance at a glance.',
-            'Use the tabs to switch between Time Entries, Expenses, Tasks, and Photos.',
+            'Six tabs: Tasks | Budget | Work Items | Expenses | Photos | Invoices.',
+            'Tasks: create and assign tasks with start/due dates and an optional link to a Work Item.',
+            'Budget: live cost control — budgeted vs. actual per Work Item, split by labour cost and material expenses.',
+            'Work Items: the scope breakdown — name, unit of measure, budgeted qty, budgeted cost, change order flag, and planned dates.',
+            'Expenses: all expenses logged against this project.',
+            'Photos: all site photos from worker submissions, grouped by date and worker.',
+            'Invoices: all invoices raised against this project.',
             'Click "Edit Project" to update the name, client, budget, or status.',
-            'Change the project status (Active / On Hold / Complete) using the status dropdown.',
-            'All approved time and expenses linked to this project are shown here.',
             'Use the back arrow to return to the Projects list.'
         ]
     },
 
     'task-assignment': {
         title: 'Task Assignment',
-        intro: 'Create and assign tasks to workers on specific projects.',
+        intro: 'Create, assign, and schedule tasks across all projects.',
         steps: [
             'Click "+ New Task" to create a task.',
-            'Fill in the task title, assign it to a worker, select the project, set a start date and due date.',
-            'Setting start and due dates places the task accurately on the Project Timeline (Gantt chart).',
-            'Set the initial status: To Do, In Progress, or Done.',
-            'Use the filters at the top to view tasks by status, project, or assigned worker.',
-            'Click Edit on any task to update it. Overdue tasks are highlighted automatically.',
+            'Select the project, assign a worker, set a start date and due date.',
+            'Start and due dates drive bar length on the Project Timeline (Gantt chart) — always set both.',
+            'Link the task to a Work Item (optional) — this connects schedule to budget for cost tracking.',
+            'Set status: To Do, In Progress, or Done.',
+            'Filter tasks by status, project, or assigned worker using the dropdowns at the top.',
+            'Overdue tasks are flagged automatically.',
             'Workers see their assigned tasks in the Worker Portal under "My Tasks".',
-            'Use the Export CSV button to download the task list, or Print / PDF for a printable report.'
+            'Use the Export CSV button to download the task list (includes Work Item and Start Date columns), or Print / PDF for a printable report.'
         ]
     },
 
@@ -102,15 +108,17 @@ window.LedgermanHelp = {
 
     'gantt-chart': {
         title: 'Project Timeline (Gantt)',
-        intro: 'Visualize your project schedule and task timelines.',
+        intro: 'Visualize your project schedule — Gantt chart plus a full task list in one view.',
         steps: [
-            'Select a project from the dropdown to load its task timeline.',
-            'Tasks appear as bars — bar length is the duration from start date to due date.',
-            'Tasks without a start or due date default to a 7-day bar from today.',
-            'Set start dates and due dates in Task Assignment to get accurate bars.',
-            'Bar colours indicate status: Blue = Open, Orange = In Progress, Green = Completed.',
-            'Use Task Assignment to add, edit, or reassign tasks.',
-            'Click Refresh to reload the chart with the latest task data.'
+            'Select a project from the dropdown to load its timeline.',
+            'Tasks appear as bars — length is the duration from start date to due date.',
+            'Bar colours: Blue = Open, Orange = In Progress, Green = Completed.',
+            'Tasks without dates default to a 7-day bar starting today — set dates in Task Assignment for accuracy.',
+            'The Task Schedule table below the chart shows every task with Work Item, assigned worker, start, due, duration, and status.',
+            'Overdue tasks are flagged in red in both the chart and the table.',
+            'Export CSV downloads the full task schedule with all fields.',
+            'Export PDF generates a Belfort-style print document — company header, project details, the Gantt chart, and the task table — ready to hand to a client or file.',
+            'Click Refresh to reload with the latest task data.'
         ]
     },
 
@@ -272,12 +280,14 @@ window.LedgermanHelp = {
 
     photos: {
         title: 'Photo Gallery',
-        intro: 'Browse all job site photos organized by project.',
+        intro: 'Browse all job site photos organized by project, date, and worker.',
         steps: [
             'Photos appear here after workers upload them during time entry.',
             'Use the project filter to view photos for a specific job.',
-            'Click any photo to open the full-size view.',
-            'Use "Export" to download all photos for a project to your computer.',
+            'Photos are grouped by date and by worker — work descriptions appear above each group.',
+            'Click any photo to open the full-size lightbox view.',
+            'Use Export PDF to generate a Belfort-style site photo report with company header, project details, and all photos — ready for client or record filing.',
+            'Use Export CSV to download a log of dates, workers, work descriptions, and photo counts.',
             'Photos are stored securely — only your company can see them.'
         ]
     },
@@ -325,7 +335,9 @@ window.LedgermanHelp = {
         intro: 'Submit your hours worked for the day.',
         steps: [
             'Select the project you worked on from the dropdown.',
-            'Enter the date and your hours worked.',
+            'Use Clock In / Clock Out to track live hours, or Manual Entry to log past hours.',
+            'If Work Items have been set up for the project, select the one you worked on — this links your hours to the project budget.',
+            'Enter units completed (e.g. metres placed, catch basins installed) if applicable.',
             'Add any expenses (materials, fuel, equipment) using the Add Expense button.',
             'Attach site photos using the camera icon — photos are linked to this submission.',
             'Tap Submit when done. Your entry goes to your supervisor for approval.',
