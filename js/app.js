@@ -1195,15 +1195,15 @@
                         'bottom:24px',
                         'right:24px',
                         'z-index:888',
-                        'background:var(--primary,#0066cc)',
-                        'color:#fff',
-                        'border:none',
+                        'background:#1a3a5c',
+                        'color:#ffffff',
+                        'border:2px solid #ffffff',
                         'border-radius:20px',
                         'padding:9px 18px',
                         'font-size:.85rem',
-                        'font-weight:600',
+                        'font-weight:700',
                         'cursor:pointer',
-                        'box-shadow:0 4px 12px rgba(0,102,204,.35)',
+                        'box-shadow:0 4px 14px rgba(0,0,0,.4)',
                         'transition:opacity .2s'
                     ].join(';');
                     helpBtn.onmouseenter = () => helpBtn.style.opacity = '.85';
@@ -1353,15 +1353,15 @@
                         'bottom:70px',
                         'right:16px',
                         'z-index:888',
-                        'background:var(--primary,#0066cc)',
-                        'color:#fff',
-                        'border:none',
+                        'background:#1a3a5c',
+                        'color:#ffffff',
+                        'border:2px solid #ffffff',
                         'border-radius:20px',
                         'padding:9px 18px',
                         'font-size:.85rem',
-                        'font-weight:600',
+                        'font-weight:700',
                         'cursor:pointer',
-                        'box-shadow:0 4px 12px rgba(0,102,204,.35)'
+                        'box-shadow:0 4px 14px rgba(0,0,0,.4)'
                     ].join(';');
                     helpBtn.onclick = () => Utils.showHelpModal(_wHelpRoute);
                     document.body.appendChild(helpBtn);
