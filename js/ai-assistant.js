@@ -8,6 +8,7 @@ window.AIAssistant = (function () {
     var _history = [];      // [{role, content}]
     var _open = false;
     var _pending = false;
+    var _relayUrl = '';     // Cached tunnel URL for transcription (fetched on first open)
 
     // ── IDs ──────────────────────────────────────────────────────────────────
     function _genId(prefix) {
@@ -132,6 +133,22 @@ window.AIAssistant = (function () {
         }
 
         return results;
+    }
+
+    // ── Fetch relay URL (tunnel) from backend — needed for HTTPS transcription ──
+    function _fetchRelayUrl(cb) {
+        if (_relayUrl) { cb(_relayUrl); return; }
+        var token = sessionStorage.getItem('ledgeman_jwt') || '';
+        var apiBase = (window.AppData && AppData.API_BASE) || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgerman-backend.onrender.com');
+        fetch(apiBase + '/api/ai/config', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            _relayUrl = (d.relay_url || '').replace(/\/$/, '');
+            cb(_relayUrl);
+        })
+        .catch(function () { cb(''); });
     }
 
     // ── Send message to backend ──────────────────────────────────────────────
@@ -401,7 +418,12 @@ window.AIAssistant = (function () {
                         var mimeType = _mediaRecorder.mimeType || 'audio/webm';
                         var blob = new Blob(_audioChunks, { type: mimeType });
 
-                        fetch('http://localhost:9999/transcribe', {
+                        _fetchRelayUrl(function (relayUrl) {
+                        var transcribeUrl = relayUrl
+                            ? relayUrl + '/transcribe'
+                            : 'http://localhost:9999/transcribe';
+
+                        fetch(transcribeUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': mimeType },
                             body: blob
@@ -422,8 +444,9 @@ window.AIAssistant = (function () {
                         })
                         .catch(function () {
                             if (inp) inp.placeholder = 'Type or speak...';
-                            _addMessage('assistant', '⚠️ Transcription service unreachable (localhost:9999).');
+                            _addMessage('assistant', '⚠️ Transcription service unreachable.');
                         });
+                        }); // end _fetchRelayUrl
                     };
 
                     _mediaRecorder.start();
