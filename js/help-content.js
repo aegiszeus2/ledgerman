@@ -29,6 +29,19 @@ window.LedgermanHelp = {
         ]
     },
 
+    'project-detail': {
+        title: 'Project Detail',
+        intro: 'Full view of a single project — time, expenses, tasks, and photos in one place.',
+        steps: [
+            'The summary bar shows total hours, expenses, and budget variance at a glance.',
+            'Use the tabs to switch between Time Entries, Expenses, Tasks, and Photos.',
+            'Click "Edit Project" to update the name, client, budget, or status.',
+            'Change the project status (Active / On Hold / Complete) using the status dropdown.',
+            'All approved time and expenses linked to this project are shown here.',
+            'Use the back arrow to return to the Projects list.'
+        ]
+    },
+
     'task-assignment': {
         title: 'Task Assignment',
         intro: 'Create and assign tasks to workers on specific projects.',
@@ -118,6 +131,32 @@ window.LedgermanHelp = {
         ]
     },
 
+    'invoice-detail': {
+        title: 'Invoice Detail',
+        intro: 'Full view of a single invoice — line items, payments, and status.',
+        steps: [
+            'The header shows the invoice number, client, project, and current status.',
+            'Line items are listed below — each shows description, quantity, rate, and amount.',
+            'The totals section shows subtotal, HST, and amount due.',
+            'Click "Add Payment" to record a payment — the outstanding balance updates automatically.',
+            'Click "Send" to mark the invoice as sent to the client.',
+            'Use the Print button to generate a PDF-ready invoice.'
+        ]
+    },
+
+    'invoice-create': {
+        title: 'Create Invoice',
+        intro: 'Build a new invoice for a client from approved time and expenses.',
+        steps: [
+            'Select the client and project from the dropdowns.',
+            'Add line items — enter description, quantity, and unit rate for each.',
+            'Click "Pull from Approved Time" to auto-populate from logged hours.',
+            'Set the HST rate — it defaults to your company setting.',
+            'Review the totals, then click Save as Draft or Send.',
+            'You can edit the invoice again any time while it\'s in Draft status.'
+        ]
+    },
+
     estimates: {
         title: 'Bid Estimates',
         intro: 'Prepare and manage project estimates for clients.',
@@ -128,6 +167,19 @@ window.LedgermanHelp = {
             'The subtotal, tax, and grand total calculate automatically.',
             'Change status: Draft → Sent → Approved.',
             'An approved estimate can be converted into a project using "Create Project".'
+        ]
+    },
+
+    'estimate-detail': {
+        title: 'Estimate Detail',
+        intro: 'Full view of a bid estimate — line items, costs, and status.',
+        steps: [
+            'The header shows the estimate number, client, and current status (Draft / Sent / Approved).',
+            'Line items show labour and materials broken down by quantity and unit price.',
+            'Direct costs (equipment, subcontractors) are listed separately below.',
+            'Totals calculate automatically — subtotal, HST, and grand total.',
+            'Click "Send" to mark it as sent to the client.',
+            'Once approved, click "Create Project" to convert the estimate into an active project.'
         ]
     },
 
@@ -150,6 +202,18 @@ window.LedgermanHelp = {
             'Click any vendor to view details or log notes.',
             'Vendors can be attached to expenses when workers log field costs.',
             'Use the search bar to find vendors quickly.'
+        ]
+    },
+
+    'vendor-detail': {
+        title: 'Vendor Detail',
+        intro: 'Full profile for a single vendor — contact info, trade, and notes.',
+        steps: [
+            'Review the vendor\'s trade, phone, email, and address at the top.',
+            'Use the Notes section to log any relevant information about this vendor.',
+            'Click "Edit" to update the vendor\'s details.',
+            'Any expenses linked to this vendor are listed in the Expenses tab.',
+            'Use the back arrow to return to the Vendors list.'
         ]
     },
 
