@@ -1176,11 +1176,18 @@ window.AdminInvoices = {
         // Working copy of line items
         var editItems = JSON.parse(JSON.stringify(inv.lineItems || inv.items || []));
         var originalExpenseIds = editItems.map(function(i) { return i.expenseId || i.id || null; }).filter(Boolean);
+        var currentProjectId = inv.projectId || '';
 
         var hstEnabled = inv.hstEnabled !== false;
         var hstRate = parseFloat(inv.hstRate) || 13;
         var holdbackEnabled = inv.holdbackEnabled || false;
         var holdbackRate = parseFloat(inv.holdbackRate) || 10;
+
+        var allProjects = AppData.getProjects();
+        var projectOptionsHtml = allProjects.map(function(p) {
+            return '<option value="' + p.id + '"' + (p.id === currentProjectId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+        }).join('');
+        if (!currentProjectId) projectOptionsHtml = '<option value="">— Select project —</option>' + projectOptionsHtml;
 
         var overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
@@ -1189,6 +1196,11 @@ window.AdminInvoices = {
             '<div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">' +
                 '<h3 style="margin-bottom:16px">Edit Invoice</h3>' +
                 '<form id="editInvoiceForm" novalidate>' +
+                    '<div class="form-group" style="margin-bottom:16px;padding:12px;background:#f0f4ff;border-radius:8px;border:1px solid #c7d2fe">' +
+                        '<label style="font-weight:700;color:#1a3a5c">Project</label>' +
+                        '<select id="editProjectSelect" style="width:100%;margin-top:4px">' + projectOptionsHtml + '</select>' +
+                        '<p style="font-size:.78rem;color:#6366f1;margin:4px 0 0">Changing the project updates the available expenses below.</p>' +
+                    '</div>' +
                     '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:12px">Invoice Details</h4>' +
                     '<div class="form-row">' +
                         '<div class="form-group"><label>Invoice Number</label><input type="text" name="invoiceNumber" value="' + esc(inv.invoiceNumber || '') + '"></div>' +
@@ -1310,8 +1322,8 @@ window.AdminInvoices = {
         }
 
         function getAvailableExpenses() {
-            if (!inv.projectId) return [];
-            var expenses = AppData.getExpenses(inv.projectId);
+            if (!currentProjectId) return [];
+            var expenses = AppData.getExpenses(currentProjectId);
             var currentExpenseIds = editItems.map(function(i) { return i.expenseId || i.id || null; }).filter(Boolean);
             return expenses.filter(function(e) {
                 if (currentExpenseIds.indexOf(e.id) !== -1) return false;
@@ -1357,7 +1369,7 @@ window.AdminInvoices = {
             el.querySelectorAll('.add-exp-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     var expId = btn.dataset.id;
-                    var exps = AppData.getExpenses(inv.projectId);
+                    var exps = AppData.getExpenses(currentProjectId);
                     var exp = null;
                     for (var i = 0; i < exps.length; i++) { if (exps[i].id === expId) { exp = exps[i]; break; } }
                     if (!exp) return;
@@ -1387,6 +1399,12 @@ window.AdminInvoices = {
             });
         }
 
+        // Project selector — live-refresh available expenses when project changes
+        overlay.querySelector('#editProjectSelect').addEventListener('change', function() {
+            currentProjectId = this.value;
+            renderUnusedExpenses();
+        });
+
         // Initial render
         renderLineItems();
         renderTotals();
@@ -1413,10 +1431,10 @@ window.AdminInvoices = {
 
             var newExpenseIds = editItems.map(function(i) { return i.expenseId || null; }).filter(Boolean);
 
-            // Unmark expenses removed from this invoice
+            // Unmark expenses removed from this invoice (search all expenses, not just current project)
             originalExpenseIds.forEach(function(eid) {
                 if (newExpenseIds.indexOf(eid) === -1) {
-                    var exps = AppData.getExpenses(inv.projectId);
+                    var exps = AppData.getExpenses();
                     for (var i = 0; i < exps.length; i++) {
                         if (exps[i].id === eid) {
                             exps[i].invoiced = false;
@@ -1431,7 +1449,7 @@ window.AdminInvoices = {
             // Mark newly added expenses as invoiced
             newExpenseIds.forEach(function(eid) {
                 if (originalExpenseIds.indexOf(eid) === -1) {
-                    var exps = AppData.getExpenses(inv.projectId);
+                    var exps = AppData.getExpenses(currentProjectId);
                     for (var i = 0; i < exps.length; i++) {
                         if (exps[i].id === eid) {
                             exps[i].invoiced = true;
@@ -1456,6 +1474,11 @@ window.AdminInvoices = {
 
             inv.invoiceNumber = fd.invoiceNumber || inv.invoiceNumber;
             inv.status = fd.status || inv.status;
+            if (currentProjectId && currentProjectId !== inv.projectId) {
+                var newProject = AppData.getProject(currentProjectId);
+                inv.projectId = currentProjectId;
+                inv.projectName = newProject ? newProject.name : inv.projectName;
+            }
             inv.invoiceDate = fd.invoiceDate || inv.invoiceDate;
             inv.date = fd.invoiceDate || inv.date;
             inv.dueDate = dueDate;
