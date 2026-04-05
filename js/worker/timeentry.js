@@ -272,6 +272,7 @@ window.WorkerTimeEntry = {
 
             var workerRate = parseFloat(worker.defaultRate) || 0;
             var selectedExpenses = []; // Reset expense list for this form
+            var selectedEquipment = []; // Reset equipment list for this form
 
             var form = document.createElement('form');
             form.className = 'time-entry-form';
@@ -349,6 +350,26 @@ window.WorkerTimeEntry = {
                     '</div>' +
                     '<input type="file" id="teExpenseInput" style="display:none">' +
                 '</div>';
+
+            // Equipment (optional — only shown when equipment exists)
+            var activeEquipment = (AppData.getEquipment ? AppData.getEquipment() : []).filter(function(eq) { return eq.status === 'Active'; });
+            if (activeEquipment.length > 0) {
+                var eqOptions = '<option value="">— Select equipment —</option>' +
+                    activeEquipment.map(function(eq) {
+                        return '<option value="' + esc(eq.id) + '" data-cost="' + (eq.costRate || 0) + '" data-charge="' + (eq.chargeOutRate || 0) + '" data-name="' + esc(eq.name) + '">' +
+                            esc(eq.name) + (eq.type ? ' (' + esc(eq.type) + ')' : '') + '</option>';
+                    }).join('');
+                formHTML +=
+                    '<div class="form-group">' +
+                        '<label class="form-label">Equipment Used <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
+                        '<div id="equipmentEntryList" style="margin-bottom:12px"></div>' +
+                        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                            '<select class="form-control" id="teEquipmentSelect" style="flex:1;min-width:160px">' + eqOptions + '</select>' +
+                            '<input class="form-control" type="number" id="teEquipmentHours" placeholder="Hours" step="0.25" min="0.25" style="width:90px">' +
+                            '<button type="button" class="btn btn-secondary" id="addEquipmentEntryBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
+                        '</div>' +
+                    '</div>';
+            }
 
             // Photos
             formHTML +=
@@ -467,6 +488,49 @@ window.WorkerTimeEntry = {
                     totalDiv.textContent = 'Total: $' + total.toFixed(2);
                     list.appendChild(totalDiv);
                 }
+            }
+
+            // Equipment entry handlers
+            if (form.querySelector('#addEquipmentEntryBtn')) {
+                function renderEquipmentList() {
+                    var list = form.querySelector('#equipmentEntryList');
+                    if (!list) return;
+                    list.innerHTML = '';
+                    selectedEquipment.forEach(function(entry, idx) {
+                        var div = document.createElement('div');
+                        div.style.cssText = 'padding:8px;background:rgba(52,152,219,.08);border:1px solid rgba(52,152,219,.2);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center';
+                        div.innerHTML =
+                            '<div>' +
+                                '<strong>' + esc(entry.equipmentName) + '</strong>' +
+                                '<span style="color:var(--text2);font-size:.85rem;margin-left:8px">' + entry.hours + ' hr</span>' +
+                                '<span style="color:var(--text2);font-size:.75rem;margin-left:8px">Cost: $' + (entry.costRate * entry.hours).toFixed(2) + ' · Revenue: $' + (entry.chargeOutRate * entry.hours).toFixed(2) + '</span>' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
+                        div.querySelector('button').addEventListener('click', function() {
+                            selectedEquipment.splice(parseInt(this.dataset.idx), 1);
+                            renderEquipmentList();
+                        });
+                        list.appendChild(div);
+                    });
+                }
+
+                form.querySelector('#addEquipmentEntryBtn').addEventListener('click', function() {
+                    var sel = form.querySelector('#teEquipmentSelect');
+                    var hrs = parseFloat(form.querySelector('#teEquipmentHours').value);
+                    if (!sel.value) { Utils.showToast('Select equipment first', 'error'); return; }
+                    if (isNaN(hrs) || hrs <= 0) { Utils.showToast('Enter valid hours (e.g. 2, 0.5)', 'error'); return; }
+                    var opt = sel.options[sel.selectedIndex];
+                    selectedEquipment.push({
+                        equipmentId:    sel.value,
+                        equipmentName:  opt.dataset.name || opt.textContent,
+                        hours:          hrs,
+                        costRate:       parseFloat(opt.dataset.cost) || 0,
+                        chargeOutRate:  parseFloat(opt.dataset.charge) || 0
+                    });
+                    sel.value = '';
+                    form.querySelector('#teEquipmentHours').value = '';
+                    renderEquipmentList();
+                });
             }
 
             // Photos
@@ -598,10 +662,42 @@ window.WorkerTimeEntry = {
                         status: 'Pending',
                         submittedAt: new Date().toISOString(),
                         rejectionReason: null,
-                        entryMethod: mode === 'clockin' ? 'Clock In/Out' : 'Manual Entry'
+                        entryMethod: mode === 'clockin' ? 'Clock In/Out' : 'Manual Entry',
+                        equipmentEntries: selectedEquipment.map(function(e) {
+                            return {
+                                equipmentId:   e.equipmentId,
+                                equipmentName: e.equipmentName,
+                                hours:         e.hours,
+                                costRate:      e.costRate,
+                                chargeOutRate: e.chargeOutRate
+                            };
+                        })
                     };
 
                     AppData.saveSubmission(submission);
+
+                    // Save individual equipment log records (for project costing rollup)
+                    if (AppData.saveEquipmentLog && selectedEquipment.length > 0) {
+                        selectedEquipment.forEach(function(e) {
+                            AppData.saveEquipmentLog({
+                                id:            AppData.generateId(),
+                                submissionId:  submissionId,
+                                equipmentId:   e.equipmentId,
+                                equipmentName: e.equipmentName,
+                                projectId:     projectId,
+                                workerId:      worker.id,
+                                workerName:    worker.name,
+                                date:          dateValue,
+                                hours:         e.hours,
+                                costRate:      e.costRate,
+                                chargeOutRate: e.chargeOutRate,
+                                cost:          Math.round(e.hours * e.costRate * 100) / 100,
+                                revenue:       Math.round(e.hours * e.chargeOutRate * 100) / 100,
+                                createdAt:     new Date().toISOString()
+                            });
+                        });
+                    }
+
                     if (isWizardMode) AppData.setData('worker_wizard_done_' + worker.id, true);
                     showSuccess();
 

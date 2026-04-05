@@ -286,6 +286,7 @@ window.AdminUsers = {
                                 <label>Role *</label>
                                 <select class="form-control" name="role">
                                     <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
+                                    <option value="Supervisor" ${worker && worker.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
                                     <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
                                 </select>
                             </div>
@@ -547,9 +548,11 @@ window.AdminUsers = {
             if (step === 0) {
                 html += '<p style="color:var(--text2);margin-bottom:12px">What is the worker\'s name and role?</p>' +
                     '<div class="form-group" style="margin-bottom:12px"><label>Worker Name *</label><input id="wiz-name" value="' + esc(overlay._wizData.name || '') + '" required></div>' +
-                    '<div class="form-group" style="margin-bottom:12px"><label>Role</label><select id="wiz-role">' +
-                    '<option value="Worker"' + (overlay._wizData.role !== 'Approver' ? ' selected' : '') + '>Worker</option>' +
-                    '<option value="Approver"' + (overlay._wizData.role === 'Approver' ? ' selected' : '') + '>Approver</option></select></div>';
+                    '<div class="form-group" style="margin-bottom:4px"><label>Role</label><select id="wiz-role">' +
+                    '<option value="Worker"' + (!overlay._wizData.role || overlay._wizData.role === 'Worker' ? ' selected' : '') + '>Worker</option>' +
+                    '<option value="Supervisor"' + (overlay._wizData.role === 'Supervisor' ? ' selected' : '') + '>Supervisor</option>' +
+                    '<option value="Approver"' + (overlay._wizData.role === 'Approver' ? ' selected' : '') + '>Approver</option></select></div>' +
+                    '<p style="font-size:.75rem;color:var(--text2);margin:0 0 12px"><strong>Supervisor</strong> — can log equipment utilization on time entries in addition to regular time.</p>';
             } else if (step === 1) {
                 html += '<p style="color:var(--text2);margin-bottom:12px">Set a PIN for this worker to log in with, and enter their hourly rates.</p>' +
                     '<div class="form-group" style="margin-bottom:12px"><label>PIN (4-6 digits) *</label>' +

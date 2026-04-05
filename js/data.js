@@ -455,6 +455,24 @@ function getEstimate(id) { return getById('estimates', id); }
 function saveEstimate(e) { return save('estimates', e); }
 function deleteEstimate(id) { remove('estimates', id); }
 
+// ─── Equipment ─────────────────────────────────────────────────────────────
+function getEquipment() { return getAll('equipment'); }
+function getEquipmentItem(id) { return getById('equipment', id); }
+function saveEquipment(e) { return save('equipment', e); }
+function deleteEquipment(id) { remove('equipment', id); }
+
+// ─── Equipment Logs ────────────────────────────────────────────────────────
+// Each log entry records equipment used during a time submission.
+// Fields: submissionId, equipmentId, equipmentName, projectId, workerId, date, hours, costRate, chargeOutRate, cost, revenue
+function getEquipmentLogs(projectId) {
+    return projectId
+        ? getAll('equipmentLogs').filter(function(l) { return l.projectId === projectId; })
+        : getAll('equipmentLogs');
+}
+function getEquipmentLog(id) { return getById('equipmentLogs', id); }
+function saveEquipmentLog(l) { return save('equipmentLogs', l); }
+function deleteEquipmentLog(id) { remove('equipmentLogs', id); }
+
 
 // ─── Invoices ──────────────────────────────────────────────────────────────
 function getInvoices(projectId) { return projectId ? getAll('invoices').filter(function(i) { return i.projectId === projectId; }) : getAll('invoices'); }
@@ -759,6 +777,10 @@ window.AppData = {
     getInvites, getInvite, saveInvite, deleteInvite,
     // Estimates
     getEstimates, getEstimate, saveEstimate, deleteEstimate,
+    // Equipment
+    getEquipment, getEquipmentItem, saveEquipment, deleteEquipment,
+    // Equipment Logs
+    getEquipmentLogs, getEquipmentLog, saveEquipmentLog, deleteEquipmentLog,
     // Backup
     exportAllData, importAllData, getLastBackupDate, setLastBackupDate, shouldRemindBackup
 };

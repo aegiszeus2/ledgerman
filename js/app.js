@@ -969,6 +969,7 @@
                 item('vendors',        '🏢', 'Vendors',      'Vendors — suppliers & subcontractors'),
                 item('clients',        '👥', 'Clients',      'Clients — your client address book'),
                 item('users',          '👷', 'Workers',      'Workers — manage team & PINs'),
+                item('equipment',     '🔧', 'Equipment',    'Equipment — manage tools & machinery rates'),
                 item('photos',         '📸', 'Photos',       'Photos — job site photo log'),
                 item('reports',        '📈', 'Reports',      'Reports — cost, labour & invoice summaries'),
                 // ── Module-gated Tier 3 ────────────────────────────────────
@@ -1158,6 +1159,9 @@
                     break;
                 case 'users':
                     if (window.AdminUsers) AdminUsers.render(content, params);
+                    break;
+                case 'equipment':
+                    if (window.AdminEquipment) AdminEquipment.render(content, params);
                     break;
                 case 'photos':
                     if (window.AdminPhotos) AdminPhotos.render(content, params);
