@@ -146,12 +146,15 @@ window.AIAssistant = (function () {
         _setThinking(true);
         _pending = true;
 
-        // Always use local relay — AI PM runs on Lucas's machine via claude CLI
-        var localRelay = 'http://localhost:9999/ledgerman-pm';
+        var token = sessionStorage.getItem('ledgeman_jwt') || '';
+        var apiBase = (window.AppData && AppData.API_BASE) || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgerman-backend.onrender.com');
 
-        fetch(localRelay, {
+        fetch(apiBase + '/api/ai/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
             body: JSON.stringify({
                 message: msgText,
                 history: _history.slice(-12),
@@ -503,6 +506,9 @@ window.AIAssistant = (function () {
             setTimeout(_maybeInit, 2000);
             return;
         }
+        // Check if AI assistant module is enabled for this company
+        var modules = window.AppData && AppData.getSettings ? AppData.getSettings().modules : null;
+        if (modules && modules['ai_assistant'] === false) return; // disabled by superadmin
         // Admin logged in — show the FAB
         if (window.AIAssistant && !document.getElementById('aiAssistantFab')) {
             AIAssistant.init();
