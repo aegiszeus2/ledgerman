@@ -62,7 +62,7 @@ window.AdminDailyReports = {
                         <button class="btn-secondary btn-sm" id="refreshReportsBtn">↻ Refresh</button>
                     </div>
                 </div>
-                <p style="color:#666;margin:0">Site summaries submitted by workers (crew count, hours, expenses, issues, photos)</p>
+                <p style="color:#b0c4de;margin:0">Site summaries submitted by workers (crew count, hours, expenses, issues, photos)</p>
             </div>
 
             <!-- Summary Cards -->
@@ -84,20 +84,20 @@ window.AdminDailyReports = {
             <!-- Filters -->
             <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
                 <div>
-                    <label style="font-size:0.85em;color:#666;display:block;margin-bottom:4px">Status:</label>
+                    <label style="font-size:0.85em;color:#b0c4de;display:block;margin-bottom:4px">Status:</label>
                     <select id="statusFilter" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                         ${statuses.map(s => `<option value="${s}" ${self._filterStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
                     </select>
                 </div>
                 <div>
-                    <label style="font-size:0.85em;color:#666;display:block;margin-bottom:4px">Project:</label>
+                    <label style="font-size:0.85em;color:#b0c4de;display:block;margin-bottom:4px">Project:</label>
                     <select id="projectFilter" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                         <option value="All">All Projects</option>
                         ${projects.map(p => `<option value="${p.id}" ${self._filterProject === p.id ? 'selected' : ''}>${Utils.escapeHtml(p.name)}</option>`).join('')}
                     </select>
                 </div>
                 <div>
-                    <label style="font-size:0.85em;color:#666;display:block;margin-bottom:4px">Sort:</label>
+                    <label style="font-size:0.85em;color:#b0c4de;display:block;margin-bottom:4px">Sort:</label>
                     <select id="sortBySelect" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                         <option value="date" ${self._sortBy === 'date' ? 'selected' : ''}>Date (Newest)</option>
                         <option value="project" ${self._sortBy === 'project' ? 'selected' : ''}>Project Name</option>
@@ -131,7 +131,7 @@ window.AdminDailyReports = {
                                 <tr style="border-bottom:1px solid #e0e0e0">
                                     <td style="padding:12px;font-size:0.9em">
                                         <div style="font-weight:500">${dateStr}</div>
-                                        <div style="color:#999;font-size:0.85em">${timeStr}</div>
+                                        <div style="color:#94a9c4;font-size:0.85em">${timeStr}</div>
                                     </td>
                                     <td style="padding:12px">
                                         ${Utils.escapeHtml(r.projectName || 'N/A')}
@@ -159,7 +159,7 @@ window.AdminDailyReports = {
                             `;
                         }).join('') : `
                             <tr>
-                                <td colspan="7" style="padding:32px;text-align:center;color:#999">
+                                <td colspan="7" style="padding:32px;text-align:center;color:#94a9c4">
                                     No daily reports yet. Workers can submit reports from the worker portal or daily-report.html.
                                 </td>
                             </tr>
@@ -282,7 +282,7 @@ window.AdminDailyReports = {
                 <div style="margin-bottom:20px">
                     <button class="btn-secondary btn-sm" id="backBtn" style="margin-bottom:12px">← Back to Reports</button>
                     <h2>${dateStr}</h2>
-                    <p style="color:#666;margin:4px 0 0">${Utils.escapeHtml(project ? project.name : report.projectName || 'Unknown Project')}</p>
+                    <p style="color:#b0c4de;margin:4px 0 0">${Utils.escapeHtml(project ? project.name : report.projectName || 'Unknown Project')}</p>
                 </div>
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">

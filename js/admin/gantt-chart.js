@@ -11,8 +11,8 @@ window.AdminGanttChart = {
 
         if (projects.length === 0) {
             container.innerHTML = `
-                <div style="padding:32px;text-align:center;color:#333">
-                    <h2 style="color:#111">No projects to visualize</h2>
+                <div style="padding:32px;text-align:center;color:#f1f5f9">
+                    <h2 style="color:#f1f5f9">No projects to visualize</h2>
                     <p>Create projects first to view them on the Gantt chart.</p>
                 </div>
             `;
@@ -28,7 +28,7 @@ window.AdminGanttChart = {
         const selectedProject = AppData.getProject(selectedProjectId);
 
         if (!selectedProject) {
-            container.innerHTML = `<div style="padding:32px;text-align:center;color:#333;font-weight:600">Project not found</div>`;
+            container.innerHTML = `<div style="padding:32px;text-align:center;color:#f1f5f9;font-weight:600">Project not found</div>`;
             return;
         }
 
@@ -79,7 +79,7 @@ window.AdminGanttChart = {
                     <h2 style="color:#111">Project Timeline</h2>
                     <button class="btn-secondary btn-sm" id="refreshGanttBtn">↻ Refresh</button>
                 </div>
-                <p style="color:#333;margin:0">Visual project schedule with task progress</p>
+                <p style="color:#b0c4de;margin:0">Visual project schedule with task progress</p>
             </div>
 
             <!-- Project Selector -->
@@ -94,7 +94,7 @@ window.AdminGanttChart = {
                 </select>
                 <div style="flex:1;border-left:2px solid #aaa;padding-left:12px">
                     <strong style="color:#111">${Utils.escapeHtml(selectedProject.name)}</strong>
-                    <div style="font-size:0.85em;color:#333;margin-top:2px">
+                    <div style="font-size:0.85em;color:#94a9c4;margin-top:2px">
                         ${projectTasks.length} task${projectTasks.length !== 1 ? 's' : ''}
                         &nbsp;•&nbsp; Status: ${selectedProject.status || 'Active'}
                     </div>
@@ -180,7 +180,7 @@ window.AdminGanttChart = {
                 }
             } else {
                 document.getElementById(chartId).innerHTML = `
-                    <div style="padding:32px;text-align:center;color:#333;font-weight:600">
+                    <div style="padding:32px;text-align:center;color:#f1f5f9;font-weight:600">
                         <p>Gantt chart library not loaded. Please refresh the page.</p>
                     </div>
                 `;

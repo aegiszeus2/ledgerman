@@ -533,8 +533,25 @@ textarea.form-control {
 }
 
 .modal {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  /* Light surface — redefine all theme vars to light values so inline
+     styles using var(--text), var(--bg) etc. auto-resolve correctly */
+  --text: #1a1a2e;
+  --text2: #4b5563;
+  --text-primary: #1a1a2e;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --bg: #f8f9fa;
+  --bg-secondary: #f5f6f8;
+  --bg-tertiary: #e8ecf0;
+  --bg-surface: #f0f4f8;
+  --bg-input: #ffffff;
+  --card: #ffffff;
+  --border: #d1d5db;
+  --border-color: #d1d5db;
+  --border-color-light: #e5e7eb;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #1a1a2e;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
   width: 100%;
@@ -555,7 +572,7 @@ textarea.form-control {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-5);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .modal-header h3 {
@@ -574,8 +591,13 @@ textarea.form-control {
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #e5e7eb;
 }
+
+/* Modal typography — ensure legible on white modal surface */
+.modal h2, .modal h3, .modal h4 { color: #1a1a2e; }
+.modal p, .modal label { color: #374151; }
+.modal .section-title { color: #1a1a2e; }
 
 /* --- Toast Notifications --- */
 .toast-container {

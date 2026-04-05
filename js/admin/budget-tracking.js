@@ -64,7 +64,7 @@ window.AdminBudgetTracking = {
                         <button class="btn-secondary btn-sm" id="refreshBudgetBtn">↻ Refresh</button>
                     </div>
                 </div>
-                <p style="color:#666;margin:0">Monitor project budgets vs. actual spending. Projects without budgets show $0.</p>
+                <p style="color:#b0c4de;margin:0">Monitor project budgets vs. actual spending. Projects without budgets show $0.</p>
             </div>
 
             <!-- Summary Cards -->
@@ -102,7 +102,7 @@ window.AdminBudgetTracking = {
 
             <!-- Sort Controls -->
             <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-                <label style="font-size:0.9em;color:#666">Sort by:</label>
+                <label style="font-size:0.9em;color:#b0c4de">Sort by:</label>
                 <select id="sortBySelect" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                     <option value="name" ${self._sortBy === 'name' ? 'selected' : ''}>Project Name</option>
                     <option value="budget" ${self._sortBy === 'budget' ? 'selected' : ''}>Budget (High→Low)</option>
@@ -137,7 +137,7 @@ window.AdminBudgetTracking = {
                                     <td style="padding:12px;text-align:left">
                                         <strong>${Utils.escapeHtml(d.name)}</strong>
                                     </td>
-                                    <td style="padding:12px;text-align:right;color:#333">$${d.budget.toFixed(2)}</td>
+                                    <td style="padding:12px;text-align:right;color:#f1f5f9">$${d.budget.toFixed(2)}</td>
                                     <td style="padding:12px;text-align:right;color:#e74c3c;font-weight:500">$${d.spent.toFixed(2)}</td>
                                     <td style="padding:12px;text-align:right;color:${d.variance >= 0 ? '#2ecc71' : '#e74c3c'};font-weight:500">
                                         ${d.variance >= 0 ? '+' : ''}$${d.variance.toFixed(2)}
@@ -155,7 +155,7 @@ window.AdminBudgetTracking = {
                             `;
                         }).join('') : `
                             <tr>
-                                <td colspan="6" style="padding:24px;text-align:center;color:#999">
+                                <td colspan="6" style="padding:24px;text-align:center;color:#94a9c4">
                                     No projects found
                                 </td>
                             </tr>

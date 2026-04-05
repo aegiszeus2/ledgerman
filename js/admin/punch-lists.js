@@ -62,7 +62,7 @@ window.AdminPunchLists = {
                         <button class="btn-primary" id="addItemBtn">+ Add Deficiency</button>
                     </div>
                 </div>
-                <p style="color:#666;margin:0">Track project deficiencies from identification to sign-off completion</p>
+                <p style="color:#b0c4de;margin:0">Track project deficiencies from identification to sign-off completion</p>
             </div>
 
             <!-- Summary Cards -->
@@ -84,20 +84,20 @@ window.AdminPunchLists = {
             <!-- Filters -->
             <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
                 <div>
-                    <label style="font-size:0.85em;color:#666;display:block;margin-bottom:4px">Project:</label>
+                    <label style="font-size:0.85em;color:#b0c4de;display:block;margin-bottom:4px">Project:</label>
                     <select id="projectFilter" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                         <option value="All">All Projects</option>
                         ${projects.map(p => `<option value="${p.id}" ${self._filterProject === p.id ? 'selected' : ''}>${Utils.escapeHtml(p.name)}</option>`).join('')}
                     </select>
                 </div>
                 <div>
-                    <label style="font-size:0.85em;color:#666;display:block;margin-bottom:4px">Status:</label>
+                    <label style="font-size:0.85em;color:#b0c4de;display:block;margin-bottom:4px">Status:</label>
                     <select id="statusFilter" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                         ${statuses.map(s => `<option value="${s}" ${self._filterStatus === s ? 'selected' : ''}>${s} (${statusCounts[s]})</option>`).join('')}
                     </select>
                 </div>
                 <div>
-                    <label style="font-size:0.85em;color:#666;display:block;margin-bottom:4px">Sort:</label>
+                    <label style="font-size:0.85em;color:#b0c4de;display:block;margin-bottom:4px">Sort:</label>
                     <select id="sortBySelect" style="padding:6px 8px;border-radius:4px;border:1px solid #ddd;font-size:0.9em">
                         <option value="priority" ${self._sortBy === 'priority' ? 'selected' : ''}>Priority (High→Low)</option>
                         <option value="status" ${self._sortBy === 'status' ? 'selected' : ''}>Status</option>
@@ -139,7 +139,7 @@ window.AdminPunchLists = {
                                 <tr style="border-bottom:1px solid #e0e0e0">
                                     <td style="padding:12px">
                                         <strong>${Utils.escapeHtml(item.description || 'Unnamed Item')}</strong>
-                                        ${item.notes ? `<div style="font-size:0.85em;color:#999;margin-top:4px">${Utils.escapeHtml(item.notes)}</div>` : ''}
+                                        ${item.notes ? `<div style="font-size:0.85em;color:#94a9c4;margin-top:4px">${Utils.escapeHtml(item.notes)}</div>` : ''}
                                     </td>
                                     <td style="padding:12px">
                                         ${Utils.escapeHtml(project ? project.name : 'Unknown')}
@@ -162,7 +162,7 @@ window.AdminPunchLists = {
                             `;
                         }).join('') : `
                             <tr>
-                                <td colspan="5" style="padding:32px;text-align:center;color:#999">
+                                <td colspan="5" style="padding:32px;text-align:center;color:#94a9c4">
                                     No deficiencies recorded. Create new items to track project issues.
                                 </td>
                             </tr>
