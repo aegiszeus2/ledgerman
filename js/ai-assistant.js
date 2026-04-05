@@ -314,8 +314,11 @@ window.AIAssistant = (function () {
             '  <span style="font-size:.78rem;color:var(--text2,#6b7280)">Thinking...</span>',
             '</div>',
             /* input row */
-            '<div style="padding:10px 12px;border-top:1px solid var(--border,#dde4e0);display:flex;gap:8px;align-items:flex-end;flex-shrink:0">',
-            '  <textarea id="aiChatInput" rows="1" placeholder="Tell me what to do..." style="flex:1;resize:none;border:1px solid var(--border,#dde4e0);border-radius:10px;padding:9px 12px;font-size:.875rem;font-family:inherit;line-height:1.4;outline:none;max-height:120px;overflow-y:auto;background:var(--surface,#fff);color:var(--text1,#1a1a1a)"></textarea>',
+            '<div style="padding:10px 12px;border-top:1px solid var(--border,#dde4e0);display:flex;gap:6px;align-items:flex-end;flex-shrink:0">',
+            '  <textarea id="aiChatInput" rows="1" placeholder="Type or speak..." style="flex:1;resize:none;border:1px solid var(--border,#dde4e0);border-radius:10px;padding:9px 12px;font-size:.875rem;font-family:inherit;line-height:1.4;outline:none;max-height:120px;overflow-y:auto;background:var(--surface,#fff);color:var(--text1,#1a1a1a)"></textarea>',
+            '  <button id="aiMicBtn" title="Voice input" style="flex-shrink:0;width:38px;height:38px;border-radius:50%;background:var(--surface2,#f0f4f0);border:1px solid var(--border,#dde4e0);color:var(--text2,#6b7280);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s">',
+            '    <svg id="aiMicIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+            '  </button>',
             '  <button id="aiSendBtn" style="flex-shrink:0;width:38px;height:38px;border-radius:50%;background:var(--primary,#1a6b3a);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .15s">',
             '    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
             '  </button>',
@@ -350,6 +353,88 @@ window.AIAssistant = (function () {
         inputEl.addEventListener('input', function () {
             inputEl.style.height = 'auto';
             inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+        });
+
+        // ── Mic / voice-to-text ──────────────────────────────────────────────
+        var _mediaRecorder = null;
+        var _audioChunks = [];
+        var _recording = false;
+
+        var micBtn = document.getElementById('aiMicBtn');
+        var micIcon = document.getElementById('aiMicIcon');
+
+        micBtn.addEventListener('click', function () {
+            if (_recording) {
+                // Stop recording
+                _mediaRecorder.stop();
+            } else {
+                // Start recording
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    _addMessage('assistant', '⚠️ Microphone not supported in this browser.');
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+                    _audioChunks = [];
+                    _mediaRecorder = new MediaRecorder(stream);
+
+                    _mediaRecorder.ondataavailable = function (e) {
+                        if (e.data && e.data.size > 0) _audioChunks.push(e.data);
+                    };
+
+                    _mediaRecorder.onstop = function () {
+                        // Stop all tracks to release mic
+                        stream.getTracks().forEach(function (t) { t.stop(); });
+
+                        // Reset mic button appearance
+                        _recording = false;
+                        micBtn.style.background = 'var(--surface2,#f0f4f0)';
+                        micBtn.style.color = 'var(--text2,#6b7280)';
+                        micBtn.title = 'Voice input';
+
+                        // Show transcribing state
+                        var inp = document.getElementById('aiChatInput');
+                        if (inp) inp.placeholder = 'Transcribing...';
+
+                        var mimeType = _mediaRecorder.mimeType || 'audio/webm';
+                        var blob = new Blob(_audioChunks, { type: mimeType });
+
+                        fetch('http://localhost:9999/transcribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': mimeType },
+                            body: blob
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (inp) inp.placeholder = 'Type or speak...';
+                            if (d.transcript) {
+                                if (inp) {
+                                    inp.value = d.transcript;
+                                    inp.style.height = 'auto';
+                                    inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+                                    inp.focus();
+                                }
+                            } else {
+                                _addMessage('assistant', '⚠️ Could not transcribe audio. Try again.');
+                            }
+                        })
+                        .catch(function () {
+                            if (inp) inp.placeholder = 'Type or speak...';
+                            _addMessage('assistant', '⚠️ Transcription service unreachable (localhost:9999).');
+                        });
+                    };
+
+                    _mediaRecorder.start();
+                    _recording = true;
+
+                    // Visual: mic button turns red while recording
+                    micBtn.style.background = '#dc2626';
+                    micBtn.style.color = '#fff';
+                    micBtn.title = 'Tap to stop recording';
+
+                }).catch(function (err) {
+                    _addMessage('assistant', '⚠️ Mic access denied: ' + err.message);
+                });
+            }
         });
 
         // Welcome message
