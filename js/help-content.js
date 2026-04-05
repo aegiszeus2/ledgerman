@@ -98,10 +98,10 @@ window.LedgermanHelp = {
         intro: 'Visualize your project schedule and task timelines.',
         steps: [
             'Select a project from the dropdown to load its task timeline.',
-            'Tasks with due dates appear as bars on the Gantt chart.',
-            'Bar length represents duration from creation to due date.',
-            'Tasks without due dates are not shown — set due dates in Task Assignment.',
-            'Use Task Assignment to add or edit tasks and their dates.'
+            'Tasks appear as bars — bar length is the duration from start date to due date.',
+            'Tasks without a start or due date default to a 7-day bar from today.',
+            'Set start dates and due dates in Task Assignment to get accurate bars.',
+            'Use Task Assignment to add, edit, or reassign tasks.'
         ]
     },
 
@@ -110,11 +110,11 @@ window.LedgermanHelp = {
         intro: 'Review and approve time entries submitted by workers.',
         steps: [
             'Pending submissions appear here once workers submit their time.',
-            'Click a submission row to expand the details — hours, project, and any expenses.',
+            'Click a submission row to expand the details — hours, project, notes, expenses, and any site photos.',
             'Click "Approve" to accept the submission. It will be included in reports and invoices.',
             'Click "Reject" to send it back to the worker with a reason.',
             'Approved time flows into the Reports and Invoices modules automatically.',
-            'The badge on the nav item shows the number of pending approvals.'
+            'Switch between Pending, Approved, and Rejected tabs to review all submissions.'
         ]
     },
 
@@ -122,12 +122,12 @@ window.LedgermanHelp = {
         title: 'Invoices',
         intro: 'Create and track client invoices for completed work.',
         steps: [
-            'Click "+ New Invoice" to create an invoice — select the client and project.',
-            'Add line items manually or pull from approved time entries.',
+            'Before creating an invoice, make sure the project has expenses logged — invoices are built from billable expenses.',
+            'Click "+ Create Invoice" to launch the invoice wizard — only projects with uninvoiced billable expenses will appear.',
+            'Work through the wizard: select project, choose expenses, set billing period, review totals, and save.',
+            'HST and holdback are calculated automatically based on your company settings.',
             'Set the invoice status: Draft → Sent → Paid.',
-            'Click "Send" to mark it as sent (email sending coming soon).',
-            'Record payments against an invoice using the "Add Payment" button.',
-            'The outstanding balance updates automatically as payments are recorded.'
+            'Record payments against an invoice using the "Record Payment" button — the outstanding balance updates automatically.'
         ]
     },
 
@@ -137,7 +137,7 @@ window.LedgermanHelp = {
         steps: [
             'The header shows the invoice number, client, project, and current status.',
             'Line items are listed below — each shows description, quantity, rate, and amount.',
-            'The totals section shows subtotal, HST, and amount due.',
+            'The totals section shows subtotal, HST, holdback (if applicable), and amount due.',
             'Click "Add Payment" to record a payment — the outstanding balance updates automatically.',
             'Click "Send" to mark the invoice as sent to the client.',
             'Use the Print button to generate a PDF-ready invoice.'
@@ -146,14 +146,14 @@ window.LedgermanHelp = {
 
     'invoice-create': {
         title: 'Create Invoice',
-        intro: 'Build a new invoice for a client from approved time and expenses.',
+        intro: 'Build a new invoice from billable expenses logged against a project.',
         steps: [
-            'Select the client and project from the dropdowns.',
-            'Add line items — enter description, quantity, and unit rate for each.',
-            'Click "Pull from Approved Time" to auto-populate from logged hours.',
-            'Set the HST rate — it defaults to your company setting.',
-            'Review the totals, then click Save as Draft or Send.',
-            'You can edit the invoice again any time while it\'s in Draft status.'
+            'Invoices are generated from expenses — log expenses against a project first (Expenses module).',
+            'Select the project — only projects with uninvoiced billable expenses appear in the list.',
+            'Choose which expenses to include as line items on this invoice.',
+            'Set the billing period, invoice date, payment terms, and notes.',
+            'HST and holdback rates default to your company settings — adjust per invoice if needed.',
+            'Review the totals, then save as Draft or mark as Sent.'
         ]
     },
 
@@ -231,12 +231,13 @@ window.LedgermanHelp = {
 
     'expenses-review': {
         title: 'Expenses Review',
-        intro: 'Review and approve worker-submitted expense claims.',
+        intro: 'Review worker-submitted expenses and classify them as billable or non-billable.',
         steps: [
+            'Use the filters at the top to narrow by project, category, vendor, or billable status.',
             'Select one or more expenses using the checkboxes on the left.',
-            'Click "Approve Selected" to approve in bulk, or open individual records to review.',
-            'Rejected expenses are sent back to the worker with a reason.',
-            'Approved expenses are included in budget tracking and invoices.'
+            'Click "Mark Billable" to flag selected expenses for invoicing, or "Mark Non-Billable" to exclude them.',
+            'Billable expenses flow into the invoice creation wizard automatically.',
+            'Click any expense row to view the full detail including receipt photo if attached.'
         ]
     },
 
@@ -245,7 +246,7 @@ window.LedgermanHelp = {
         intro: 'Manage your field crew accounts and PINs.',
         steps: [
             'Click "+ Add Worker" to create a new worker account.',
-            'Set the worker\'s name, role, and a 4-digit PIN for field login.',
+            'Set the worker\'s name, role, and a 4–6 digit PIN for field login.',
             'Workers log in from the Worker Portal using the company name, their name, and PIN — no email needed.',
             'Deactivate a worker to block their login without deleting their history.',
             'Use "Send Invite" to invite workers who need email-based accounts.'
@@ -317,10 +318,10 @@ window.LedgermanHelp = {
         title: 'My History',
         intro: 'View all your past time entries and their status.',
         steps: [
-            'Approved entries are shown in green.',
-            'Rejected entries show in red with the rejection reason — tap to resubmit.',
+            'Approved entries are shown in green — hours and project are visible on each card.',
+            'Rejected entries show in red with the rejection reason — tap "Resubmit" to correct and resend.',
             'Pending entries are waiting for your supervisor\'s review.',
-            'Tap any entry to see the full details including expenses and photos.'
+            'Use the filter tabs (All / Pending / Approved / Rejected) to sort your history.'
         ]
     },
 

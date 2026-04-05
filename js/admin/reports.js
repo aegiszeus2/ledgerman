@@ -644,7 +644,7 @@ window.AdminReports = {
 
         content.querySelector('#lnrPrint').addEventListener('click', function() { window.print(); });
 
-        content.querySelector('#lnrRun').addEventListener('click', function() {
+        content.querySelector('#lnrRun').addEventListener('click', async function() {
             const projectId = content.querySelector('#lnrProject').value;
             const fromDate = content.querySelector('#lnrFrom').value;
             const toDate = content.querySelector('#lnrTo').value;
@@ -653,7 +653,7 @@ window.AdminReports = {
 
             // Gather data
             const allSubmissions = AppData.getSubmissions().filter(function(s) {
-                if (s.status !== 'approved') return false;
+                if ((s.status || '').toLowerCase() !== 'approved') return false;
                 const d = (s.date || s.createdAt || '').slice(0, 10);
                 if (fromDate && d < fromDate) return false;
                 if (toDate && d > toDate) return false;
@@ -663,7 +663,25 @@ window.AdminReports = {
 
             const allExpenses = AppData.getExpenses();
             const allWorkers = AppData.getWorkers();
-            const allPhotos = AppData.getPhotos ? AppData.getPhotos() : [];
+            // Build submissionId → [{src, filename}] map from IndexedDB photos
+            const allPhotos = {};
+            try {
+                const rawPhotos = await AppData.getAllPhotos();
+                rawPhotos.forEach(function(ph) {
+                    const sid = ph.submissionId;
+                    if (!sid) return;
+                    if (!allPhotos[sid]) allPhotos[sid] = [];
+                    var src = '';
+                    if (ph.thumbnail instanceof Blob) {
+                        src = URL.createObjectURL(ph.thumbnail);
+                    } else if (ph.blob instanceof Blob) {
+                        src = URL.createObjectURL(ph.blob);
+                    } else {
+                        src = ph.dataUrl || ph.url || ph.thumbnail || '';
+                    }
+                    allPhotos[sid].push({ src: src, filename: ph.filename || '' });
+                });
+            } catch(e) { console.warn('[LNR] photos load failed:', e); }
 
             // Group: project → date → submissions
             const grouped = {};
@@ -718,7 +736,7 @@ window.AdminReports = {
                         });
 
                         // Photos linked to submission
-                        const subPhotos = allPhotos.filter(function(ph) { return ph.submissionId === s.id; });
+                        const subPhotos = allPhotos[s.id] || [];
 
                         html += '<div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:8px">' +
                             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
@@ -752,8 +770,7 @@ window.AdminReports = {
                             html += '<div style="margin-top:6px"><strong style="font-size:.85rem;color:#555">Site Photos (' + subPhotos.length + '):</strong>' +
                                 '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
                             subPhotos.slice(0, 6).forEach(function(ph) {
-                                const src = ph.dataUrl || ph.url || ph.thumbnail || '';
-                                if (src) html += '<img src="' + src + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb">';
+                                if (ph.src) html += '<img src="' + ph.src + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb">';
                             });
                             html += '</div></div>';
                         }

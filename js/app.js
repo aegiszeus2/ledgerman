@@ -1139,13 +1139,13 @@
                     if (window.AdminInvoices) AdminInvoices.renderDetail(content, params.invoiceId);
                     break;
                 case 'invoice-create':
+                    if (window.AdminInvoices) AdminInvoices.renderCreate(content, params);
+                    break;
                 case 'estimates':
                     if (window.AdminEstimates) AdminEstimates.render(content, params);
                     break;
                 case 'estimate-detail':
                     if (window.AdminEstimates) AdminEstimates.renderDetail(content, params.estimateId, params);
-                    break;
-                    if (window.AdminInvoices) AdminInvoices.renderCreate(content, params);
                     break;
                 case 'users':
                     if (window.AdminUsers) AdminUsers.render(content, params);
