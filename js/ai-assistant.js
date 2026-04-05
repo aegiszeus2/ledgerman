@@ -146,15 +146,12 @@ window.AIAssistant = (function () {
         _setThinking(true);
         _pending = true;
 
-        var token = sessionStorage.getItem('ledgeman_jwt') || '';
-        var apiBase = AppData.API_BASE || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgerman-backend.onrender.com');
+        // Always use local relay — AI PM runs on Lucas's machine via claude CLI
+        var localRelay = 'http://localhost:9999/ledgerman-pm';
 
-        fetch(apiBase + '/api/ai/chat', {
+        fetch(localRelay, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: msgText,
                 history: _history.slice(-12),
