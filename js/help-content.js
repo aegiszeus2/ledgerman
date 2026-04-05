@@ -350,10 +350,10 @@ Utils.showHelpModal = function(route) {
     if (existing) existing.remove();
 
     const stepsHtml = help.steps.map((step, i) => `
-        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border,#e5e7eb)">
+        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #e5e7eb">
             <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--primary,#0066cc);color:#fff;
                         display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700">${i + 1}</div>
-            <div style="padding-top:3px;color:var(--text,#111);font-size:.95rem;line-height:1.5">${step}</div>
+            <div style="padding-top:3px;color:#111111;font-size:.95rem;line-height:1.5">${step}</div>
         </div>
     `).join('');
 
@@ -361,14 +361,14 @@ Utils.showHelpModal = function(route) {
     overlay.id = 'helpModalOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
     overlay.innerHTML = `
-        <div style="background:#fff;border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-            <div style="padding:20px 20px 16px;border-bottom:1px solid var(--border,#e5e7eb);display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="background:#ffffff;border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+            <div style="padding:20px 20px 16px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:flex-start">
                 <div>
-                    <div style="font-size:.75rem;font-weight:600;color:var(--primary,#0066cc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">How To Use</div>
-                    <h3 style="margin:0;font-size:1.15rem;font-weight:700;color:var(--text,#111)">${help.title}</h3>
-                    <p style="margin:6px 0 0;font-size:.9rem;color:var(--text2,#666)">${help.intro}</p>
+                    <div style="font-size:.75rem;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">How To Use</div>
+                    <h3 style="margin:0;font-size:1.15rem;font-weight:700;color:#111111">${help.title}</h3>
+                    <p style="margin:6px 0 0;font-size:.9rem;color:#333333">${help.intro}</p>
                 </div>
-                <button id="helpModalClose" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#999;padding:0 0 0 12px;line-height:1">×</button>
+                <button id="helpModalClose" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#333333;padding:0 0 0 12px;line-height:1">×</button>
             </div>
             <div style="padding:8px 20px 20px">
                 ${stepsHtml}
