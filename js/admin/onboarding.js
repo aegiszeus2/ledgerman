@@ -69,7 +69,7 @@ window.LedgermanOnboarding = {
             icon: '🎉',
             title: "You're Ready",
             subtitle: 'Start managing your first project',
-            body: 'That\'s the core of Ledgerman. Create a project, invite your workers, let them log time, approve it, and invoice your client. Everything is saved securely and syncs across devices. Tap <strong>Advanced Guide</strong> below to explore the full platform — or jump straight in.',
+            body: 'That\'s the core of Ledgerman. Create a project, invite your workers, let them log time, approve it, and invoice your client. Everything is saved securely and syncs across devices. Tap <strong>Advanced Guide</strong> below to explore the full platform — or jump straight in. — or jump straight in.',
             action: { label: 'Create First Project', route: 'projects' },
             switchToAdvanced: true
         }
@@ -214,7 +214,7 @@ window.LedgermanOnboarding = {
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
                         <button id="onboardNoviceBtn" style="border:2px solid #e5e7eb;border-radius:12px;padding:20px 14px;background:#fff;cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">🌱</div>
-                            <div style="font-weight:700;color:#1a1a2e;font-size:.95rem;margin-bottom:4px">Novice PM</div>
+                            <div style="font-weight:700;color:#1a1a2e;font-size:.95rem;margin-bottom:4px">Basic PM</div>
                             <div style="font-size:.8rem;color:#888;line-height:1.4">New to Ledgerman? Learn the essentials — projects, workers, time, and invoicing in 10 steps.</div>
                         </button>
                         <button id="onboardAdvancedBtn" style="border:2px solid #e5e7eb;border-radius:12px;padding:20px 14px;background:#fff;cursor:pointer;text-align:center;transition:all .2s">
@@ -264,7 +264,7 @@ window.LedgermanOnboarding = {
         const progressPct = Math.round(((index + 1) / total) * 100);
 
         const levelColor = level === 'novice' ? '#10b981' : '#6366f1';
-        const levelLabel = level === 'novice' ? '🌱 Novice Guide' : '⚡ Advanced Guide';
+        const levelLabel = level === 'novice' ? '🌱 Basic Guide' : '⚡ Advanced Guide';
 
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
@@ -279,7 +279,7 @@ window.LedgermanOnboarding = {
         if (step.switchToAdvanced) {
             switchBtnHtml = `<button id="tourSwitchBtn" style="margin-top:8px;width:100%;padding:10px;border:2px solid #6366f1;background:none;border-radius:8px;color:#6366f1;font-weight:600;font-size:.88rem;cursor:pointer">⚡ Switch to Advanced Guide</button>`;
         } else if (step.switchToNovice) {
-            switchBtnHtml = `<button id="tourSwitchBtn" style="margin-top:8px;width:100%;padding:10px;border:2px solid #10b981;background:none;border-radius:8px;color:#10b981;font-weight:600;font-size:.88rem;cursor:pointer">🌱 View Novice Guide</button>`;
+            switchBtnHtml = `<button id="tourSwitchBtn" style="margin-top:8px;width:100%;padding:10px;border:2px solid #10b981;background:none;border-radius:8px;color:#10b981;font-weight:600;font-size:.88rem;cursor:pointer">🌱 View Basic Guide</button>`;
         }
 
         overlay.innerHTML = `
