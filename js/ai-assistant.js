@@ -519,28 +519,52 @@ window.AIAssistant = (function () {
     };
 }());
 
-// Auto-init after DOM ready — listen for login success via App.currentUser
+// Auto-init — show FAB only for admin, hide/remove for workers
 (function () {
-    function _maybeInit() {
-        // Only show for admin users (not worker portal)
+    function _removeFab() {
+        var fab = document.getElementById('aiAssistantFab');
+        if (fab) fab.remove();
+        var panel = document.getElementById('aiAssistantWidget');
+        if (panel) panel.remove();
+    }
+
+    function _checkUser() {
         var user = window.App && App.currentUser;
-        if (!user || user.type === 'worker') {
-            // Not logged in yet — retry after a short delay
-            setTimeout(_maybeInit, 2000);
+
+        // Not logged in yet — keep waiting
+        if (!user) {
+            setTimeout(_checkUser, 1500);
             return;
         }
-        // Check if AI assistant module is enabled for this company
+
+        // Worker portal — remove button and stop
+        if (user.type === 'worker') {
+            _removeFab();
+            // Keep polling in case user logs out and admin logs back in
+            setTimeout(_checkUser, 3000);
+            return;
+        }
+
+        // Admin — check module flag
         var modules = window.AppData && AppData.getSettings ? AppData.getSettings().modules : null;
-        if (modules && modules['ai_assistant'] === false) return; // disabled by superadmin
-        // Admin logged in — show the FAB
+        if (modules && modules['ai_assistant'] === false) {
+            _removeFab();
+            setTimeout(_checkUser, 3000);
+            return;
+        }
+
+        // Admin with module enabled — show FAB
         if (window.AIAssistant && !document.getElementById('aiAssistantFab')) {
             AIAssistant.init();
         }
+
+        // Keep polling to catch logout → worker login
+        setTimeout(_checkUser, 3000);
     }
-    // Start checking after app has had time to init
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { setTimeout(_maybeInit, 1500); });
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(_checkUser, 1500); });
     } else {
-        setTimeout(_maybeInit, 1500);
+        setTimeout(_checkUser, 1500);
     }
 }());
