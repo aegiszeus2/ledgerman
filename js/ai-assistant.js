@@ -18,21 +18,50 @@ window.AIAssistant = (function () {
     // ── Build context snapshot to send with each message ────────────────────
     function _buildContext() {
         var ctx = {};
+
+        // Projects
         try {
             ctx.projects = (AppData.getProjects() || []).map(function (p) {
-                return { id: p.id, name: p.name, status: p.status, client: p.client };
+                return { id: p.id, projectNumber: p.projectNumber, name: p.name, status: p.status,
+                         client: p.clientName || p.client, budget: p.budget || 0,
+                         startDate: p.startDate, endDate: p.endDate };
             });
         } catch (e) { ctx.projects = []; }
+
+        // Workers (active only)
         try {
             ctx.workers = (AppData.getWorkers() || []).filter(function (w) { return w.status === 'Active'; }).map(function (w) {
                 return { id: w.id, name: w.name, role: w.role, payRate: w.payRate, costRate: w.costRate };
             });
         } catch (e) { ctx.workers = []; }
+
+        // Tasks
         try {
             ctx.tasks = (AppData.getTasks() || []).map(function (t) {
-                return { id: t.id, title: t.title || t.name, projectId: t.projectId, status: t.status, assigned_to_worker_name: t.assigned_to_worker_name };
+                return { id: t.id, title: t.title || t.name, projectId: t.projectId,
+                         status: t.status, assigned_to_worker_name: t.assigned_to_worker_name,
+                         due_date: t.due_date || t.dueDate };
             });
         } catch (e) { ctx.tasks = []; }
+
+        // Work items
+        try {
+            ctx.workItems = (AppData.getSubtasks ? AppData.getSubtasks() : []).map(function (wi) {
+                return { id: wi.id, name: wi.name, projectId: wi.projectId,
+                         unitOfMeasure: wi.unitOfMeasure, budgetedQty: wi.budgetedQty,
+                         budgetedCost: wi.budgetedCost };
+            });
+        } catch (e) { ctx.workItems = []; }
+
+        // Equipment
+        try {
+            ctx.equipment = (AppData.getEquipment ? AppData.getEquipment() : []).map(function (eq) {
+                return { id: eq.id, name: eq.name, type: eq.type,
+                         costRate: eq.costRate, chargeOutRate: eq.chargeOutRate,
+                         serviceIntervalHours: eq.serviceIntervalHours };
+            });
+        } catch (e) { ctx.equipment = []; }
+
         return ctx;
     }
 
@@ -113,11 +142,26 @@ window.AIAssistant = (function () {
                     AppData.saveSubtask(wi);
                     results.push('Created work item: ' + wi.name);
 
+                } else if (type === 'update_work_item') {
+                    var exWi = AppData.getSubtask ? AppData.getSubtask(data.id) : null;
+                    if (exWi) {
+                        AppData.saveSubtask(Object.assign({}, exWi, data, { updated_at: new Date().toISOString() }));
+                        results.push('Updated work item: ' + (data.name || exWi.name));
+                    }
+
                 } else if (type === 'navigate_to') {
                     var mod = data.module;
                     if (mod && window.App && App.navigate) {
                         setTimeout(function () { App.navigate(mod); }, 300);
                         results.push('Navigating to: ' + mod);
+                    }
+
+                } else if (type === 'navigate_project') {
+                    var pId = data.projectId;
+                    var tab = data.tab || 'tasks';
+                    if (pId && window.App && App.navigate) {
+                        setTimeout(function () { App.navigate('projects', { projectId: pId, tab: tab }); }, 300);
+                        results.push('Opening project: ' + (data.projectName || pId));
                     }
                 }
             } catch (err) {
@@ -234,14 +278,16 @@ window.AIAssistant = (function () {
             actions.forEach(function (a) {
                 var badge = document.createElement('span');
                 var label = {
-                    create_project: '✅ Project created',
-                    update_project: '✏️ Project updated',
-                    create_task: '✅ Task created',
-                    update_task: '✏️ Task updated',
-                    create_worker: '✅ Worker added',
-                    update_worker: '✏️ Worker updated',
+                    create_project:   '✅ Project created',
+                    update_project:   '✏️ Project updated',
+                    create_task:      '✅ Task created',
+                    update_task:      '✏️ Task updated',
+                    create_worker:    '✅ Worker added',
+                    update_worker:    '✏️ Worker updated',
                     create_work_item: '✅ Work item created',
-                    navigate_to: '→ Navigating'
+                    update_work_item: '✏️ Work item updated',
+                    navigate_to:      '→ Navigating',
+                    navigate_project: '→ Opening project'
                 }[a.type] || a.type;
                 badge.textContent = label;
                 badge.style.cssText = 'font-size:.72rem;padding:2px 8px;border-radius:10px;background:var(--success-bg,#e6f4ea);color:var(--success,#1a6b3a);font-weight:500';
@@ -257,9 +303,39 @@ window.AIAssistant = (function () {
     function _renderText(text) {
         if (!text) return '';
         var esc = Utils && Utils.escapeHtml ? Utils.escapeHtml : function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-        return esc(text)
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Process line by line
+        var lines = text.split('\n');
+        var out = [];
+        var inList = false;
+
+        lines.forEach(function (line) {
+            var escaped = esc(line);
+            // Apply inline formatting
+            escaped = escaped
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+            // Bullet list items: "- text" or "• text"
+            if (/^[-•]\s/.test(line)) {
+                if (!inList) { out.push('<ul style="margin:6px 0 6px 16px;padding:0;list-style:disc">'); inList = true; }
+                out.push('<li style="margin-bottom:3px">' + escaped.replace(/^[-•]\s+/, '') + '</li>');
+            // Numbered list: "1. text"
+            } else if (/^\d+\.\s/.test(line)) {
+                if (!inList) { out.push('<ol style="margin:6px 0 6px 16px;padding:0">'); inList = true; }
+                out.push('<li style="margin-bottom:3px">' + escaped.replace(/^\d+\.\s+/, '') + '</li>');
+            } else {
+                if (inList) { out.push(inList === 'ol' ? '</ol>' : '</ul>'); inList = false; }
+                if (escaped === '') {
+                    out.push('<div style="height:6px"></div>');
+                } else {
+                    out.push('<div>' + escaped + '</div>');
+                }
+            }
+        });
+
+        if (inList) out.push('</ul>');
+        return out.join('');
     }
 
     function _setThinking(on) {
@@ -464,7 +540,7 @@ window.AIAssistant = (function () {
         });
 
         // Welcome message
-        _addMessage('assistant', 'Hi! I\'m your Assistant PM. Tell me what you need:\n\n• "Create a project for Magna west entrance fence, contract value $85,000"\n• "Assign the site inspection task to Marco"\n• "Add a work item: clear and grub, 2500 m2, budgeted $18,000"\n• "Show me the Gantt chart"');
+        _addMessage('assistant', 'Hi! I\'m your Assistant PM. Ask me anything or tell me what to do:\n\n- "How much have I spent on Magna so far?"\n- "What\'s the budget remaining on the Tulip Hotel project?"\n- "Show me all open tasks"\n- "Create a project for west entrance fence, $85K contract, client Magna"\n- "Add a work item: clear and grub, 2500 m2, budgeted $18,000 under Magna"\n- "Assign site inspection to Marco, due Friday"');
     }
 
     // ── Panel controls ───────────────────────────────────────────────────────
