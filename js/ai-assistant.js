@@ -163,6 +163,22 @@ window.AIAssistant = (function () {
                         setTimeout(function () { App.navigate('projects', { projectId: pId, tab: tab }); }, 300);
                         results.push('Opening project: ' + (data.projectName || pId));
                     }
+
+                } else if (type === 'create_expense') {
+                    var exp = Object.assign({
+                        id: _genId('exp'),
+                        entity_type: 'expenses',
+                        status: 'Pending',
+                        date: new Date().toISOString().slice(0, 10),
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }, data);
+                    if (AppData.saveExpense) {
+                        AppData.saveExpense(exp);
+                        results.push('Created expense: ' + exp.description + ' ($' + exp.amount + ')');
+                    } else {
+                        results.push('Expense module not available — navigate to Expenses to add manually.');
+                    }
                 }
             } catch (err) {
                 console.error('[AIAssistant] Action failed:', type, err);
@@ -286,6 +302,7 @@ window.AIAssistant = (function () {
                     update_worker:    '✏️ Worker updated',
                     create_work_item: '✅ Work item created',
                     update_work_item: '✏️ Work item updated',
+                    create_expense:   '✅ Expense added',
                     navigate_to:      '→ Navigating',
                     navigate_project: '→ Opening project'
                 }[a.type] || a.type;
@@ -549,8 +566,42 @@ window.AIAssistant = (function () {
             }
         });
 
-        // Welcome message
-        _addMessage('assistant', 'Hi! I\'m your Assistant PM. Ask me anything or tell me what to do:\n\n- "How much have I spent on Magna so far?"\n- "What\'s the budget remaining on the Tulip Hotel project?"\n- "Show me all open tasks"\n- "Create a project for west entrance fence, $85K contract, client Magna"\n- "Add a work item: clear and grub, 2500 m2, budgeted $18,000 under Magna"\n- "Assign site inspection to Marco, due Friday"');
+        // Dynamic context-aware welcome
+        (function () {
+            var lines = ['Hi! I\'m your Assistant PM. Here\'s what I can see right now:\n'];
+            try {
+                var projs = (AppData.getProjects() || []).filter(function(p){ return p.status === 'Active'; });
+                if (projs.length) {
+                    lines.push('**Active projects (' + projs.length + '):** ' + projs.slice(0, 3).map(function(p){ return p.name; }).join(', ') + (projs.length > 3 ? '…' : ''));
+                }
+                var workers = (AppData.getWorkers() || []).filter(function(w){ return w.status === 'Active'; });
+                if (workers.length) {
+                    lines.push('**Workers:** ' + workers.length + ' active');
+                }
+                var tasks = (AppData.getTasks() || []);
+                var openTasks = tasks.filter(function(t){ return (t.status||'').toLowerCase() !== 'done' && (t.status||'').toLowerCase() !== 'completed'; });
+                var today = new Date().toISOString().slice(0,10);
+                var overdue = openTasks.filter(function(t){ return (t.due_date||t.dueDate||'') < today && (t.due_date||t.dueDate||''); });
+                if (overdue.length) {
+                    lines.push('⚠️ **' + overdue.length + ' overdue task(s)** — say "show overdue tasks" to see them');
+                } else if (openTasks.length) {
+                    lines.push('**Open tasks:** ' + openTasks.length);
+                }
+            } catch(e) {}
+
+            lines.push('\nTell me what you need or ask a question — for example:');
+            try {
+                var ps = (AppData.getProjects() || []).filter(function(p){ return p.status==='Active'; });
+                var ws = (AppData.getWorkers() || []).filter(function(w){ return w.status==='Active'; });
+                if (ps.length) lines.push('- "How much have I spent on ' + ps[0].name + '?"');
+                if (ps.length) lines.push('- "What\'s the budget remaining on ' + ps[0].name + '?"');
+                if (ws.length && ps.length) lines.push('- "Assign a task to ' + ws[0].name + ' on ' + ps[0].name + '"');
+            } catch(e) {}
+            lines.push('- "Show me all open tasks"');
+            lines.push('- "Create a new project"');
+
+            _addMessage('assistant', lines.join('\n'));
+        })();
     }
 
     // ── Panel controls ───────────────────────────────────────────────────────
