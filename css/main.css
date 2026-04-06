@@ -1380,6 +1380,74 @@ input:focus, textarea:focus, select:focus {
     padding: 14px;
 }
 
+/* ─── Mobile Optimization ───────────────────────────────────────────────── */
+
+/* Scrollable table wrapper — add class="table-responsive" to <div> wrapping tables */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* Touch-friendly tap targets: minimum 44px height for buttons and inputs */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  button {
+    min-height: 44px;
+  }
+
+  .form-control,
+  input,
+  select,
+  textarea {
+    /* 16px minimum prevents iOS Safari auto-zoom on focus */
+    font-size: 1rem !important;
+    min-height: 44px;
+  }
+
+  textarea.form-control,
+  textarea {
+    min-height: 80px;
+  }
+
+  /* Stack form rows vertically on mobile */
+  .form-row {
+    flex-direction: column;
+    gap: var(--space-3, 12px);
+  }
+
+  /* Ensure tables scroll horizontally instead of overflowing */
+  .table,
+  table {
+    min-width: 480px;
+  }
+
+  /* Wrap any bare table in a scrollable container */
+  .card-body > table,
+  .panel > table,
+  .section > table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent fixed-width containers from overflowing viewport */
+  .modal-content,
+  .card,
+  .panel {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Ensure modals don't overflow */
+  .modal {
+    padding: 8px;
+  }
+}
+
 /* ─── Analytics Badge ───────────────────────────────────────────────────── */
 .analytics-stat {
     display: flex;
