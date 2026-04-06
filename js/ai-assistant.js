@@ -409,12 +409,16 @@ window.AIAssistant = (function () {
             '  </div>',
             '  <span style="font-size:.78rem;color:var(--text2,#6b7280)">Thinking...</span>',
             '</div>',
-            /* input row */
-            '<div style="padding:10px 12px;border-top:1px solid var(--border,#dde4e0);display:flex;gap:6px;align-items:flex-end;flex-shrink:0">',
-            '  <textarea id="aiChatInput" rows="1" placeholder="Type or speak..." style="flex:1;resize:none;border:1px solid var(--border,#dde4e0);border-radius:10px;padding:9px 12px;font-size:.875rem;font-family:inherit;line-height:1.4;outline:none;max-height:120px;overflow-y:auto;background:var(--surface,#fff);color:var(--text1,#1a1a1a)"></textarea>',
-            '  <button id="aiMicBtn" title="Voice input" style="flex-shrink:0;width:38px;height:38px;border-radius:50%;background:var(--surface2,#f0f4f0);border:1px solid var(--border,#dde4e0);color:var(--text2,#6b7280);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s">',
-            '    <svg id="aiMicIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+            /* voice button row */
+            '<div style="padding:8px 12px 0;border-top:1px solid var(--border,#dde4e0);flex-shrink:0">',
+            '  <button id="aiMicBtn" style="width:100%;padding:9px;border-radius:10px;border:2px solid var(--primary,#1a6b3a);background:#fff;color:var(--primary,#1a6b3a);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-size:.85rem;font-weight:600;font-family:inherit;transition:background .15s,color .15s">',
+            '    <svg id="aiMicIcon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+            '    <span id="aiMicLabel">Tap to speak</span>',
             '  </button>',
+            '</div>',
+            /* text input row */
+            '<div style="padding:8px 12px 10px;display:flex;gap:6px;align-items:flex-end;flex-shrink:0">',
+            '  <textarea id="aiChatInput" rows="1" placeholder="Or type here..." style="flex:1;resize:none;border:1px solid var(--border,#dde4e0);border-radius:10px;padding:9px 12px;font-size:.875rem;font-family:inherit;line-height:1.4;outline:none;max-height:120px;overflow-y:auto;background:var(--surface,#fff);color:var(--text1,#1a1a1a)"></textarea>',
             '  <button id="aiSendBtn" style="flex-shrink:0;width:38px;height:38px;border-radius:50%;background:var(--primary,#1a6b3a);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .15s">',
             '    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
             '  </button>',
@@ -483,9 +487,12 @@ window.AIAssistant = (function () {
 
                         // Reset mic button appearance
                         _recording = false;
-                        micBtn.style.background = 'var(--surface2,#f0f4f0)';
-                        micBtn.style.color = 'var(--text2,#6b7280)';
+                        micBtn.style.background = '#fff';
+                        micBtn.style.color = 'var(--primary,#1a6b3a)';
+                        micBtn.style.border = '2px solid var(--primary,#1a6b3a)';
                         micBtn.title = 'Voice input';
+                        var micLbl = document.getElementById('aiMicLabel');
+                        if (micLbl) micLbl.textContent = 'Tap to speak';
 
                         // Show transcribing state
                         var inp = document.getElementById('aiChatInput');
@@ -531,7 +538,10 @@ window.AIAssistant = (function () {
                     // Visual: mic button turns red while recording
                     micBtn.style.background = '#dc2626';
                     micBtn.style.color = '#fff';
+                    micBtn.style.border = '2px solid #dc2626';
                     micBtn.title = 'Tap to stop recording';
+                    var micLbl2 = document.getElementById('aiMicLabel');
+                    if (micLbl2) micLbl2.textContent = 'Recording… tap to stop';
 
                 }).catch(function (err) {
                     _addMessage('assistant', '⚠️ Mic access denied: ' + err.message);
