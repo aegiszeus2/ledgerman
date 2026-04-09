@@ -201,6 +201,16 @@
             }
             document.getElementById('backToLogin').onclick = () => this.showLogin();
             document.getElementById('forgotPin').onclick = () => this._showPinReset();
+            // Show/Hide PIN toggle
+            document.querySelectorAll('.password-toggle[data-toggle]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var fieldId = this.getAttribute('data-toggle');
+                    var field = document.getElementById(fieldId);
+                    if (!field) return;
+                    field.type = field.type === 'password' ? 'text' : 'password';
+                    this.textContent = field.type === 'password' ? 'Show' : 'Hide';
+                });
+            });
             document.getElementById('workerLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const companyName = document.getElementById('workerCompanyName').value.trim();
