@@ -71,7 +71,7 @@ window.LedgermanHelp = {
             'The main view lists all projects with their budgeted total, actual spend, and variance. Click Manage on any project to set up its budget.',
             'CREATE A BUDGET: Click "Manage" on a project → "+ New Budget Draft". This creates a draft version where you can add work items.',
             'ADD ITEMS MANUALLY: Inside a draft, click "+ Add Item". Fill in description (required), category, quantity, unit, and unit cost. Total auto-calculates.',
-            'AI GENERATE: Click "🤖 AI Generate" and paste a scope description or rough estimate list. The parser extracts line items automatically. Review and edit the preview table before committing.',
+            'AI GENERATE: Click "🤖 AI Generate" and paste a scope description, contract section, or estimate list. Click "Extract Items" — a preview table appears showing the parsed work items. Review, edit, or delete any row before clicking "Add Items to Budget". Nothing is saved until you confirm.',
             'IMPORT FROM CSV: Click "📂 Import CSV" → Download Template to get the correct format. Fill it in Excel, save as CSV, then upload. Valid rows go to a preview table for review.',
             'APPROVE BUDGET: Once your work items are complete, click "✓ Approve Budget". This locks the version as the baseline — it cannot be edited after approval.',
             'CREATE REVISION: If scope changes after approval, click "Create Revision". A new draft is created with all items copied. Edit it and approve when ready.',
