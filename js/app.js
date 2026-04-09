@@ -176,7 +176,7 @@
                                     placeholder="Employee Name" value="${Utils.escapeHtml(prefilledName)}" required autocomplete="off">
                             </div>
                             <div class="form-group">
-                                <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" value="${Utils.escapeHtml(prefilledPin)}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
+                                <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="12" inputmode="numeric" pattern="[0-9]{6,12}" value="${Utils.escapeHtml(prefilledPin)}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
                             </div>
                             <div class="form-group" style="display:flex;align-items:center;margin-bottom:16px">
                                 <input type="checkbox" id="workerKeepMeSignedIn" style="margin-right:8px;cursor:pointer">
@@ -606,9 +606,9 @@
                                         style="letter-spacing:6px;text-align:center;font-size:1.4rem;padding:14px">
                                 </div>
                                 <div class="form-group" style="margin-bottom:12px">
-                                    <label>New PIN (4-6 digits)</label>
+                                    <label>New PIN (6+ digits)</label>
                                     <input type="password" class="form-control" id="pinResetNewPin"
-                                        pattern="[0-9]{4,6}" minlength="4" maxlength="6"
+                                        pattern="[0-9]{6,12}" minlength="6" maxlength="12"
                                         inputmode="numeric" required placeholder="Enter new PIN">
                                 </div>
                                 <div class="form-error" id="pinResetError2" style="display:none"></div>
@@ -690,8 +690,8 @@
                 }
 
                 // Validate new PIN
-                if (!newPin || newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
-                    errEl.textContent = 'PIN must be 4-6 digits.';
+                if (!newPin || newPin.length < 6 || newPin.length > 12 || !/^\d+$/.test(newPin)) {
+                    errEl.textContent = 'PIN must be at least 6 digits.';
                     errEl.style.display = 'block';
                     return;
                 }

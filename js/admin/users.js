@@ -303,9 +303,9 @@ window.AdminUsers = {
                             <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
                         </div>
                         <div class="form-group" style="margin-bottom:16px">
-                            <label>PIN (4-6 digits) *</label>
+                            <label>PIN (6+ digits)${isEdit ? ' — leave blank to keep current' : ' *'}</label>
                             <div style="position:relative;max-width:200px">
-                                <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="${esc(worker ? worker.pin : '')}" required style="padding-right:50px">
+                                <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{6,12}" minlength="6" maxlength="12" inputmode="numeric" value="" ${isEdit ? '' : 'required'} placeholder="${isEdit ? '••••••' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
                                 <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
                             </div>
                         </div>
@@ -391,16 +391,14 @@ window.AdminUsers = {
                 Utils.showToast('Worker name is required', 'error');
                 return;
             }
-            if (!fd.pin || fd.pin.length < 4 || fd.pin.length > 6 || !/^\d+$/.test(fd.pin)) {
-                Utils.showToast('PIN must be 4-6 digits', 'error');
+            // PIN: required on create, optional on edit (blank = keep existing)
+            const pinChanged = fd.pin && fd.pin.length > 0;
+            if (!isEdit && (!fd.pin || fd.pin.length < 6 || fd.pin.length > 12 || !/^\d+$/.test(fd.pin))) {
+                Utils.showToast('PIN must be at least 6 digits', 'error');
                 return;
             }
-            // Check for duplicate PIN
-            const existingPinWorker = AppData.getWorkers().find(function(w) {
-                return w.pin === fd.pin && (!isEdit || w.id !== worker.id);
-            });
-            if (existingPinWorker) {
-                Utils.showToast('This PIN is already used by ' + existingPinWorker.name, 'error');
+            if (isEdit && pinChanged && (fd.pin.length < 6 || fd.pin.length > 12 || !/^\d+$/.test(fd.pin))) {
+                Utils.showToast('New PIN must be at least 6 digits', 'error');
                 return;
             }
 
@@ -408,7 +406,7 @@ window.AdminUsers = {
                 id: isEdit ? worker.id : AppData.generateId(),
                 name: fd.name.trim(),
                 role: fd.role || 'Worker',
-                pin: fd.pin,
+                pin: pinChanged ? fd.pin : (isEdit ? worker.pin : fd.pin),
                 status: fd.status || 'Active',
                 email: (fd.email || '').trim() || (isEdit ? worker.email || '' : ''),
                 phone: (fd.phone || '').trim(),
@@ -555,8 +553,8 @@ window.AdminUsers = {
                     '<p style="font-size:.75rem;color:var(--text2);margin:0 0 12px"><strong>Supervisor</strong> — can log equipment utilization on time entries in addition to regular time.</p>';
             } else if (step === 1) {
                 html += '<p style="color:var(--text2);margin-bottom:12px">Set a PIN for this worker to log in with, and enter their hourly rates.</p>' +
-                    '<div class="form-group" style="margin-bottom:12px"><label>PIN (4-6 digits) *</label>' +
-                    '<div style="position:relative;max-width:200px"><input id="wiz-pin" type="password" pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" value="' + esc(overlay._wizData.pin || '') + '" style="padding-right:50px">' +
+                    '<div class="form-group" style="margin-bottom:12px"><label>PIN (6+ digits) *</label>' +
+                    '<div style="position:relative;max-width:200px"><input id="wiz-pin" type="password" pattern="[0-9]{6,12}" minlength="6" maxlength="12" inputmode="numeric" value="' + esc(overlay._wizData.pin || '') + '" style="padding-right:50px">' +
                     '<button type="button" id="wiz-toggle-pin" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button></div></div>' +
                     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px">' +
                     '<div class="form-group"><label>Pay Rate ($/hr)</label><input type="number" id="wiz-payrate" step="0.01" min="0" value="' + (overlay._wizData.payRate || '') + '" placeholder="0.00"></div>' +
@@ -620,8 +618,8 @@ window.AdminUsers = {
                 }
                 if (step === 1) {
                     var pin = overlay.querySelector('#wiz-pin').value;
-                    if (!pin || pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
-                        Utils.showToast('PIN must be 4-6 digits', 'error');
+                    if (!pin || pin.length < 6 || pin.length > 12 || !/^\d+$/.test(pin)) {
+                        Utils.showToast('PIN must be 6-12 digits', 'error');
                         return;
                     }
                     var existing = AppData.getWorkers().find(function(w) { return w.pin === pin; });
