@@ -807,6 +807,9 @@ window.AdminBudgetTracking = {
     // ══════════════════════════════════════════════════════════════════════
     //  AI TEXT PARSER
     // ══════════════════════════════════════════════════════════════════════
+    // Ollama relay endpoint — only reachable when on the same machine as LittleShield
+    OLLAMA_RELAY: 'http://localhost:9999/ollama/budget-items',
+
     _showAIImport() {
         const self = this;
         const overlay = document.createElement('div');
@@ -814,43 +817,107 @@ window.AdminBudgetTracking = {
 
         overlay.innerHTML = `
             <div style="background:#fff;border-radius:10px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
-                <h3 style="margin-bottom:8px">🤖 AI Budget Generator</h3>
-                <p style="color:#666;font-size:.88em;margin-bottom:16px">
-                    Paste a rough scope, estimate table, or list of work items. The parser will extract structured line items.
-                    <strong>Review and edit before committing.</strong>
-                </p>
-                <div style="margin-bottom:8px">
-                    <div style="font-size:.82em;color:#999;margin-bottom:6px">Example input:</div>
-                    <div style="padding:8px 12px;background:#f5f5f5;border-radius:6px;font-size:.82em;color:#555;font-family:monospace;white-space:pre-wrap">Excavation — 800 m³ @ $28.50/m³
-Granular A base course 120 tonnes @ $45.00
-Supply & install precast concrete curb 350 lm @ $85
-Asphalt paving — 2 lifts, 1200 m² @ $38/m²
-Traffic control — allow $8,500 LS
-Project management — 12 weeks @ $2,200/wk</div>
+                <h3 style="margin-bottom:6px">🤖 AI Budget Generator</h3>
+                <div id="ai_mode_badge" style="margin-bottom:12px">
+                    <span style="padding:3px 10px;border-radius:10px;font-size:.78em;background:#e8f5e9;color:#2e7d32">Checking Ollama…</span>
                 </div>
-                <textarea id="ai_input" placeholder="Paste your work items here..." style="width:100%;height:180px;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:.88em;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>
+                <p style="color:#666;font-size:.88em;margin-bottom:14px">
+                    Paste a contract section, email, scope description, or work item list.
+                    AI will extract structured line items. <strong>Review and edit before committing.</strong>
+                </p>
+                <textarea id="ai_input" placeholder="Paste contract text, email, or scope of work here…" style="width:100%;height:200px;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:.88em;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px">
                     <button class="btn-secondary" id="ai_cancel">Cancel</button>
-                    <button class="btn-primary" id="ai_parse">Parse Items →</button>
+                    <button class="btn-primary" id="ai_parse">Extract Items →</button>
+                </div>
+                <div id="ai_status" style="display:none;margin-top:12px;text-align:center;color:#666;font-size:.88em">
+                    <div style="display:inline-block;width:16px;height:16px;border:2px solid #3498db;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px"></div>
+                    <span id="ai_status_text">Sending to Ollama…</span>
                 </div>
                 <div id="ai_preview" style="display:none;margin-top:20px"></div>
             </div>
+            <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
         `;
 
         document.body.appendChild(overlay);
+
+        // Check if Ollama relay is reachable
+        let ollamaAvailable = false;
+        fetch(self.OLLAMA_RELAY, { method: 'OPTIONS', signal: AbortSignal.timeout(2000) })
+            .then(() => {
+                ollamaAvailable = true;
+                overlay.querySelector('#ai_mode_badge').innerHTML =
+                    '<span style="padding:3px 10px;border-radius:10px;font-size:.78em;background:#e8f5e9;color:#2e7d32">🟢 Ollama (llama3.1:8b) — understands prose, contracts, emails</span>';
+            })
+            .catch(() => {
+                overlay.querySelector('#ai_mode_badge').innerHTML =
+                    '<span style="padding:3px 10px;border-radius:10px;font-size:.78em;background:#fff3e0;color:#e65100">🟡 Basic parser (Ollama offline) — structured text only</span>';
+            });
+
         overlay.querySelector('#ai_cancel').onclick = () => document.body.removeChild(overlay);
-        overlay.querySelector('#ai_parse').onclick = () => {
-            const text = overlay.querySelector('#ai_input').value;
-            if (!text.trim()) return;
-            const parsed = self._parseAIText(text);
+
+        overlay.querySelector('#ai_parse').onclick = async () => {
+            const text = overlay.querySelector('#ai_input').value.trim();
+            if (!text) return;
             const previewEl = overlay.querySelector('#ai_preview');
-            if (parsed.length === 0) {
-                previewEl.innerHTML = '<div style="color:#e74c3c;font-size:.88em">Could not parse any items. Check format and try again.</div>';
-                previewEl.style.display = 'block';
-                return;
+            const statusEl  = overlay.querySelector('#ai_status');
+            previewEl.style.display = 'none';
+
+            if (ollamaAvailable) {
+                // Try Ollama
+                statusEl.style.display = 'block';
+                overlay.querySelector('#ai_parse').disabled = true;
+                overlay.querySelector('#ai_status_text').textContent = 'Sending to Ollama (llama3.1:8b)…';
+                try {
+                    const res = await fetch(self.OLLAMA_RELAY, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text }),
+                        signal: AbortSignal.timeout(90000),
+                    });
+                    statusEl.style.display = 'none';
+                    overlay.querySelector('#ai_parse').disabled = false;
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        previewEl.innerHTML = `<div style="color:#e74c3c;font-size:.88em">Ollama error: ${err.error || res.status}. Falling back to basic parser.</div>`;
+                        previewEl.style.display = 'block';
+                        setTimeout(() => {
+                            const fallback = self._parseAIText(text);
+                            self._renderPreviewTable(fallback.length ? fallback : [], previewEl, overlay, 'basic parser');
+                        }, 1500);
+                        return;
+                    }
+                    const data = await res.json();
+                    const items = data.items || [];
+                    if (items.length === 0) {
+                        previewEl.innerHTML = '<div style="color:#e74c3c;font-size:.88em">Ollama found no work items in this text. Try rephrasing or use CSV import.</div>';
+                        previewEl.style.display = 'block';
+                        return;
+                    }
+                    self._renderPreviewTable(items, previewEl, overlay, 'Ollama');
+                } catch (err) {
+                    statusEl.style.display = 'none';
+                    overlay.querySelector('#ai_parse').disabled = false;
+                    // Timeout or network error — fall back
+                    previewEl.innerHTML = `<div style="color:#f39c12;font-size:.88em">Ollama timed out. Falling back to basic parser…</div>`;
+                    previewEl.style.display = 'block';
+                    setTimeout(() => {
+                        const fallback = self._parseAIText(text);
+                        self._renderPreviewTable(fallback.length ? fallback : [], previewEl, overlay, 'basic parser');
+                    }, 800);
+                }
+            } else {
+                // Regex fallback
+                const parsed = self._parseAIText(text);
+                if (parsed.length === 0) {
+                    previewEl.innerHTML = '<div style="color:#e74c3c;font-size:.88em">Could not parse items. Try structured text (e.g. "Excavation 800 m³ @ $28.50") or use CSV import.</div>';
+                    previewEl.style.display = 'block';
+                    return;
+                }
+                self._renderPreviewTable(parsed, previewEl, overlay, 'basic parser');
             }
-            self._renderPreviewTable(parsed, previewEl, overlay);
         };
+
         overlay.addEventListener('click', e => { if (e.target === overlay) document.body.removeChild(overlay); });
     },
 
@@ -987,7 +1054,7 @@ Project management — 12 weeks @ $2,200/wk</div>
         return results;
     },
 
-    _renderPreviewTable(items, container, overlay) {
+    _renderPreviewTable(items, container, overlay, source) {
         const self = this;
         let editableItems = items.map((item, idx) => Object.assign({}, item, { _idx: idx }));
 
@@ -996,7 +1063,9 @@ Project management — 12 weeks @ $2,200/wk</div>
             container.innerHTML = `
                 <hr style="margin:16px 0">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                    <div style="font-weight:600;font-size:.95em">${editableItems.length} items parsed · Total: $${self._fmt(total)}</div>
+                    <div style="font-weight:600;font-size:.95em">${editableItems.length} items · Total: $${self._fmt(total)}
+                        ${source ? `<span style="margin-left:8px;font-size:.78em;font-weight:400;color:#999">via ${source}</span>` : ''}
+                    </div>
                     <div style="font-size:.82em;color:#999">Edit cells inline before committing</div>
                 </div>
                 <div style="overflow-x:auto;border:1px solid #e0e0e0;border-radius:6px;margin-bottom:14px">
