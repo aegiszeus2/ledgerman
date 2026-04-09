@@ -190,7 +190,7 @@ window.AdminUsers = {
                 if (!worker) return;
                 const confirmed = await Utils.confirm('Reset PIN for "' + worker.name + '"? A new random PIN will be generated.');
                 if (!confirmed) return;
-                const newPin = String(Math.floor(1000 + Math.random() * 9000));
+                const newPin = String(Math.floor(100000 + Math.random() * 900000));
                 worker.pin = newPin;
                 AppData.saveWorker(worker);
                 const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
