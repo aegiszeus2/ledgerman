@@ -66,15 +66,18 @@ window.LedgermanHelp = {
 
     'budget-tracking': {
         title: 'Budget Tracking',
-        intro: 'Monitor project budgets against actual spending in real time.',
+        intro: 'Create and manage line-item budgets per project. Track actuals vs. budget with full version control.',
         steps: [
-            'All projects are listed with their budgeted vs. actual costs and variance.',
-            'The variance column shows how much is left (green) or overspent (red) per project.',
-            'Use the status filter tabs (All / Active / Completed / On Hold) to narrow the view.',
-            'Sort the table by budget, amount spent, variance, or % spent using the Sort By dropdown.',
-            'Expenses logged by workers flow in automatically — no manual entry needed here.',
-            'Click Refresh to pull the latest data.',
-            'Use the Export CSV button to download budget data, or Print / PDF to generate a printable report.'
+            'The main view lists all projects with their budgeted total, actual spend, and variance. Click Manage on any project to set up its budget.',
+            'CREATE A BUDGET: Click "Manage" on a project → "+ New Budget Draft". This creates a draft version where you can add work items.',
+            'ADD ITEMS MANUALLY: Inside a draft, click "+ Add Item". Fill in description (required), category, quantity, unit, and unit cost. Total auto-calculates.',
+            'AI GENERATE: Click "🤖 AI Generate" and paste a scope description or rough estimate list. The parser extracts line items automatically. Review and edit the preview table before committing.',
+            'IMPORT FROM CSV: Click "📂 Import CSV" → Download Template to get the correct format. Fill it in Excel, save as CSV, then upload. Valid rows go to a preview table for review.',
+            'APPROVE BUDGET: Once your work items are complete, click "✓ Approve Budget". This locks the version as the baseline — it cannot be edited after approval.',
+            'CREATE REVISION: If scope changes after approval, click "Create Revision". A new draft is created with all items copied. Edit it and approve when ready.',
+            'VERSION HISTORY: Each project shows all budget versions with their status (draft / approved). Approved versions are permanently preserved for comparison.',
+            'ACTUALS: Actual spend is pulled from expenses logged against each project. Variance = Budgeted − Spent.',
+            'EXPORT: Inside an approved version, click Export CSV to download the full work item list. From the main view, Export CSV downloads the project summary.'
         ]
     },
 
