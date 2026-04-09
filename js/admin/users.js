@@ -185,18 +185,10 @@ window.AdminUsers = {
         });
 
         container.querySelectorAll('.reset-pin-worker').forEach(function(btn) {
-            btn.addEventListener('click', async function() {
+            btn.addEventListener('click', function() {
                 const worker = AppData.getWorker(btn.dataset.id);
                 if (!worker) return;
-                const confirmed = await Utils.confirm('Reset PIN for "' + worker.name + '"? A new random PIN will be generated.');
-                if (!confirmed) return;
-                const newPin = String(Math.floor(100000 + Math.random() * 900000));
-                worker.pin = newPin;
-                AppData.saveWorker(worker);
-                const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
-                AppData.addAuditLog(username, 'PIN Reset', 'Worker: ' + worker.name);
-                Utils.showToast('PIN reset to: ' + newPin);
-                self._renderList();
+                self._showSetPinModal(worker);
             });
         });
 
@@ -447,6 +439,56 @@ window.AdminUsers = {
             overlay.remove();
             self._renderList();
         });
+    },
+
+    _showSetPinModal(worker) {
+        const self = this;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+        overlay.innerHTML = `
+            <div style="background:#fff;border-radius:10px;width:100%;max-width:380px;padding:24px;box-sizing:border-box">
+                <h3 style="margin-bottom:6px">Set PIN — ${Utils.escapeHtml(worker.name)}</h3>
+                <p style="color:#666;font-size:.88em;margin-bottom:20px">Enter a specific PIN or auto-generate a random one.</p>
+                <div style="margin-bottom:16px">
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:6px">New PIN (6–12 digits)</label>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <input id="manualPinInput" type="text" inputmode="numeric" pattern="[0-9]{6,12}" maxlength="12"
+                            placeholder="Enter PIN manually"
+                            style="flex:1;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:1em;letter-spacing:2px">
+                        <button class="btn-secondary btn-sm" id="autoGenBtn" style="white-space:nowrap">Auto-generate</button>
+                    </div>
+                    <div id="pinError" style="display:none;margin-top:6px;color:#e74c3c;font-size:.82em"></div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:10px">
+                    <button class="btn-secondary" id="cancelPinBtn">Cancel</button>
+                    <button class="btn-primary" id="savePinBtn">Set PIN</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#autoGenBtn').onclick = function() {
+            overlay.querySelector('#manualPinInput').value = String(Math.floor(100000 + Math.random() * 900000));
+            overlay.querySelector('#pinError').style.display = 'none';
+        };
+        overlay.querySelector('#cancelPinBtn').onclick = function() { document.body.removeChild(overlay); };
+        overlay.querySelector('#savePinBtn').onclick = function() {
+            const pin = overlay.querySelector('#manualPinInput').value.trim();
+            const errEl = overlay.querySelector('#pinError');
+            if (!pin || !/^\d{6,12}$/.test(pin)) {
+                errEl.textContent = 'PIN must be 6–12 digits.';
+                errEl.style.display = 'block';
+                return;
+            }
+            worker.pin = pin;
+            AppData.saveWorker(worker);
+            const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            AppData.addAuditLog(username, 'PIN Set', 'Worker: ' + worker.name);
+            Utils.showToast('PIN updated for ' + worker.name);
+            document.body.removeChild(overlay);
+            self._renderList();
+        };
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) document.body.removeChild(overlay); });
     },
 
     _showInviteModal(workerId) {
