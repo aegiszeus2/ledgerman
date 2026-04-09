@@ -217,26 +217,29 @@ async function syncFromServer() {
     try {
         const data = await _apiFetch('/api/sync');
         _cache = {
-            workers:     data.workers     || [],
-            projects:    data.projects    || [],
-            tasks:       data.tasks       || [],
-            clients:     data.clients     || [],
-            subtasks:    data.subtasks    || [],
-            expenses:    data.expenses    || [],
-            submissions: data.submissions || [],
-            invoices:    data.invoices    || [],
-            payments:    data.payments    || [],
-            vendors:     data.vendors     || [],
-            invites:     data.invites     || [],
-            estimates:   data.estimates   || [],
-            auditLog:    data.auditLog    || [],
-            daily_reports: data.daily_reports || [],
-            punch_items: data.punch_items || [],
-            settings:    data.settings    || {},
+            workers:          data.workers          || [],
+            projects:         data.projects         || [],
+            tasks:            data.tasks            || [],
+            clients:          data.clients          || [],
+            subtasks:         data.subtasks         || [],
+            expenses:         data.expenses         || [],
+            submissions:      data.submissions      || [],
+            invoices:         data.invoices         || [],
+            payments:         data.payments         || [],
+            vendors:          data.vendors          || [],
+            invites:          data.invites          || [],
+            estimates:        data.estimates        || [],
+            auditLog:         data.auditLog         || [],
+            daily_reports:    data.daily_reports    || [],
+            punch_items:      data.punch_items      || [],
+            budget_versions:  data.budget_versions  || [],
+            budget_items:     data.budget_items     || [],
+            settings:         data.settings         || {},
         };
         // Mirror to localStorage as offline backup
         ['workers','projects','tasks','clients','subtasks','expenses','submissions',
-         'invoices','payments','vendors','invites','estimates','auditLog','daily_reports','punch_items'].forEach(function(key) {
+         'invoices','payments','vendors','invites','estimates','auditLog','daily_reports','punch_items',
+         'budget_versions','budget_items'].forEach(function(key) {
             setData(key, _cache[key]);
         });
         setData('settings', _cache.settings);
@@ -247,21 +250,23 @@ async function syncFromServer() {
         console.warn('[Ledgerman] Sync failed — using localStorage fallback:', e.message);
         // Fall back to localStorage
         _cache = {
-            workers:     getData('workers')     || [],
-            projects:    getData('projects')    || [],
-            clients:     getData('clients')     || [],
-            subtasks:    getData('subtasks')    || [],
-            expenses:    getData('expenses')    || [],
-            submissions: getData('submissions') || [],
-            invoices:    getData('invoices')    || [],
-            payments:    getData('payments')    || [],
-            vendors:     getData('vendors')     || [],
-            invites:     getData('invites')     || [],
-            estimates:   getData('estimates')   || [],
-            auditLog:    getData('auditLog')    || [],
-            daily_reports: getData('daily_reports') || [],
-            punch_items: getData('punch_items') || [],
-            settings:    getData('settings')    || {},
+            workers:         getData('workers')         || [],
+            projects:        getData('projects')        || [],
+            clients:         getData('clients')         || [],
+            subtasks:        getData('subtasks')        || [],
+            expenses:        getData('expenses')        || [],
+            submissions:     getData('submissions')     || [],
+            invoices:        getData('invoices')        || [],
+            payments:        getData('payments')        || [],
+            vendors:         getData('vendors')         || [],
+            invites:         getData('invites')         || [],
+            estimates:       getData('estimates')       || [],
+            auditLog:        getData('auditLog')        || [],
+            daily_reports:   getData('daily_reports')   || [],
+            punch_items:     getData('punch_items')     || [],
+            budget_versions: getData('budget_versions') || [],
+            budget_items:    getData('budget_items')    || [],
+            settings:        getData('settings')        || {},
         };
         return _cache;
     }
@@ -525,6 +530,31 @@ function getInvites() { return getAll('invites'); }
 function getInvite(token) { return getInvites().find(function(i) { return i.token === token; }); }
 function saveInvite(invite) { return save('invites', invite); }
 function deleteInvite(token) { _setList('invites', getInvites().filter(function(i) { return i.token !== token; })); }
+
+// ─── Budget Versions ───────────────────────────────────────────────────────
+// Budget version = a snapshot of a project budget (draft → approved baseline → revised)
+// Fields: id, projectId, version (int), status ('draft'|'approved'|'superseded'),
+//         name, totalBudget, createdAt, approvedAt, approvedBy, notes
+function getBudgetVersions(projectId) {
+    var all = getAll('budget_versions');
+    return projectId ? all.filter(function(v) { return v.projectId === projectId; }) : all;
+}
+function getBudgetVersion(id) { return getById('budget_versions', id); }
+function saveBudgetVersion(v) { return save('budget_versions', v); }
+function deleteBudgetVersion(id) { remove('budget_versions', id); }
+
+// ─── Budget Items ──────────────────────────────────────────────────────────
+// Individual line items within a budget version (work items / cost breakdown)
+// Fields: id, projectId, budgetVersionId, costCode, division, description,
+//         category ('Labour'|'Material'|'Equipment'|'Subcontract'|'Other'),
+//         quantity, unit, unitCost, total, notes, createdAt, updatedAt
+function getBudgetItems(budgetVersionId) {
+    var all = getAll('budget_items');
+    return budgetVersionId ? all.filter(function(i) { return i.budgetVersionId === budgetVersionId; }) : all;
+}
+function getBudgetItem(id) { return getById('budget_items', id); }
+function saveBudgetItem(item) { return save('budget_items', item); }
+function deleteBudgetItem(id) { remove('budget_items', id); }
 
 // ─── Audit Log ─────────────────────────────────────────────────────────────
 function addAuditLog(user, action, details) {
@@ -857,6 +887,10 @@ window.AppData = {
     getEquipmentLogs, getEquipmentLog, saveEquipmentLog, deleteEquipmentLog,
     // Notifications
     getNotifications, getNotification, saveNotification, deleteNotification,
+    // Budget Versions
+    getBudgetVersions, getBudgetVersion, saveBudgetVersion, deleteBudgetVersion,
+    // Budget Items
+    getBudgetItems, getBudgetItem, saveBudgetItem, deleteBudgetItem,
     // Backup
     exportAllData, importAllData, getLastBackupDate, setLastBackupDate, shouldRemindBackup
 };
