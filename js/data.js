@@ -396,7 +396,12 @@ function saveWorker(w) {
         _apiFetch('/api/workers' + (isNew ? '' : '/' + normalized.id), {
             method: isNew ? 'POST' : 'PUT',
             body: JSON.stringify(normalized)
-        }).catch(function(e) { console.warn('[API] saveWorker:', e.message); });
+        }).catch(function(e) {
+            console.warn('[API] saveWorker:', e.message);
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Worker save failed: ' + e.message, 'error');
+            }
+        });
     }
     return normalized;
 }
