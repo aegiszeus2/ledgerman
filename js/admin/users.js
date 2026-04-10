@@ -74,7 +74,18 @@ window.AdminUsers = {
                                     '</td>' +
                                     '<td>' + Utils.escapeHtml(w.role || 'Worker') + '</td>' +
                                     '<td style="font-size:.85rem;color:var(--text2)">' + (w.phone ? Utils.escapeHtml(w.phone) : '<span style="color:var(--border)">—</span>') + '</td>' +
-                                    '<td style="white-space:nowrap;letter-spacing:2px;color:var(--text2)">\u2022\u2022\u2022\u2022\u2022\u2022</td>' +
+                                    (function() {
+                                        var p = w.pin || '';
+                                        var isHash = p.startsWith('$2b$') || p.startsWith('$2a$');
+                                        if (isHash) {
+                                            return '<td style="white-space:nowrap;font-size:.8rem;color:var(--text2)">Reset required <button class="btn-ghost btn-sm reset-pin-worker" data-id="' + w.id + '" style="font-size:.75rem;padding:2px 6px;color:var(--warn)">Reset</button></td>';
+                                        }
+                                        return '<td style="white-space:nowrap">' +
+                                            '<span class="pin-masked" data-id="' + w.id + '">' + '\u2022'.repeat(p.length || 4) + '</span>' +
+                                            '<span class="pin-revealed" data-id="' + w.id + '" style="display:none;font-family:monospace">' + Utils.escapeHtml(p) + '</span>' +
+                                            ' <button class="btn-ghost btn-sm reveal-pin" data-id="' + w.id + '" style="font-size:.75rem;padding:2px 6px">Show</button>' +
+                                        '</td>';
+                                    })() +
                                     '<td><span class="pstatus ' + statusClass + '">' + Utils.escapeHtml(w.status || 'Active') + '</span></td>' +
                                     '<td class="amount">' + (payRate ? Utils.formatCurrency(payRate) + '/hr' : '—') + '</td>' +
                                     '<td class="amount">' + (costRate ? Utils.formatCurrency(costRate) + '/hr' : '—') + '</td>' +
@@ -149,6 +160,25 @@ window.AdminUsers = {
             self._filter = e.target.value;
             self._renderList();
         }, 250));
+
+        // Reveal/hide PIN buttons
+        container.querySelectorAll('.reveal-pin').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var id = btn.dataset.id;
+                var masked = container.querySelector('.pin-masked[data-id="' + id + '"]');
+                var revealed = container.querySelector('.pin-revealed[data-id="' + id + '"]');
+                if (!masked || !revealed) return;
+                if (revealed.style.display === 'none') {
+                    masked.style.display = 'none';
+                    revealed.style.display = 'inline';
+                    btn.textContent = 'Hide';
+                } else {
+                    masked.style.display = 'inline';
+                    revealed.style.display = 'none';
+                    btn.textContent = 'Show';
+                }
+            });
+        });
 
         container.querySelectorAll('.edit-worker').forEach(function(btn) {
             btn.addEventListener('click', function() {
