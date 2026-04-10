@@ -74,11 +74,7 @@ window.AdminUsers = {
                                     '</td>' +
                                     '<td>' + Utils.escapeHtml(w.role || 'Worker') + '</td>' +
                                     '<td style="font-size:.85rem;color:var(--text2)">' + (w.phone ? Utils.escapeHtml(w.phone) : '<span style="color:var(--border)">—</span>') + '</td>' +
-                                    '<td style="white-space:nowrap">' +
-                                        '<span class="pin-masked" data-id="' + w.id + '">' + '\u2022'.repeat((w.pin || '').length || 4) + '</span>' +
-                                        '<span class="pin-revealed" data-id="' + w.id + '" style="display:none">' + Utils.escapeHtml(w.pin || '') + '</span>' +
-                                        ' <button class="btn-ghost btn-sm reveal-pin" data-id="' + w.id + '" title="Reveal PIN" style="font-size:.75rem;padding:2px 6px">Show</button>' +
-                                    '</td>' +
+                                    '<td style="white-space:nowrap;letter-spacing:2px;color:var(--text2)">\u2022\u2022\u2022\u2022\u2022\u2022</td>' +
                                     '<td><span class="pstatus ' + statusClass + '">' + Utils.escapeHtml(w.status || 'Active') + '</span></td>' +
                                     '<td class="amount">' + (payRate ? Utils.formatCurrency(payRate) + '/hr' : '—') + '</td>' +
                                     '<td class="amount">' + (costRate ? Utils.formatCurrency(costRate) + '/hr' : '—') + '</td>' +
@@ -153,24 +149,6 @@ window.AdminUsers = {
             self._filter = e.target.value;
             self._renderList();
         }, 250));
-
-        // Reveal PIN buttons
-        container.querySelectorAll('.reveal-pin').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                const id = btn.dataset.id;
-                const masked = container.querySelector('.pin-masked[data-id="' + id + '"]');
-                const revealed = container.querySelector('.pin-revealed[data-id="' + id + '"]');
-                if (revealed.style.display === 'none') {
-                    masked.style.display = 'none';
-                    revealed.style.display = 'inline';
-                    btn.textContent = 'Hide';
-                } else {
-                    masked.style.display = 'inline';
-                    revealed.style.display = 'none';
-                    btn.textContent = 'Show';
-                }
-            });
-        });
 
         container.querySelectorAll('.edit-worker').forEach(function(btn) {
             btn.addEventListener('click', function() {
@@ -297,7 +275,7 @@ window.AdminUsers = {
                         <div class="form-group" style="margin-bottom:16px">
                             <label>PIN (6+ digits)${isEdit ? ' — leave blank to keep current' : ' *'}</label>
                             <div style="position:relative;max-width:200px">
-                                <input class="form-control" name="pin" id="workerPinInput" type="password" pattern="[0-9]{6,12}" minlength="6" maxlength="12" inputmode="numeric" value="" ${isEdit ? '' : 'required'} placeholder="${isEdit ? '••••••' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
+                                <input class="form-control" name="pin" id="workerPinInput" type="password" maxlength="12" inputmode="numeric" value="" placeholder="${isEdit ? 'Leave blank to keep current' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
                                 <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
                             </div>
                         </div>
