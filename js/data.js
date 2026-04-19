@@ -220,7 +220,19 @@ async function apiUseInvite(token, inviteData) {
 }
 
 // ─── Sync from Server ──────────────────────────────────────────────────────
+// Entities synced from server + mirrored to localStorage
+var _SYNC_ENTITY_KEYS = [
+    'workers','projects','tasks','clients','subtasks','expenses','submissions',
+    'invoices','payments','vendors','invites','estimates','auditLog','daily_reports',
+    'punch_items','equipment','equipmentLogs','notifications','budget_versions','budget_items'
+];
+
 async function syncFromServer() {
+    // Capture pre-sync localStorage for orphan recovery (items saved locally before refresh
+    // but async POST hadn't completed — rescues them after server says they're missing)
+    var _preSyncLocal = {};
+    _SYNC_ENTITY_KEYS.forEach(function(k) { _preSyncLocal[k] = getData(k) || []; });
+
     try {
         const data = await _apiFetch('/api/sync');
         _cache = {
@@ -239,42 +251,48 @@ async function syncFromServer() {
             auditLog:         data.auditLog         || [],
             daily_reports:    data.daily_reports    || [],
             punch_items:      data.punch_items      || [],
+            equipment:        data.equipment        || [],
+            equipmentLogs:    data.equipmentLogs    || [],
+            notifications:    data.notifications    || [],
             budget_versions:  data.budget_versions  || [],
             budget_items:     data.budget_items     || [],
             settings:         data.settings         || {},
         };
         // Mirror to localStorage as offline backup
-        ['workers','projects','tasks','clients','subtasks','expenses','submissions',
-         'invoices','payments','vendors','invites','estimates','auditLog','daily_reports','punch_items',
-         'budget_versions','budget_items'].forEach(function(key) {
-            setData(key, _cache[key]);
-        });
+        _SYNC_ENTITY_KEYS.forEach(function(key) { setData(key, _cache[key]); });
         setData('settings', _cache.settings);
         console.log('[Ledgerman] Synced from server. Workers:', _cache.workers.length,
             'Projects:', _cache.projects.length, 'Tasks:', _cache.tasks.length, 'Submissions:', _cache.submissions.length);
+
+        // ── Orphan recovery ──────────────────────────────────────────────────
+        // If an item was saved locally but the server confirms it's missing (async race),
+        // add it back to cache immediately and re-push to backend.
+        if (isApiMode() && getJwt()) {
+            var _orphanTypes = ['projects','tasks','clients','subtasks','expenses',
+                'invoices','payments','vendors','estimates','daily_reports','punch_items',
+                'equipment','equipmentLogs','budget_versions','budget_items'];
+            _orphanTypes.forEach(function(key) {
+                var serverIds = new Set((_cache[key] || []).map(function(i) { return i.id; }));
+                (_preSyncLocal[key] || []).forEach(function(localItem) {
+                    if (localItem && localItem.id && !serverIds.has(localItem.id)) {
+                        console.log('[Ledgerman] Recovering orphaned ' + key + ' item:', localItem.id);
+                        if (_cache[key]) { _cache[key].push(localItem); setData(key, _cache[key]); }
+                        _apiFetch('/api/' + key, { method: 'POST', body: JSON.stringify(localItem) })
+                            .catch(function(e) {
+                                console.warn('[Ledgerman] Orphan recovery failed ' + key + ':', e.message);
+                            });
+                    }
+                });
+            });
+        }
+
         return _cache;
     } catch (e) {
         console.warn('[Ledgerman] Sync failed — using localStorage fallback:', e.message);
-        // Fall back to localStorage
-        _cache = {
-            workers:         getData('workers')         || [],
-            projects:        getData('projects')        || [],
-            clients:         getData('clients')         || [],
-            subtasks:        getData('subtasks')        || [],
-            expenses:        getData('expenses')        || [],
-            submissions:     getData('submissions')     || [],
-            invoices:        getData('invoices')        || [],
-            payments:        getData('payments')        || [],
-            vendors:         getData('vendors')         || [],
-            invites:         getData('invites')         || [],
-            estimates:       getData('estimates')       || [],
-            auditLog:        getData('auditLog')        || [],
-            daily_reports:   getData('daily_reports')   || [],
-            punch_items:     getData('punch_items')     || [],
-            budget_versions: getData('budget_versions') || [],
-            budget_items:    getData('budget_items')    || [],
-            settings:        getData('settings')        || {},
-        };
+        // Fall back to localStorage (populate all keys including tasks which was previously missing)
+        _cache = {};
+        _SYNC_ENTITY_KEYS.forEach(function(k) { _cache[k] = getData(k) || []; });
+        _cache.settings = getData('settings') || {};
         return _cache;
     }
 }
