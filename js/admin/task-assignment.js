@@ -297,27 +297,20 @@ window.AdminTaskAssignment = {
             const formData = new FormData(form);
             const data = Object.fromEntries(formData);
 
-            if (isEdit) {
-                // Update existing task
-                const updated = {
-                    ...task,
-                    ...data,
-                    id: task.id,
-                    entity_type: 'tasks'
-                };
-                AppData.saveTask(updated);
-            } else {
-                // Create new task
-                const newTask = {
-                    id: 'task_' + Date.now(),
-                    entity_type: 'tasks',
-                    ...data,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                };
-                AppData.saveTask(newTask);
-            }
+            const taskData = isEdit
+                ? { ...task, ...data, id: task.id, entity_type: 'tasks' }
+                : { id: 'task_' + Date.now(), entity_type: 'tasks', ...data,
+                    created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
 
+            const submitBtn = form.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('tasks', taskData);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Task' : 'Create Task'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             Utils.showToast(isEdit ? 'Task updated' : 'Task created');
             overlay.remove();
             self._renderList();

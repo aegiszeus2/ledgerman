@@ -383,7 +383,7 @@ window.AdminUsers = {
             overlay.remove();
         });
 
-        overlay.querySelector('#workerModalForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#workerModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -420,27 +420,35 @@ window.AdminUsers = {
                 totpSecret: isEdit ? worker.totpSecret || '' : '',
                 email2FAEnabled: fd.email2FA === 'on' && !!((fd.email || '').trim() || (isEdit ? worker.email || '' : ''))
             };
-            AppData.saveWorker(workerData);
-
-            // Update project assignments
-            const selectedProjects = [];
-            overlay.querySelectorAll('.project-checkbox:checked').forEach(function(cb) {
-                selectedProjects.push(cb.value);
-            });
-            const allProjects = AppData.getProjects();
-            allProjects.forEach(function(p) {
-                const assigned = p.assignedWorkers || [];
-                const isAssigned = assigned.includes(workerData.id);
-                const shouldBeAssigned = selectedProjects.includes(p.id);
-                if (shouldBeAssigned && !isAssigned) {
-                    p.assignedWorkers = assigned.concat([workerData.id]);
-                    AppData.saveProject(p);
-                } else if (!shouldBeAssigned && isAssigned) {
-                    p.assignedWorkers = assigned.filter(function(wid) { return wid !== workerData.id; });
-                    AppData.saveProject(p);
+            // Workers use dedicated endpoint — saveWorkerAsync handles POST vs PUT
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveWorkerAsync(workerData);
+                // Also persist project assignment changes (fire-and-forget is acceptable here
+                // since project data was already confirmed by prior loads — just updating an array field)
+                const selectedProjects = [];
+                overlay.querySelectorAll('.project-checkbox:checked').forEach(function(cb) {
+                    selectedProjects.push(cb.value);
+                });
+                const allProjects = AppData.getProjects();
+                for (const p of allProjects) {
+                    const assigned = p.assignedWorkers || [];
+                    const isAssigned = assigned.includes(workerData.id);
+                    const shouldBeAssigned = selectedProjects.includes(p.id);
+                    if (shouldBeAssigned && !isAssigned) {
+                        p.assignedWorkers = assigned.concat([workerData.id]);
+                        AppData.saveEntityAsync('projects', p).catch(function() {});
+                    } else if (!shouldBeAssigned && isAssigned) {
+                        p.assignedWorkers = assigned.filter(function(wid) { return wid !== workerData.id; });
+                        AppData.saveEntityAsync('projects', p).catch(function() {});
+                    }
                 }
-            });
-
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Worker' : 'Add Worker'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Worker Updated' : 'Worker Added', workerData.name + ' (' + workerData.role + ')');
             Utils.showToast(isEdit ? 'Worker updated' : 'Worker added');

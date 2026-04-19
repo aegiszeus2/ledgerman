@@ -133,6 +133,13 @@ async function apiLoginAdmin(companyName, password) {
         body: JSON.stringify({ companyName: companyName, password: password })
     });
     setJwt(data.token);
+    // Extract companyId from JWT payload so isApiMode() returns true for admin sessions
+    if (data.token) {
+        try {
+            const payload = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            if (payload.companyId) setCompanyId(payload.companyId);
+        } catch (e) { /* malformed token — ignore */ }
+    }
     return data;
 }
 
@@ -339,6 +346,72 @@ function remove(entity, id) {
     }
 }
 
+/**
+ * saveEntityAsync(entity, item)
+ * Confirmed-persistence save for entities that use the generic /api/<entity> endpoint.
+ * - In API mode: awaits the server POST. On success, updates local cache. On failure, throws.
+ *   The caller must NOT close the form until this resolves.
+ * - In offline mode: falls through to synchronous save() immediately.
+ */
+async function saveEntityAsync(entity, item) {
+    if (isApiMode() && getJwt() && entity !== 'auditLog') {
+        // Server write FIRST — only update cache on confirmed success
+        let resp;
+        try {
+            resp = await _apiFetch('/api/' + entity, {
+                method: 'POST',
+                body: JSON.stringify(item)
+            });
+        } catch (e) {
+            throw new Error(e.message || 'Server unreachable');
+        }
+        if (resp && resp.error) {
+            throw new Error(resp.error);
+        }
+        // Confirmed — now update local cache
+        var items = _getList(entity);
+        var idx = items.findIndex(function(x) { return x.id === item.id; });
+        if (idx >= 0) items[idx] = item;
+        else items.push(item);
+        _setList(entity, items);
+        return item;
+    }
+    // Offline fallback — synchronous local save
+    return save(entity, item);
+}
+
+/**
+ * saveWorkerAsync(w)
+ * Confirmed-persistence save for workers (dedicated /api/workers endpoint).
+ * Same contract as saveEntityAsync: awaits server, updates cache on success, throws on failure.
+ */
+async function saveWorkerAsync(w) {
+    var normalized = _normalizeWorker(w);
+    if (isApiMode() && getJwt()) {
+        var items = _getList('workers');
+        var isNew = items.findIndex(function(x) { return x.id === normalized.id; }) < 0;
+        let resp;
+        try {
+            resp = await _apiFetch('/api/workers' + (isNew ? '' : '/' + normalized.id), {
+                method: isNew ? 'POST' : 'PUT',
+                body: JSON.stringify(normalized)
+            });
+        } catch (e) {
+            throw new Error(e.message || 'Server unreachable');
+        }
+        if (resp && resp.error) {
+            throw new Error(resp.error);
+        }
+        // Confirmed — update cache
+        if (isNew) items.push(normalized);
+        else { var idx2 = items.findIndex(function(x) { return x.id === normalized.id; }); if (idx2 >= 0) items[idx2] = normalized; }
+        _setList('workers', items);
+        return normalized;
+    }
+    // Offline fallback
+    return saveWorker(w);
+}
+
 // ─── Settings ──────────────────────────────────────────────────────────────
 function getSettings() {
     if (_cache && _cache.settings && Object.keys(_cache.settings).length > 0) {
@@ -363,6 +436,21 @@ function saveSettings(settings) {
 
 function getCompanyName() {
     return getSettings().companyName || 'My Company';
+}
+
+async function saveSettingsAsync(settings) {
+    if (isApiMode() && getJwt()) {
+        let resp;
+        try {
+            resp = await _apiFetch('/api/settings', { method: 'PUT', body: JSON.stringify(settings) });
+        } catch (e) {
+            throw new Error(e.message || 'Server unreachable');
+        }
+        if (resp && resp.error) throw new Error(resp.error);
+    }
+    if (_cache) _cache.settings = settings;
+    setData('settings', settings);
+    return settings;
 }
 
 // ─── Worker key normaliser (API returns snake_case) ────────────────────────
@@ -573,9 +661,9 @@ function addAuditLog(user, action, details) {
     var logs = _getList('auditLog');
     logs.push(entry);
     _setList('auditLog', logs);
-    // Push to API (use /api/audit convenience endpoint)
+    // Push to API (use /api/auditLog endpoint — matches VALID_ENTITY_TYPES on server)
     if (isApiMode() && getJwt()) {
-        _apiFetch('/api/audit', {
+        _apiFetch('/api/auditLog', {
             method: 'POST',
             body: JSON.stringify({ user: user, action: action, details: details || '' })
         }).catch(function(e) { console.warn('[API] addAuditLog:', e.message); });
@@ -854,6 +942,7 @@ window.AppData = {
     saveLogo, getLogo, getAllPhotos, openDB,
     // Raw helpers
     getData, setData, generateId, getAll, getById, save, remove,
+    saveEntityAsync, saveWorkerAsync, saveSettingsAsync,
     // Settings
     getSettings, saveSettings, getCompanyName,
     // Workers

@@ -243,18 +243,26 @@ window.AdminSettings = {
                 }
             });
         });
-        container.querySelector('#settingsForm').addEventListener('submit', function(e) {
+        container.querySelector('#settingsForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
             fd.defaultHstRate = parseFloat(fd.defaultHstRate) || 13;
             fd.sessionTimeout = parseInt(fd.sessionTimeout) || 30;
             fd.setupComplete = true;
-            AppData.saveSettings(fd);
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveSettingsAsync(fd);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Settings'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Settings'; }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Settings Updated', 'Company settings saved');
             Utils.showToast('Settings saved successfully');
-            // Re-init email service after settings change
             if (window.EmailService) EmailService.init();
         });
 

@@ -329,7 +329,7 @@ window.AdminProjects = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#projectModalForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#projectModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -370,7 +370,19 @@ window.AdminProjects = {
                 assignedWorkers: workerIds,
                 budget: parseFloat(fd.budget) || 0,
             };
-            AppData.saveProject(projectData);
+
+            // ── Confirmed-persistence save ──
+            // Modal stays open until server confirms. On failure: re-enable, show error, keep form.
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('projects', projectData);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Project'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return; // form stays open — user can retry or cancel
+            }
+            // Only reaches here on confirmed server persistence
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Project Updated' : 'Project Created', projectData.name);
             Utils.showToast(isEdit ? 'Project updated' : 'Project created');
@@ -578,7 +590,7 @@ window.AdminProjects = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#taskForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#taskForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -594,7 +606,15 @@ window.AdminProjects = {
                 status: fd.status || 'Todo',
                 workItemId: fd.workItemId || null
             };
-            AppData.saveTask(data);
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('tasks', data);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update' : 'Add Task'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Task Updated' : 'Task Added', data.name);
             Utils.showToast(isEdit ? 'Task updated' : 'Task added');
@@ -861,7 +881,7 @@ window.AdminProjects = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#subtaskForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#subtaskForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -878,7 +898,15 @@ window.AdminProjects = {
                 startDate: (fd.startDate || '').trim(),
                 endDate: (fd.endDate || '').trim()
             };
-            AppData.saveSubtask(data);
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('subtasks', data);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update' : 'Add'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Subtask Updated' : 'Subtask Added', data.name);
             Utils.showToast(isEdit ? 'Subtask updated' : 'Subtask added');

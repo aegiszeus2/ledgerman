@@ -1424,7 +1424,7 @@ window.AdminInvoices = {
         overlay.querySelector('#editHoldbackRate').addEventListener('input', function() { holdbackRate = parseFloat(this.value) || 0; renderTotals(); });
 
         // Save
-        overlay.querySelector('#editInvoiceForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#editInvoiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             var fd = Utils.getFormData(this);
             var t = calcTotals();
@@ -1502,8 +1502,15 @@ window.AdminInvoices = {
             inv.holdback = t.hbAmt;
             inv.total = t.total;
             inv.netPayable = t.net;
-            AppData.saveInvoice(inv);
-
+            var submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('invoices', inv);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Invoice'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Invoice Edited', 'Invoice ' + inv.invoiceNumber + ' — ' + editItems.length + ' items, total ' + Utils.formatCurrency(t.total));
             Utils.showToast('Invoice saved');
@@ -1557,7 +1564,7 @@ window.AdminInvoices = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#paymentForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#paymentForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             var fd = Utils.getFormData(this);
@@ -1575,26 +1582,31 @@ window.AdminInvoices = {
                 method: fd.method || 'Other',
                 notes: (fd.notes || '').trim()
             };
-            AppData.savePayment(payment);
 
-            // Update invoice status
+            // Compute new invoice status (local calc only — no save yet)
             var inv = AppData.getInvoice(invoiceId);
             if (inv) {
-                var allPayments = AppData.getPayments(invoiceId);
-                var totalPaid = allPayments.reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
-                if (totalPaid >= (parseFloat(inv.total) || 0) - 0.01) {
-                    inv.status = 'Paid';
-                } else {
-                    inv.status = 'Partially Paid';
-                }
-                AppData.saveInvoice(inv);
+                // Include the new payment in the total (it's not in cache yet)
+                var existingPayments = AppData.getPayments(invoiceId);
+                var totalPaid = existingPayments.reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0) + amount;
+                inv.status = totalPaid >= (parseFloat(inv.total) || 0) - 0.01 ? 'Paid' : 'Partially Paid';
             }
 
+            // Confirmed-persistence save — modal stays open on failure
+            var submitBtn2 = this.querySelector('[type="submit"]');
+            if (submitBtn2) { submitBtn2.disabled = true; submitBtn2.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('payments', payment);
+                if (inv) { await AppData.saveEntityAsync('invoices', inv); }
+            } catch(err) {
+                if (submitBtn2) { submitBtn2.disabled = false; submitBtn2.textContent = 'Record Payment'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Payment Recorded', Utils.formatCurrency(amount) + ' via ' + payment.method + ' for invoice ' + (inv ? inv.invoiceNumber : ''));
             Utils.showToast('Payment of ' + Utils.formatCurrency(amount) + ' recorded');
             overlay.remove();
-
             if (onComplete) onComplete();
         });
     }

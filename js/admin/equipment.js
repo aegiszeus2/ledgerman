@@ -308,7 +308,7 @@ window.AdminEquipment = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#equipmentModalForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#equipmentModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             var fd = Utils.getFormData(this);
 
@@ -338,7 +338,15 @@ window.AdminEquipment = {
                 createdAt:            isEdit ? (item.createdAt || new Date().toISOString()) : new Date().toISOString()
             };
 
-            AppData.saveEquipment(equipmentData);
+            var submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('equipment', equipmentData);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Equipment' : 'Add Equipment'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Equipment Updated' : 'Equipment Added', equipmentData.name);
             Utils.showToast(isEdit ? 'Equipment updated' : 'Equipment added');

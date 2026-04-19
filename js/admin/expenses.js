@@ -410,7 +410,7 @@ window.AdminExpenses = {
             });
         }
 
-        overlay.querySelector('#expenseFormModal').addEventListener('submit', function(e) {
+        overlay.querySelector('#expenseFormModal').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -490,7 +490,15 @@ window.AdminExpenses = {
                 if (!isLabor) expenseData.vendor = expenseData.vendorName || '';
             }
 
-            AppData.saveExpense(expenseData);
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('expenses', expenseData);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update' : 'Add Expense'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Expense Updated' : 'Expense Added', type + ': ' + expenseData.description + ' - ' + Utils.formatCurrency(amount));
             Utils.showToast(isEdit ? 'Expense updated' : 'Expense added');

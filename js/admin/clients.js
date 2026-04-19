@@ -211,7 +211,7 @@ window.AdminClients = {
             overlay.remove();
         });
 
-        overlay.querySelector('#clientModalForm').addEventListener('submit', function(e) {
+        overlay.querySelector('#clientModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -230,7 +230,15 @@ window.AdminClients = {
                 phone: (fd.phone || '').trim(),
                 email: (fd.email || '').trim()
             };
-            AppData.saveClient(clientData);
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+                await AppData.saveEntityAsync('clients', clientData);
+            } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Client'; }
+                Utils.showToast('Save failed: ' + err.message, 'error');
+                return;
+            }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Client Updated' : 'Client Added', clientData.name);
             Utils.showToast(isEdit ? 'Client updated' : 'Client added');

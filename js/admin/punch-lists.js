@@ -350,13 +350,16 @@ window.AdminPunchLists = {
                 updated_at: new Date().toISOString()
             };
 
+            const submitBtn = document.querySelector('#punchForm [type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
             try {
-                AppData.save('punch_items', newItem);
+                await AppData.saveEntityAsync('punch_items', newItem);
                 Utils.showToast(isNew ? 'Deficiency created' : 'Deficiency updated', 'success');
                 self._renderList();
             } catch(err) {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Item'; }
                 console.error('Save failed:', err);
-                Utils.showToast('Failed to save item', 'error');
+                Utils.showToast('Failed to save item: ' + err.message, 'error');
             }
         };
     }
