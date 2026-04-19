@@ -140,6 +140,7 @@ window.AdminPunchLists = {
                                     <td style="padding:12px">
                                         <strong>${Utils.escapeHtml(item.description || 'Unnamed Item')}</strong>
                                         ${item.notes ? `<div style="font-size:0.85em;color:#94a9c4;margin-top:4px">${Utils.escapeHtml(item.notes)}</div>` : ''}
+                                        ${item.photoId ? `<div style="margin-top:4px"><span style="font-size:0.8em;color:#3498db">📷 Photo attached</span></div>` : ''}
                                     </td>
                                     <td style="padding:12px">
                                         ${Utils.escapeHtml(project ? project.name : 'Unknown')}
@@ -156,6 +157,7 @@ window.AdminPunchLists = {
                                     </td>
                                     <td style="padding:12px;text-align:center;font-size:0.85em">
                                         <button class="btn-secondary btn-sm" data-item-id="${item.id}" data-action="edit" style="font-size:0.75em">Edit</button>
+                                        ${item.photoId ? `<button class="btn-secondary btn-sm" data-item-id="${item.id}" data-photo-id="${item.photoId}" data-action="viewphoto" style="font-size:0.75em;margin-left:4px">📷</button>` : ''}
                                         <button class="btn-secondary btn-sm" data-item-id="${item.id}" data-action="delete" style="font-size:0.75em;margin-left:4px">Delete</button>
                                     </td>
                                 </tr>
@@ -248,6 +250,33 @@ window.AdminPunchLists = {
             };
         });
 
+        document.querySelectorAll('[data-action="viewphoto"]').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                const photoId = btn.dataset.photoId;
+                if (!photoId) return;
+                try {
+                    const photo = await AppData.getPhoto(photoId);
+                    if (!photo || !photo.blob) { Utils.showToast('Photo not found', 'error'); return; }
+                    const url = URL.createObjectURL(photo.blob);
+                    const overlay = document.createElement('div');
+                    overlay.className = 'modal-overlay active';
+                    overlay.style.cssText = 'display:flex;z-index:9999';
+                    overlay.innerHTML = `
+                        <div class="modal" style="max-width:90vw;max-height:90vh;padding:0;overflow:hidden;background:#000;position:relative">
+                            <button style="position:absolute;top:8px;right:8px;z-index:10;color:#fff;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:36px;height:36px;font-size:1.4rem;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
+                            <img src="${url}" style="max-width:90vw;max-height:80vh;display:block;object-fit:contain" alt="Photo">
+                        </div>
+                    `;
+                    document.body.appendChild(overlay);
+                    overlay.querySelector('button').onclick = () => { URL.revokeObjectURL(url); document.body.removeChild(overlay); };
+                    overlay.onclick = (ev) => { if (ev.target === overlay) { URL.revokeObjectURL(url); document.body.removeChild(overlay); } };
+                } catch(err) {
+                    Utils.showToast('Failed to load photo', 'error');
+                }
+            };
+        });
+
         document.querySelectorAll('[data-action="delete"]').forEach(btn => {
             btn.onclick = async (e) => {
                 e.preventDefault();
@@ -279,6 +308,21 @@ window.AdminPunchLists = {
         const priority = item ? item.priority : 'Medium';
         const status = item ? item.status : 'Open';
         const projectId = item ? item.projectId : (projects.length > 0 ? projects[0].id : '');
+        const photoId = item ? (item.photoId || null) : null;
+
+        // Load existing photo if editing
+        let existingPhotoUrl = null;
+        if (photoId) {
+            AppData.getPhoto(photoId).then(function(photo) {
+                if (photo && photo.blob) {
+                    existingPhotoUrl = URL.createObjectURL(photo.blob);
+                    const preview = document.getElementById('punchPhotoPreview');
+                    if (preview) {
+                        preview.innerHTML = `<img src="${existingPhotoUrl}" style="max-width:100%;max-height:180px;border-radius:6px;border:1px solid #ddd" alt="Attached photo"><br><small style="color:#94a9c4">Current photo — upload new to replace</small>`;
+                    }
+                }
+            }).catch(function() {});
+        }
 
         container.innerHTML = `
             <div style="max-width:600px;margin:0 auto">
@@ -326,6 +370,14 @@ window.AdminPunchLists = {
                         </div>
                     </div>
 
+                    <div style="margin-bottom:16px">
+                        <label style="display:block;font-weight:500;margin-bottom:6px">📷 Photo</label>
+                        <div id="punchPhotoPreview" style="margin-bottom:8px">${photoId ? '<em style="color:#94a9c4;font-size:0.85em">Loading existing photo…</em>' : ''}</div>
+                        <input type="file" id="punchPhotoInput" accept="image/*" capture="environment"
+                               style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.9em;background:#fff" />
+                        <div style="font-size:0.8em;color:#94a9c4;margin-top:4px">Take a photo or select from gallery. Max 10 MB.</div>
+                    </div>
+
                     <div style="display:flex;gap:8px;justify-content:space-between">
                         <button type="button" id="cancelBtn" class="btn-secondary">Cancel</button>
                         <button type="submit" class="btn-primary">Save Item</button>
@@ -336,30 +388,81 @@ window.AdminPunchLists = {
 
         document.getElementById('cancelBtn').onclick = () => self._renderList();
 
+        // Live preview when file is picked
+        document.getElementById('punchPhotoInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            const preview = document.getElementById('punchPhotoPreview');
+            const url = URL.createObjectURL(file);
+            preview.innerHTML = `<img src="${url}" style="max-width:100%;max-height:180px;border-radius:6px;border:1px solid #ddd" alt="Preview">`;
+        });
+
         document.getElementById('punchForm').onsubmit = async (e) => {
             e.preventDefault();
 
-            const newItem = {
-                id: id,
-                projectId: document.getElementById('projectSelect').value,
-                description: document.getElementById('descriptionInput').value,
-                notes: document.getElementById('notesInput').value,
-                priority: document.getElementById('prioritySelect').value,
-                status: document.getElementById('statusSelect').value,
-                created_at: item ? item.created_at : new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
-
             const submitBtn = document.querySelector('#punchForm [type="submit"]');
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+
             try {
+                // Handle photo upload
+                let savedPhotoId = photoId; // keep existing if no new file
+                const fileInput = document.getElementById('punchPhotoInput');
+                const file = fileInput && fileInput.files[0];
+                if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                        throw new Error('Photo exceeds 10 MB limit');
+                    }
+                    // Compress/thumbnail: draw to canvas at max 400px
+                    const thumbBlob = await new Promise(function(resolve) {
+                        const img = new Image();
+                        const objUrl = URL.createObjectURL(file);
+                        img.onload = function() {
+                            URL.revokeObjectURL(objUrl);
+                            const MAX = 400;
+                            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = Math.round(img.width * scale);
+                            canvas.height = Math.round(img.height * scale);
+                            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                            canvas.toBlob(resolve, 'image/jpeg', 0.75);
+                        };
+                        img.src = objUrl;
+                    });
+
+                    const newPhotoId = AppData.generateId();
+                    await AppData.savePhoto({
+                        id: newPhotoId,
+                        projectId: document.getElementById('projectSelect').value,
+                        workerId: '',
+                        submissionId: 'punch_' + id,
+                        date: new Date().toISOString().slice(0, 10),
+                        filename: file.name,
+                        blob: file,
+                        thumbnail: thumbBlob,
+                        description: document.getElementById('descriptionInput').value
+                    });
+                    savedPhotoId = newPhotoId;
+                }
+
+                const newItem = {
+                    id: id,
+                    projectId: document.getElementById('projectSelect').value,
+                    description: document.getElementById('descriptionInput').value,
+                    notes: document.getElementById('notesInput').value,
+                    priority: document.getElementById('prioritySelect').value,
+                    status: document.getElementById('statusSelect').value,
+                    photoId: savedPhotoId || undefined,
+                    created_at: item ? item.created_at : new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
                 await AppData.saveEntityAsync('punch_items', newItem);
                 Utils.showToast(isNew ? 'Deficiency created' : 'Deficiency updated', 'success');
                 self._renderList();
             } catch(err) {
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Item'; }
                 console.error('Save failed:', err);
-                Utils.showToast('Failed to save item: ' + err.message, 'error');
+                Utils.showToast('Failed to save: ' + err.message, 'error');
             }
         };
     }
