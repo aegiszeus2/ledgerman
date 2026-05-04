@@ -159,6 +159,7 @@ window.AdminApprovals = {
                     '<div style="display:flex;gap:8px;align-items:flex-start">' +
                         '<button class="btn btn-primary btn-sm approve-btn" data-id="' + sub.id + '">Approve</button>' +
                         '<button class="btn btn-danger btn-sm reject-btn" data-id="' + sub.id + '">Reject</button>' +
+                        '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '">Edit</button>' +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -198,6 +199,13 @@ window.AdminApprovals = {
         contentEl.querySelectorAll('.reject-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 self._showRejectModal(btn.dataset.id);
+            });
+        });
+
+        // Edit buttons
+        contentEl.querySelectorAll('.edit-sub-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self._showEditModal(btn.dataset.id);
             });
         });
     },
@@ -375,6 +383,125 @@ window.AdminApprovals = {
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Submission Rejected', (worker ? worker.name : 'Worker') + (reason ? ' - ' + reason : ''));
             Utils.showToast('Submission rejected');
+            overlay.remove();
+            self._renderContent();
+        });
+    },
+
+    _showEditModal(subId) {
+        const self = this;
+        const sub = AppData.getSubmission(subId);
+        if (!sub) return;
+
+        const worker = AppData.getWorker(sub.workerId);
+        const project = AppData.getProject(sub.projectId);
+        const isFlat = sub.rateType === 'Flat' || sub.rateType === 'flat';
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+            <div class="modal" style="max-width:480px">
+                <h3>Edit Submission</h3>
+                <p style="font-size:.85rem;color:var(--text2);margin-top:-8px;margin-bottom:16px">
+                    ${Utils.escapeHtml(worker ? worker.name : 'Worker')} &mdash; ${Utils.escapeHtml(project ? project.name : 'Project')}
+                </p>
+
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" class="form-control" id="editDate" value="${sub.date || ''}">
+                </div>
+
+                <div class="form-group">
+                    <label>Description / Notes</label>
+                    <textarea class="form-control" id="editDescription" rows="2">${Utils.escapeHtml(sub.description || '')}</textarea>
+                </div>
+
+                ${isFlat ? `
+                <div class="form-group">
+                    <label>Flat Amount ($)</label>
+                    <input type="number" class="form-control" id="editFlatAmount" value="${sub.flatAmount || sub.flatRate || sub.amount || 0}" step="0.01" min="0">
+                </div>
+                ` : `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" class="form-control" id="editStartTime" value="${sub.startTime || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" class="form-control" id="editEndTime" value="${sub.endTime || ''}">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="form-group">
+                        <label>Hours</label>
+                        <input type="number" class="form-control" id="editHours" value="${sub.hours || 0}" step="0.25" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Rate ($/hr)</label>
+                        <input type="number" class="form-control" id="editRate" value="${sub.rate || 0}" step="0.01" min="0">
+                    </div>
+                </div>
+                `}
+
+                <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="saveEditBtn">Save Changes</button>
+                    <button class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+
+        overlay.querySelector('#saveEditBtn').addEventListener('click', async function() {
+            const saveBtn = overlay.querySelector('#saveEditBtn');
+            const errEl = overlay.querySelector('#editErrMsg');
+            errEl.style.display = 'none';
+
+            const newDate = overlay.querySelector('#editDate').value;
+            const newDesc = overlay.querySelector('#editDescription').value.trim();
+
+            if (!newDate) { errEl.textContent = 'Date is required.'; errEl.style.display = 'block'; return; }
+
+            sub.date = newDate;
+            sub.description = newDesc;
+
+            if (isFlat) {
+                const flatAmt = parseFloat(overlay.querySelector('#editFlatAmount').value) || 0;
+                sub.flatAmount = flatAmt;
+                sub.flatRate = flatAmt;
+                sub.amount = flatAmt;
+            } else {
+                const startTime = overlay.querySelector('#editStartTime').value;
+                const endTime = overlay.querySelector('#editEndTime').value;
+                const hours = parseFloat(overlay.querySelector('#editHours').value) || 0;
+                const rate = parseFloat(overlay.querySelector('#editRate').value) || 0;
+                sub.startTime = startTime;
+                sub.endTime = endTime;
+                sub.hours = hours;
+                sub.rate = rate;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving…';
+            try {
+                await AppData.saveEntityAsync('submissions', sub);
+            } catch (e) {
+                errEl.textContent = 'Failed to save: ' + e.message;
+                errEl.style.display = 'block';
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes';
+                return;
+            }
+
+            const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            AppData.addAuditLog(username, 'Submission Edited', (worker ? worker.name : 'Worker') + ' — admin modified entry');
+            Utils.showToast('Submission updated');
             overlay.remove();
             self._renderContent();
         });
