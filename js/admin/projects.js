@@ -1327,7 +1327,7 @@ window.AdminProjects = {
             if (overlay.querySelector('#wizPrev')) {
                 overlay.querySelector('#wizPrev').addEventListener('click', function() { step--; renderWizardStep(); });
             }
-            overlay.querySelector('#wizNext').addEventListener('click', function() {
+            overlay.querySelector('#wizNext').addEventListener('click', async function() {
                 if (step === 0) {
                     const name = overlay.querySelector('#wiz-name').value.trim();
                     if (!name) { Utils.showToast('Project name is required', 'error'); return; }
@@ -1387,7 +1387,12 @@ window.AdminProjects = {
                             projectData.clientPostalCode = client.postalCode || '';
                         }
                     }
-                    AppData.saveProject(projectData);
+                    try {
+                        await AppData.saveEntityAsync('projects', projectData);
+                    } catch (e) {
+                        Utils.showToast('Failed to create project: ' + e.message, 'error');
+                        return;
+                    }
                     const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
                     AppData.addAuditLog(username, 'Project Created', projectData.name + ' (via wizard)');
                     Utils.showToast('Project created!');

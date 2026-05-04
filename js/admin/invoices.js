@@ -629,8 +629,8 @@ window.AdminInvoices = {
             self._wizardStep = 2;
             self._renderWizard();
         });
-        navEl.querySelector('#wizSave').addEventListener('click', function() {
-            self._saveInvoice();
+        navEl.querySelector('#wizSave').addEventListener('click', async function() {
+            await self._saveInvoice();
         });
     },
 
@@ -778,7 +778,7 @@ window.AdminInvoices = {
         '</div>';
     },
 
-    _saveInvoice() {
+    async _saveInvoice() {
         var self = this;
         var wd = self._wizardData;
         var project = AppData.getProject(wd.projectId);
@@ -879,14 +879,20 @@ window.AdminInvoices = {
             createdAt: new Date().toISOString()
         };
 
-        AppData.saveInvoice(invoice);
+        try {
+            await AppData.saveEntityAsync('invoices', invoice);
+        } catch (e) {
+            Utils.showToast('Failed to save invoice: ' + e.message, 'error');
+            return;
+        }
 
         // Mark expenses as invoiced
-        selectedExpenses.forEach(function(e) {
-            e.invoiced = true;
-            e.invoiceId = invoice.id;
-            AppData.saveExpense(e);
-        });
+        for (var _ei = 0; _ei < selectedExpenses.length; _ei++) {
+            var _exp = selectedExpenses[_ei];
+            _exp.invoiced = true;
+            _exp.invoiceId = invoice.id;
+            try { await AppData.saveEntityAsync('expenses', _exp); } catch (e) { /* non-critical */ }
+        }
 
         var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
         AppData.addAuditLog(username, 'Invoice Created', invoice.invoiceNumber + ' - ' + Utils.formatCurrency(total) + ' for ' + project.name);
@@ -1432,34 +1438,36 @@ window.AdminInvoices = {
             var newExpenseIds = editItems.map(function(i) { return i.expenseId || null; }).filter(Boolean);
 
             // Unmark expenses removed from this invoice (search all expenses, not just current project)
-            originalExpenseIds.forEach(function(eid) {
-                if (newExpenseIds.indexOf(eid) === -1) {
-                    var exps = AppData.getExpenses();
-                    for (var i = 0; i < exps.length; i++) {
-                        if (exps[i].id === eid) {
-                            exps[i].invoiced = false;
-                            exps[i].invoiceId = null;
-                            AppData.saveExpense(exps[i]);
+            for (var _ri = 0; _ri < originalExpenseIds.length; _ri++) {
+                var _reid = originalExpenseIds[_ri];
+                if (newExpenseIds.indexOf(_reid) === -1) {
+                    var _rexps = AppData.getExpenses();
+                    for (var _rj = 0; _rj < _rexps.length; _rj++) {
+                        if (_rexps[_rj].id === _reid) {
+                            _rexps[_rj].invoiced = false;
+                            _rexps[_rj].invoiceId = null;
+                            try { await AppData.saveEntityAsync('expenses', _rexps[_rj]); } catch (e) { /* non-critical */ }
                             break;
                         }
                     }
                 }
-            });
+            }
 
             // Mark newly added expenses as invoiced
-            newExpenseIds.forEach(function(eid) {
-                if (originalExpenseIds.indexOf(eid) === -1) {
-                    var exps = AppData.getExpenses(currentProjectId);
-                    for (var i = 0; i < exps.length; i++) {
-                        if (exps[i].id === eid) {
-                            exps[i].invoiced = true;
-                            exps[i].invoiceId = invoiceId;
-                            AppData.saveExpense(exps[i]);
+            for (var _ai = 0; _ai < newExpenseIds.length; _ai++) {
+                var _aeid = newExpenseIds[_ai];
+                if (originalExpenseIds.indexOf(_aeid) === -1) {
+                    var _aexps = AppData.getExpenses(currentProjectId);
+                    for (var _aj = 0; _aj < _aexps.length; _aj++) {
+                        if (_aexps[_aj].id === _aeid) {
+                            _aexps[_aj].invoiced = true;
+                            _aexps[_aj].invoiceId = invoiceId;
+                            try { await AppData.saveEntityAsync('expenses', _aexps[_aj]); } catch (e) { /* non-critical */ }
                             break;
                         }
                     }
                 }
-            });
+            }
 
             // Compute due date
             var dueDate = fd.dueDate || '';

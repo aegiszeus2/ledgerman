@@ -404,7 +404,17 @@ window.AdminEstimates = {
                 updated_at: new Date().toISOString()
             };
 
-            AppData.saveEstimate(newEstimate);
+            const saveBtn = overlay.querySelector('#saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving…';
+            try {
+                await AppData.saveEstimateAsync(newEstimate);
+            } catch (e) {
+                Utils.showToast('Failed to save estimate: ' + e.message, 'error');
+                saveBtn.disabled = false;
+                saveBtn.textContent = isEdit ? 'Update' : 'Create';
+                return;
+            }
             overlay.remove();
             Utils.showToast(isEdit ? 'Estimate updated' : 'Estimate created');
             if (!isEdit) {
@@ -449,7 +459,7 @@ window.AdminEstimates = {
 
         const form = overlay.querySelector('#itemForm');
         overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', () => {
+        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
             const formData = new FormData(form);
             const description = formData.get('description').trim();
 
@@ -474,7 +484,12 @@ window.AdminEstimates = {
 
             estimate.items = items;
             self._recalculateTotals(estimate);
-            AppData.saveEstimate(estimate);
+            try {
+                await AppData.saveEstimateAsync(estimate);
+            } catch (e) {
+                Utils.showToast('Failed to save item: ' + e.message, 'error');
+                return;
+            }
             overlay.remove();
             Utils.showToast(isEdit ? 'Item updated' : 'Item added');
             self._renderDetail();
@@ -552,7 +567,7 @@ window.AdminEstimates = {
 
         const form = overlay.querySelector('#costForm');
         overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', () => {
+        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
             const formData = new FormData(form);
             const costType = formData.get('costType').trim();
             const description = formData.get('description').trim();
@@ -592,7 +607,12 @@ window.AdminEstimates = {
             }
 
             self._recalculateTotals(estimate);
-            AppData.saveEstimate(estimate);
+            try {
+                await AppData.saveEstimateAsync(estimate);
+            } catch (e) {
+                Utils.showToast('Failed to save cost: ' + e.message, 'error');
+                return;
+            }
             overlay.remove();
             Utils.showToast(isEdit ? 'Cost updated' : 'Cost added');
             self._renderDetail();
@@ -625,16 +645,21 @@ window.AdminEstimates = {
         estimate.total = total;
     },
 
-    _deleteItem(estimateId, itemId) {
+    async _deleteItem(estimateId, itemId) {
         const estimate = AppData.getEstimate(estimateId);
         estimate.items = (estimate.items || []).filter(i => i.id !== itemId);
         this._recalculateTotals(estimate);
-        AppData.saveEstimate(estimate);
+        try {
+            await AppData.saveEstimateAsync(estimate);
+        } catch (e) {
+            Utils.showToast('Failed to delete item: ' + e.message, 'error');
+            return;
+        }
         Utils.showToast('Item deleted');
         this._renderDetail();
     },
 
-    _deleteCost(estimateId, itemId, subtaskId, costId) {
+    async _deleteCost(estimateId, itemId, subtaskId, costId) {
         const estimate = AppData.getEstimate(estimateId);
         const item = (estimate.items || []).find(i => i.id === itemId);
         if (!item) return;
@@ -649,7 +674,12 @@ window.AdminEstimates = {
         }
 
         this._recalculateTotals(estimate);
-        AppData.saveEstimate(estimate);
+        try {
+            await AppData.saveEstimateAsync(estimate);
+        } catch (e) {
+            Utils.showToast('Failed to delete cost: ' + e.message, 'error');
+            return;
+        }
         Utils.showToast('Cost deleted');
         this._renderDetail();
     },
@@ -658,7 +688,7 @@ window.AdminEstimates = {
         const estimate = AppData.getEstimate(estimateId);
         if (estimate) {
             estimate.status = 'sent';
-            AppData.saveEstimate(estimate);
+            try { await AppData.saveEstimateAsync(estimate); } catch (e) { Utils.showToast('Failed: ' + e.message, 'error'); return; }
             Utils.showToast('Estimate sent');
         }
     },
@@ -667,7 +697,7 @@ window.AdminEstimates = {
         const estimate = AppData.getEstimate(estimateId);
         if (estimate) {
             estimate.status = 'approved';
-            AppData.saveEstimate(estimate);
+            try { await AppData.saveEstimateAsync(estimate); } catch (e) { Utils.showToast('Failed: ' + e.message, 'error'); return; }
             Utils.showToast('Estimate approved');
         }
     },
@@ -684,7 +714,7 @@ window.AdminEstimates = {
                     budget: estimate.subtotal || 0,
                     created_at: new Date().toISOString()
                 };
-                AppData.saveProject(newProject);
+                await AppData.saveEntityAsync('projects', newProject);
                 Utils.showToast('Project created from estimate');
                 this._viewingEstimateId = null;
             }

@@ -51,7 +51,7 @@ window.AdminApprovals = {
                 const confirmed = await Utils.confirm('Approve all ' + pending.length + ' pending submissions? Each will be converted to a labor expense.');
                 if (!confirmed) return;
                 for (const sub of pending) {
-                    self._approveSubmission(sub);
+                    await self._approveSubmission(sub);
                 }
                 Utils.showToast(pending.length + ' submissions approved');
                 self._renderContent();
@@ -185,10 +185,10 @@ window.AdminApprovals = {
 
         // Approve buttons
         contentEl.querySelectorAll('.approve-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', async function() {
                 const sub = AppData.getSubmission(btn.dataset.id);
                 if (!sub) return;
-                self._approveSubmission(sub);
+                await self._approveSubmission(sub);
                 Utils.showToast('Submission approved');
                 self._renderContent();
             });
@@ -254,14 +254,14 @@ window.AdminApprovals = {
                 const worker = AppData.getWorker(sub.workerId);
                 const confirmed = await Utils.confirm('Unapprove this entry for ' + (worker ? worker.name : 'this worker') + '? The linked expense will be removed and it will return to Pending.');
                 if (!confirmed) return;
-                self._unapproveSubmission(sub);
+                await self._unapproveSubmission(sub);
                 Utils.showToast('Submission unapproved — moved back to Pending');
                 self._renderContent();
             });
         });
     },
 
-    _unapproveSubmission(sub) {
+    async _unapproveSubmission(sub) {
         // Remove the linked expense created on approval
         const allExpenses = AppData.getExpenses ? AppData.getExpenses() : [];
         const linked = allExpenses.filter(function(e) { return e.submissionId === sub.id; });
@@ -271,14 +271,19 @@ window.AdminApprovals = {
         sub.status = 'Pending';
         sub.reviewedAt = null;
         sub.reviewedBy = null;
-        AppData.saveSubmission(sub);
+        try {
+            await AppData.saveEntityAsync('submissions', sub);
+        } catch (e) {
+            Utils.showToast('Failed to unapprove: ' + e.message, 'error');
+            return;
+        }
 
         const worker = AppData.getWorker(sub.workerId);
         const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
         AppData.addAuditLog(username, 'Submission Unapproved', (worker ? worker.name : 'Worker') + ' — returned to Pending');
     },
 
-    _approveSubmission(sub) {
+    async _approveSubmission(sub) {
         // Create labor expense from submission
         let amount = 0;
         if (sub.rateType === 'flat') {
@@ -305,13 +310,23 @@ window.AdminApprovals = {
             source: 'Worker Submission',
             submissionId: sub.id
         };
-        AppData.saveExpense(expense);
+        try {
+            await AppData.saveEntityAsync('expenses', expense);
+        } catch (e) {
+            Utils.showToast('Failed to create expense record: ' + e.message, 'error');
+            return;
+        }
 
         // Mark submission as approved
         sub.status = 'Approved';
         sub.reviewedAt = new Date().toISOString();
         sub.reviewedBy = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
-        AppData.saveSubmission(sub);
+        try {
+            await AppData.saveEntityAsync('submissions', sub);
+        } catch (e) {
+            Utils.showToast('Failed to mark submission approved: ' + e.message, 'error');
+            return;
+        }
 
         const worker = AppData.getWorker(sub.workerId);
         const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
@@ -349,7 +364,12 @@ window.AdminApprovals = {
             sub.rejectionReason = reason;
             sub.reviewedAt = new Date().toISOString();
             sub.reviewedBy = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
-            AppData.saveSubmission(sub);
+            try {
+                await AppData.saveEntityAsync('submissions', sub);
+            } catch (e) {
+                Utils.showToast('Failed to reject submission: ' + e.message, 'error');
+                return;
+            }
 
             const worker = AppData.getWorker(sub.workerId);
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';

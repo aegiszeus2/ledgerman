@@ -359,7 +359,7 @@ window.AdminDailyReports = {
                 try {
                     // Update report status
                     const updated = Object.assign({}, report, { status: newStatus });
-                    AppData.save('daily_reports', updated);
+                    await AppData.saveEntityAsync('daily_reports', updated);
                     Utils.showToast(`Report marked as ${newStatus}`, 'success');
                     self._renderDetail(reportId);
                 } catch(err) {

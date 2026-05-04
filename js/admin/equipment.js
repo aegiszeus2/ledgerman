@@ -182,7 +182,12 @@ window.AdminEquipment = {
                 // Reset alert flag
                 item.alertSent = false;
                 item.lastServicedAt = new Date().toISOString();
-                AppData.saveEquipment(item);
+                try {
+                    await AppData.saveEquipmentAsync(item);
+                } catch (e) {
+                    Utils.showToast('Failed to save service reset: ' + e.message, 'error');
+                    return;
+                }
                 // Dismiss any open notifications for this equipment
                 var notifs = AppData.getNotifications ? AppData.getNotifications() : [];
                 notifs.filter(function(n) { return n.equipmentId === item.id && !n.resolved; })

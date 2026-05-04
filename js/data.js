@@ -569,12 +569,14 @@ function getWorkerSubmissions(workerId) { return getSubmissions().filter(functio
 function getEstimates() { return getAll('estimates'); }
 function getEstimate(id) { return getById('estimates', id); }
 function saveEstimate(e) { return save('estimates', e); }
+async function saveEstimateAsync(e) { return saveEntityAsync('estimates', e); }
 function deleteEstimate(id) { remove('estimates', id); }
 
 // ─── Equipment ─────────────────────────────────────────────────────────────
 function getEquipment() { return getAll('equipment'); }
 function getEquipmentItem(id) { return getById('equipment', id); }
 function saveEquipment(e) { return save('equipment', e); }
+async function saveEquipmentAsync(e) { return saveEntityAsync('equipment', e); }
 function deleteEquipment(id) { remove('equipment', id); }
 
 // ─── Equipment Logs ────────────────────────────────────────────────────────
@@ -652,6 +654,7 @@ function getBudgetVersions(projectId) {
 }
 function getBudgetVersion(id) { return getById('budget_versions', id); }
 function saveBudgetVersion(v) { return save('budget_versions', v); }
+async function saveBudgetVersionAsync(v) { return saveEntityAsync('budget_versions', v); }
 function deleteBudgetVersion(id) { remove('budget_versions', id); }
 
 // ─── Budget Items ──────────────────────────────────────────────────────────
@@ -665,6 +668,7 @@ function getBudgetItems(budgetVersionId) {
 }
 function getBudgetItem(id) { return getById('budget_items', id); }
 function saveBudgetItem(item) { return save('budget_items', item); }
+async function saveBudgetItemAsync(item) { return saveEntityAsync('budget_items', item); }
 function deleteBudgetItem(id) { remove('budget_items', id); }
 
 // ─── Audit Log ─────────────────────────────────────────────────────────────
@@ -961,6 +965,7 @@ window.AppData = {
     // Raw helpers
     getData, setData, generateId, getAll, getById, save, remove,
     saveEntityAsync, saveWorkerAsync, saveSettingsAsync,
+    saveEstimateAsync, saveEquipmentAsync, saveBudgetVersionAsync, saveBudgetItemAsync,
     // Settings
     getSettings, saveSettings, getCompanyName,
     // Workers

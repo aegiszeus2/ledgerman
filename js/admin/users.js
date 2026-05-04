@@ -488,7 +488,7 @@ window.AdminUsers = {
             overlay.querySelector('#pinError').style.display = 'none';
         };
         overlay.querySelector('#cancelPinBtn').onclick = function() { document.body.removeChild(overlay); };
-        overlay.querySelector('#savePinBtn').onclick = function() {
+        overlay.querySelector('#savePinBtn').onclick = async function() {
             const pin = overlay.querySelector('#manualPinInput').value.trim();
             const errEl = overlay.querySelector('#pinError');
             if (!pin || !/^\d{6,12}$/.test(pin)) {
@@ -497,7 +497,13 @@ window.AdminUsers = {
                 return;
             }
             worker.pin = pin;
-            AppData.saveWorker(worker);
+            try {
+                await AppData.saveWorkerAsync(worker);
+            } catch (e) {
+                errEl.textContent = 'Failed to save PIN: ' + e.message;
+                errEl.style.display = 'block';
+                return;
+            }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'PIN Set', 'Worker: ' + worker.name);
             Utils.showToast('PIN updated for ' + worker.name);
@@ -669,7 +675,7 @@ window.AdminUsers = {
                 });
             }
 
-            overlay.querySelector('#wizNext').addEventListener('click', function() {
+            overlay.querySelector('#wizNext').addEventListener('click', async function() {
                 if (step === 0) {
                     var name = overlay.querySelector('#wiz-name').value.trim();
                     if (!name) { Utils.showToast('Worker name is required', 'error'); return; }
@@ -703,20 +709,25 @@ window.AdminUsers = {
                         costRate: parseFloat(d.costRate) || 0,
                         defaultRate: parseFloat(d.payRate) || 0
                     };
-                    AppData.saveWorker(workerData);
+                    try {
+                        await AppData.saveWorkerAsync(workerData);
+                    } catch (e) {
+                        Utils.showToast('Failed to save worker: ' + e.message, 'error');
+                        return;
+                    }
 
                     // Assign to projects
                     var selectedProjects = d.projects || [];
-                    selectedProjects.forEach(function(pid) {
-                        var project = AppData.getProject(pid);
+                    for (var i = 0; i < selectedProjects.length; i++) {
+                        var project = AppData.getProject(selectedProjects[i]);
                         if (project) {
                             var assigned = project.assignedWorkers || [];
                             if (!assigned.includes(workerData.id)) {
                                 project.assignedWorkers = assigned.concat([workerData.id]);
-                                AppData.saveProject(project);
+                                try { await AppData.saveEntityAsync('projects', project); } catch (e) { /* non-critical */ }
                             }
                         }
-                    });
+                    }
 
                     var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
                     AppData.addAuditLog(username, 'Worker Added', workerData.name + ' (' + workerData.role + ') (via wizard)');

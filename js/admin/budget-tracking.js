@@ -541,7 +541,7 @@ window.AdminBudgetTracking = {
     // ══════════════════════════════════════════════════════════════════════
     //  BUDGET VERSION MANAGEMENT
     // ══════════════════════════════════════════════════════════════════════
-    _createDraftVersion() {
+    async _createDraftVersion() {
         const self = this;
         const projectId = self._projectId;
         const versions = AppData.getBudgetVersions ? AppData.getBudgetVersions(projectId) : [];
@@ -562,14 +562,19 @@ window.AdminBudgetTracking = {
             approvedBy: null,
             notes: '',
         };
-        AppData.saveBudgetVersion(ver);
+        try {
+            await AppData.saveBudgetVersionAsync(ver);
+        } catch (e) {
+            Utils.showToast('Failed to create budget version: ' + e.message, 'error');
+            return;
+        }
         AppData.addAuditLog('Admin', 'budget_version_created', 'Created draft budget v' + versionNum + ' for project ' + projectId);
         self._budgetVersionId = ver.id;
         self._view = 'version';
         self.render(self._container);
     },
 
-    _approveVersion(versionId) {
+    async _approveVersion(versionId) {
         const self = this;
         const ver = AppData.getBudgetVersion(versionId);
         if (!ver) return;
@@ -583,7 +588,12 @@ window.AdminBudgetTracking = {
         ver.approvedAt = new Date().toISOString();
         ver.approvedBy = 'Admin';
         ver.totalBudget = items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
-        AppData.saveBudgetVersion(ver);
+        try {
+            await AppData.saveBudgetVersionAsync(ver);
+        } catch (e) {
+            Utils.showToast('Failed to approve budget: ' + e.message, 'error');
+            return;
+        }
         AppData.addAuditLog('Admin', 'budget_approved', 'Approved budget v' + ver.version + ' ($' + ver.totalBudget.toFixed(2) + ') for project ' + ver.projectId);
         Utils.showToast('Budget approved and locked as baseline.', 'success');
         self._view = 'project';
@@ -591,7 +601,7 @@ window.AdminBudgetTracking = {
         self.render(self._container);
     },
 
-    _createRevision(sourceVersionId) {
+    async _createRevision(sourceVersionId) {
         const self = this;
         const source = AppData.getBudgetVersion(sourceVersionId);
         if (!source) return;
@@ -616,19 +626,28 @@ window.AdminBudgetTracking = {
             approvedBy: null,
             notes: 'Revised from v' + source.version,
         };
-        AppData.saveBudgetVersion(newVer);
+        try {
+            await AppData.saveBudgetVersionAsync(newVer);
+        } catch (e) {
+            Utils.showToast('Failed to create revision: ' + e.message, 'error');
+            return;
+        }
 
         // Copy all items from source
         const sourceItems = AppData.getBudgetItems ? AppData.getBudgetItems(sourceVersionId) : [];
-        sourceItems.forEach(item => {
+        for (const item of sourceItems) {
             const newItem = Object.assign({}, item, {
                 id: Date.now().toString(36) + Math.random().toString(36).substr(2,9),
                 budgetVersionId: newVer.id,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             });
-            AppData.saveBudgetItem(newItem);
-        });
+            try {
+                await AppData.saveBudgetItemAsync(newItem);
+            } catch (e) {
+                Utils.showToast('Error copying item: ' + e.message, 'error');
+            }
+        }
 
         AppData.addAuditLog('Admin', 'budget_revision_created', 'Created revision v' + newVersion + ' from v' + source.version);
         Utils.showToast('Revision created. ' + sourceItems.length + ' items copied.', 'success');
@@ -756,7 +775,7 @@ window.AdminBudgetTracking = {
         });
 
         overlay.querySelector('#fi_cancel').onclick = () => document.body.removeChild(overlay);
-        overlay.querySelector('#fi_save').onclick = () => {
+        overlay.querySelector('#fi_save').onclick = async () => {
             const errorEl = overlay.querySelector('#fi_error');
             const desc    = overlay.querySelector('#fi_description').value.trim();
             const qty     = parseFloat(overlay.querySelector('#fi_qty').value);
@@ -788,7 +807,17 @@ window.AdminBudgetTracking = {
                 createdAt:   item.createdAt || new Date().toISOString(),
                 updatedAt:   new Date().toISOString(),
             };
-            AppData.saveBudgetItem(saved);
+            const saveBtn = overlay.querySelector('#fi_save');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving…';
+            try {
+                await AppData.saveBudgetItemAsync(saved);
+            } catch (e) {
+                Utils.showToast('Failed to save item: ' + e.message, 'error');
+                saveBtn.disabled = false;
+                saveBtn.textContent = isNew ? 'Add Item' : 'Save Changes';
+                return;
+            }
             AppData.addAuditLog('Admin', isNew ? 'budget_item_added' : 'budget_item_edited', desc + ' $' + saved.total.toFixed(2));
             document.body.removeChild(overlay);
             self.render(self._container);
@@ -1143,12 +1172,14 @@ window.AdminBudgetTracking = {
             });
 
             document.getElementById('ai_cancel2').onclick = () => document.body.removeChild(overlay);
-            document.getElementById('ai_commit').onclick = () => {
+            document.getElementById('ai_commit').onclick = async () => {
                 const ver = AppData.getBudgetVersion(self._budgetVersionId);
                 if (!ver) return;
+                const commitBtn = document.getElementById('ai_commit');
+                if (commitBtn) { commitBtn.disabled = true; commitBtn.textContent = 'Saving…'; }
                 let saved = 0;
-                editableItems.forEach(item => {
-                    if (!item.description.trim()) return;
+                for (const item of editableItems) {
+                    if (!item.description.trim()) continue;
                     const newItem = {
                         id: Date.now().toString(36) + Math.random().toString(36).substr(2,9) + saved,
                         projectId: ver.projectId,
@@ -1165,9 +1196,13 @@ window.AdminBudgetTracking = {
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString(),
                     };
-                    AppData.saveBudgetItem(newItem);
-                    saved++;
-                });
+                    try {
+                        await AppData.saveBudgetItemAsync(newItem);
+                        saved++;
+                    } catch (e) {
+                        Utils.showToast('Error saving item "' + newItem.description + '": ' + e.message, 'error');
+                    }
+                }
                 AppData.addAuditLog('Admin', 'budget_ai_import', saved + ' items imported via AI parser');
                 document.body.removeChild(overlay);
                 Utils.showToast(saved + ' work items added.', 'success');
@@ -1400,11 +1435,13 @@ window.AdminBudgetTracking = {
 if (typeof AppData !== 'undefined') {
     AppData.getBudgetVersions  = AppData.getBudgetVersions  || function(pid) { return typeof getBudgetVersions  === 'function' ? getBudgetVersions(pid)  : []; };
     AppData.getBudgetVersion   = AppData.getBudgetVersion   || function(id)  { return typeof getBudgetVersion   === 'function' ? getBudgetVersion(id)    : null; };
-    AppData.saveBudgetVersion  = AppData.saveBudgetVersion  || function(v)   { return typeof saveBudgetVersion  === 'function' ? saveBudgetVersion(v)    : null; };
-    AppData.deleteBudgetVersion = AppData.deleteBudgetVersion || function(id) { return typeof deleteBudgetVersion === 'function' ? deleteBudgetVersion(id) : null; };
-    AppData.getBudgetItems     = AppData.getBudgetItems     || function(vid) { return typeof getBudgetItems     === 'function' ? getBudgetItems(vid)     : []; };
-    AppData.getBudgetItem      = AppData.getBudgetItem      || function(id)  { return typeof getBudgetItem      === 'function' ? getBudgetItem(id)       : null; };
-    AppData.saveBudgetItem     = AppData.saveBudgetItem     || function(i)   { return typeof saveBudgetItem     === 'function' ? saveBudgetItem(i)       : null; };
-    AppData.deleteBudgetItem   = AppData.deleteBudgetItem   || function(id)  { return typeof deleteBudgetItem   === 'function' ? deleteBudgetItem(id)    : null; };
-    AppData.generateId         = AppData.generateId         || function()    { return Date.now().toString(36) + Math.random().toString(36).substr(2,9); };
+    AppData.saveBudgetVersion      = AppData.saveBudgetVersion      || function(v)   { return typeof saveBudgetVersion      === 'function' ? saveBudgetVersion(v)      : null; };
+    AppData.saveBudgetVersionAsync = AppData.saveBudgetVersionAsync || function(v)   { return typeof saveBudgetVersionAsync === 'function' ? saveBudgetVersionAsync(v) : Promise.resolve(null); };
+    AppData.deleteBudgetVersion    = AppData.deleteBudgetVersion    || function(id)  { return typeof deleteBudgetVersion    === 'function' ? deleteBudgetVersion(id)  : null; };
+    AppData.getBudgetItems         = AppData.getBudgetItems         || function(vid) { return typeof getBudgetItems         === 'function' ? getBudgetItems(vid)      : []; };
+    AppData.getBudgetItem          = AppData.getBudgetItem          || function(id)  { return typeof getBudgetItem          === 'function' ? getBudgetItem(id)        : null; };
+    AppData.saveBudgetItem         = AppData.saveBudgetItem         || function(i)   { return typeof saveBudgetItem         === 'function' ? saveBudgetItem(i)        : null; };
+    AppData.saveBudgetItemAsync    = AppData.saveBudgetItemAsync    || function(i)   { return typeof saveBudgetItemAsync    === 'function' ? saveBudgetItemAsync(i)   : Promise.resolve(null); };
+    AppData.deleteBudgetItem       = AppData.deleteBudgetItem       || function(id)  { return typeof deleteBudgetItem       === 'function' ? deleteBudgetItem(id)     : null; };
+    AppData.generateId             = AppData.generateId             || function()    { return Date.now().toString(36) + Math.random().toString(36).substr(2,9); };
 }

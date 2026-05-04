@@ -298,14 +298,14 @@ window.AdminExpensesReview = {
         // Bulk actions
         var markBillable = self._container.querySelector('#erMarkBillable');
         if (markBillable) {
-            markBillable.addEventListener('click', function() {
-                self._bulkSetBillable(true);
+            markBillable.addEventListener('click', async function() {
+                await self._bulkSetBillable(true);
             });
         }
         var markNonBillable = self._container.querySelector('#erMarkNonBillable');
         if (markNonBillable) {
-            markNonBillable.addEventListener('click', function() {
-                self._bulkSetBillable(false);
+            markNonBillable.addEventListener('click', async function() {
+                await self._bulkSetBillable(false);
             });
         }
 
@@ -419,16 +419,16 @@ window.AdminExpensesReview = {
         }
     },
 
-    _bulkSetBillable(billable) {
+    async _bulkSetBillable(billable) {
         var self = this;
         if (self._selected.length === 0) return;
-        self._selected.forEach(function(id) {
-            var exp = AppData.getExpense(id);
-            if (!exp || exp.invoiceStatus === 'Already Invoiced') return;
+        for (var _bi = 0; _bi < self._selected.length; _bi++) {
+            var exp = AppData.getExpense(self._selected[_bi]);
+            if (!exp || exp.invoiceStatus === 'Already Invoiced') continue;
             exp.billable = billable;
             exp.invoiceStatus = billable ? 'Ready to Invoice' : 'N/A';
-            AppData.saveExpense(exp);
-        });
+            try { await AppData.saveEntityAsync('expenses', exp); } catch (e) { /* non-critical */ }
+        }
         Utils.showToast('Updated ' + self._selected.length + ' expense(s)');
         self._selected = [];
         self._renderView();
