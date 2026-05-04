@@ -126,6 +126,8 @@ window.AdminApprovals = {
             return;
         }
 
+        const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
+
         contentEl.innerHTML = pending.map(function(sub) {
             const worker = AppData.getWorker(sub.workerId);
             const project = AppData.getProject(sub.projectId);
@@ -141,11 +143,17 @@ window.AdminApprovals = {
                 amountInfo = timeStr + (parseFloat(sub.hours) || 0) + ' hrs @ ' + Utils.formatCurrency(sub.rate || 0) + '/hr = ' + Utils.formatCurrency((parseFloat(sub.hours) || 0) * (parseFloat(sub.rate) || 0));
             }
 
+            const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
+            const editBadge = editHistory.length > 0
+                ? '<span style="font-size:.72rem;padding:1px 7px;border-radius:10px;background:rgba(255,165,0,.18);color:#b8860b;margin-left:6px" title="' + Utils.escapeHtml(editHistory.map(function(e){ return 'Edited by ' + e.modifiedBy + (e.reason ? ': ' + e.reason : ''); }).join(' | ')) + '">✏ edited ' + editHistory.length + 'x</span>'
+                : '';
+
             return '<div class="card" data-sub-id="' + sub.id + '" style="border-left:3px solid var(--warn)">' +
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">' +
                     '<div style="flex:1;min-width:200px">' +
                         '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
                             '<strong style="font-size:1.05rem">' + Utils.escapeHtml(workerName) + '</strong>' +
+                            editBadge +
                             '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
                             '<span style="font-size:.8rem;color:var(--text2)">' + Utils.formatDate(sub.date) + '</span>' +
                         '</div>' +
@@ -159,7 +167,7 @@ window.AdminApprovals = {
                     '<div style="display:flex;gap:8px;align-items:flex-start">' +
                         '<button class="btn btn-primary btn-sm approve-btn" data-id="' + sub.id + '">Approve</button>' +
                         '<button class="btn btn-danger btn-sm reject-btn" data-id="' + sub.id + '">Reject</button>' +
-                        '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '">Edit</button>' +
+                        (isAdmin ? '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '">Edit</button>' : '') +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -202,7 +210,7 @@ window.AdminApprovals = {
             });
         });
 
-        // Edit buttons
+        // Edit buttons (admin only — button already hidden for non-admins via render logic)
         contentEl.querySelectorAll('.edit-sub-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 self._showEditModal(btn.dataset.id);
@@ -221,6 +229,8 @@ window.AdminApprovals = {
             return;
         }
 
+        const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
+
         contentEl.innerHTML = '<div class="card"><table>' +
             '<thead><tr><th>Date</th><th>Worker</th><th>Project</th><th>Description</th><th class="amount">Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>' +
             '<tbody>' +
@@ -228,7 +238,7 @@ window.AdminApprovals = {
                 const worker = AppData.getWorker(sub.workerId);
                 const project = AppData.getProject(sub.projectId);
                 let amount = 0;
-                if (sub.rateType === 'flat') {
+                if (sub.rateType === 'flat' || sub.rateType === 'Flat') {
                     amount = parseFloat(sub.flatAmount || sub.amount) || 0;
                 } else {
                     amount = (parseFloat(sub.hours) || 0) * (parseFloat(sub.rate) || 0);
@@ -236,20 +246,30 @@ window.AdminApprovals = {
                 const statusStyle = sub.status === 'Approved'
                     ? 'background:rgba(46,204,113,.2);color:var(--success)'
                     : 'background:rgba(233,69,96,.2);color:var(--accent)';
-                const actionBtn = sub.status === 'Approved'
-                    ? '<button class="btn-secondary btn-sm unapprove-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px;white-space:nowrap">Unapprove</button>'
+                const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
+                const editedTag = editHistory.length > 0
+                    ? ' <span style="font-size:.68rem;color:#b8860b" title="' + Utils.escapeHtml(editHistory.map(function(e){ return 'Edited by ' + e.modifiedBy + (e.reason ? ': ' + e.reason : ''); }).join(' | ')) + '">✏</span>'
                     : '';
+
+                let actionBtns = '';
+                if (sub.status === 'Approved') {
+                    actionBtns += '<button class="btn-secondary btn-sm unapprove-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px;white-space:nowrap">Unapprove</button> ';
+                }
+                if (isAdmin) {
+                    actionBtns += '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px">Edit</button>';
+                }
+
                 return '<tr>' +
                     '<td>' + Utils.formatDate(sub.date) + '</td>' +
                     '<td>' + Utils.escapeHtml(worker ? worker.name : 'Unknown') + '</td>' +
                     '<td>' + Utils.escapeHtml(project ? project.name : 'Unknown') + '</td>' +
-                    '<td>' + Utils.escapeHtml(sub.description || '') +
+                    '<td>' + Utils.escapeHtml(sub.description || '') + editedTag +
                         (sub.rejectionReason ? '<br><span style="font-size:.8rem;color:var(--accent)">Reason: ' + Utils.escapeHtml(sub.rejectionReason) + '</span>' : '') +
                     '</td>' +
                     '<td class="amount">' + Utils.formatCurrency(amount) + '</td>' +
                     '<td style="font-size:.78rem;white-space:nowrap">' + (sub.entryMethod === 'Clock In/Out' ? '<span style="color:var(--success)">⏱ Clock In/Out</span>' : '<span style="color:var(--text2)">✏️ Manual</span>') + '</td>' +
                     '<td><span style="font-size:.75rem;padding:2px 8px;border-radius:12px;' + statusStyle + '">' + sub.status + '</span></td>' +
-                    '<td>' + actionBtn + '</td>' +
+                    '<td style="white-space:nowrap">' + actionBtns + '</td>' +
                 '</tr>';
             }).join('') +
             '</tbody></table></div>';
@@ -265,6 +285,13 @@ window.AdminApprovals = {
                 await self._unapproveSubmission(sub);
                 Utils.showToast('Submission unapproved — moved back to Pending');
                 self._renderContent();
+            });
+        });
+
+        // Edit buttons on history tab
+        contentEl.querySelectorAll('.edit-sub-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self._showEditModal(btn.dataset.id);
             });
         });
     },
@@ -396,16 +423,56 @@ window.AdminApprovals = {
         const worker = AppData.getWorker(sub.workerId);
         const project = AppData.getProject(sub.projectId);
         const isFlat = sub.rateType === 'Flat' || sub.rateType === 'flat';
+        const isApproved = sub.status === 'Approved';
+        const isRejected = sub.status === 'Rejected';
+        const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
+
+        // Build edit history HTML
+        let historyHtml = '';
+        if (editHistory.length > 0) {
+            historyHtml = '<div style="background:var(--bg2,#f8f8f8);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.8rem">' +
+                '<strong style="display:block;margin-bottom:6px;color:var(--text2)">Edit History</strong>' +
+                editHistory.map(function(e) {
+                    const changeLines = Object.keys(e.changes || {}).map(function(k) {
+                        return '<span style="color:var(--text2)">' + Utils.escapeHtml(k) + ':</span> ' +
+                               Utils.escapeHtml(String(e.changes[k].from)) + ' → ' +
+                               '<strong>' + Utils.escapeHtml(String(e.changes[k].to)) + '</strong>';
+                    }).join(' &nbsp;|&nbsp; ');
+                    return '<div style="margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid var(--border,#e0e0e0)">' +
+                        '<span style="color:var(--text2)">' + (e.modifiedAt ? new Date(e.modifiedAt).toLocaleString() : '') + '</span> &nbsp;by <strong>' + Utils.escapeHtml(e.modifiedBy || '') + '</strong>' +
+                        (e.reason ? ' &mdash; <em>' + Utils.escapeHtml(e.reason) + '</em>' : '') +
+                        (changeLines ? '<br>' + changeLines : '') +
+                    '</div>';
+                }).join('') +
+            '</div>';
+        }
+
+        // Status warning banner
+        let statusBanner = '';
+        if (isApproved) {
+            statusBanner = '<div style="background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.85rem">' +
+                '⚠️ This entry is <strong>Approved</strong>. Editing will update the record. ' +
+                'Check "Require re-approval" below to move it back to Pending and invalidate the linked expense.' +
+            '</div>';
+        } else if (isRejected) {
+            statusBanner = '<div style="background:rgba(52,152,219,.1);border:1px solid rgba(52,152,219,.3);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.85rem">' +
+                'ℹ️ This entry was <strong>Rejected</strong>. You can edit and optionally move it back to Pending for re-review.' +
+            '</div>';
+        }
 
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
         overlay.style.display = 'flex';
         overlay.innerHTML = `
-            <div class="modal" style="max-width:480px">
+            <div class="modal" style="max-width:500px;max-height:90vh;overflow-y:auto">
                 <h3>Edit Submission</h3>
-                <p style="font-size:.85rem;color:var(--text2);margin-top:-8px;margin-bottom:16px">
+                <p style="font-size:.85rem;color:var(--text2);margin-top:-8px;margin-bottom:14px">
                     ${Utils.escapeHtml(worker ? worker.name : 'Worker')} &mdash; ${Utils.escapeHtml(project ? project.name : 'Project')}
+                    <span style="font-size:.78rem;padding:2px 7px;border-radius:10px;margin-left:6px;background:${isApproved ? 'rgba(46,204,113,.2);color:var(--success)' : isRejected ? 'rgba(233,69,96,.2);color:var(--accent)' : 'rgba(255,193,7,.2);color:#856404'}">${sub.status || 'Pending'}</span>
                 </p>
+
+                ${statusBanner}
+                ${historyHtml}
 
                 <div class="form-group">
                     <label>Date</label>
@@ -445,6 +512,20 @@ window.AdminApprovals = {
                 </div>
                 `}
 
+                <div class="form-group">
+                    <label>Reason for modification <span style="color:var(--text2);font-weight:normal">(recommended)</span></label>
+                    <input type="text" class="form-control" id="editReason" placeholder="e.g. Worker reported wrong hours, corrected to 7.5">
+                </div>
+
+                ${(isApproved || isRejected) ? `
+                <div class="form-group" style="display:flex;align-items:center;gap:8px">
+                    <input type="checkbox" id="editReApprove" ${isRejected ? 'checked' : ''}>
+                    <label for="editReApprove" style="margin:0;cursor:pointer">
+                        ${isApproved ? 'Require re-approval (moves back to Pending, removes linked expense)' : 'Move back to Pending for re-review'}
+                    </label>
+                </div>
+                ` : ''}
+
                 <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
 
                 <div class="form-actions">
@@ -464,33 +545,45 @@ window.AdminApprovals = {
             errEl.style.display = 'none';
 
             const newDate = overlay.querySelector('#editDate').value;
-            const newDesc = overlay.querySelector('#editDescription').value.trim();
-
             if (!newDate) { errEl.textContent = 'Date is required.'; errEl.style.display = 'block'; return; }
 
-            sub.date = newDate;
-            sub.description = newDesc;
+            const reason = overlay.querySelector('#editReason').value.trim();
+            const reApproveEl = overlay.querySelector('#editReApprove');
+            const requireReApproval = reApproveEl ? reApproveEl.checked : false;
+
+            const fields = { date: newDate, description: overlay.querySelector('#editDescription').value.trim() };
 
             if (isFlat) {
                 const flatAmt = parseFloat(overlay.querySelector('#editFlatAmount').value) || 0;
-                sub.flatAmount = flatAmt;
-                sub.flatRate = flatAmt;
-                sub.amount = flatAmt;
+                fields.flatAmount = flatAmt;
+                fields.flatRate = flatAmt;
+                fields.amount = flatAmt;
             } else {
-                const startTime = overlay.querySelector('#editStartTime').value;
-                const endTime = overlay.querySelector('#editEndTime').value;
-                const hours = parseFloat(overlay.querySelector('#editHours').value) || 0;
-                const rate = parseFloat(overlay.querySelector('#editRate').value) || 0;
-                sub.startTime = startTime;
-                sub.endTime = endTime;
-                sub.hours = hours;
-                sub.rate = rate;
+                fields.startTime = overlay.querySelector('#editStartTime').value;
+                fields.endTime = overlay.querySelector('#editEndTime').value;
+                fields.hours = parseFloat(overlay.querySelector('#editHours').value) || 0;
+                fields.rate = parseFloat(overlay.querySelector('#editRate').value) || 0;
+            }
+
+            // If moving approved back to pending, also remove linked expense client-side
+            if (requireReApproval && isApproved) {
+                const allExpenses = AppData.getExpenses ? AppData.getExpenses() : [];
+                const linked = allExpenses.filter(function(e) { return e.submissionId === subId; });
+                linked.forEach(function(e) { AppData.deleteExpense(e.id); });
             }
 
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving…';
             try {
-                await AppData.saveEntityAsync('submissions', sub);
+                // Use editSubmissionAsync if available (dedicated route with full audit trail)
+                if (typeof AppData.editSubmissionAsync === 'function') {
+                    await AppData.editSubmissionAsync(subId, fields, reason, requireReApproval);
+                } else {
+                    // Fallback: generic save (older deploy)
+                    Object.assign(sub, fields);
+                    if (requireReApproval && isApproved) { sub.status = 'Pending'; sub.reviewedAt = null; sub.reviewedBy = null; }
+                    await AppData.saveEntityAsync('submissions', sub);
+                }
             } catch (e) {
                 errEl.textContent = 'Failed to save: ' + e.message;
                 errEl.style.display = 'block';
@@ -499,9 +592,7 @@ window.AdminApprovals = {
                 return;
             }
 
-            const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
-            AppData.addAuditLog(username, 'Submission Edited', (worker ? worker.name : 'Worker') + ' — admin modified entry');
-            Utils.showToast('Submission updated');
+            Utils.showToast('Submission updated' + (requireReApproval && (isApproved || isRejected) ? ' — moved to Pending' : ''));
             overlay.remove();
             self._renderContent();
         });

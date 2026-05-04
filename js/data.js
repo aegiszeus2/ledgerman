@@ -671,6 +671,33 @@ function saveBudgetItem(item) { return save('budget_items', item); }
 async function saveBudgetItemAsync(item) { return saveEntityAsync('budget_items', item); }
 function deleteBudgetItem(id) { remove('budget_items', id); }
 
+// ─── Submission Admin Edit ──────────────────────────────────────────────────
+/**
+ * editSubmissionAsync(submissionId, fields, reason, requireReApproval)
+ * Calls the dedicated admin-edit endpoint — records field-level diff + audit trail.
+ * Admin role required (enforced server-side). Throws on failure.
+ */
+async function editSubmissionAsync(submissionId, fields, reason, requireReApproval) {
+    const body = Object.assign({}, fields, {
+        reason: reason || '',
+        requireReApproval: !!requireReApproval
+    });
+    const resp = await _apiFetch('/api/submissions/' + submissionId + '/admin-edit', {
+        method: 'PATCH',
+        body: JSON.stringify(body)
+    });
+    if (!resp || resp.error) {
+        throw new Error(resp && resp.error ? resp.error : 'Failed to edit submission');
+    }
+    // Update local cache
+    var cached = getData('submissions');
+    var idx = cached.findIndex(function(s) { return s.id === submissionId; });
+    if (idx >= 0) cached[idx] = resp;
+    else cached.push(resp);
+    setData('submissions', cached);
+    return resp;
+}
+
 // ─── Audit Log ─────────────────────────────────────────────────────────────
 function addAuditLog(user, action, details) {
     var entry = {
@@ -966,6 +993,7 @@ window.AppData = {
     getData, setData, generateId, getAll, getById, save, remove,
     saveEntityAsync, saveWorkerAsync, saveSettingsAsync,
     saveEstimateAsync, saveEquipmentAsync, saveBudgetVersionAsync, saveBudgetItemAsync,
+    editSubmissionAsync,
     // Settings
     getSettings, saveSettings, getCompanyName,
     // Workers
