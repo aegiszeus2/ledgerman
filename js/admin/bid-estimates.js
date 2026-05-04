@@ -80,7 +80,10 @@ window.AdminEstimates = (function () {
         _container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2 style="margin:0">Bid Estimates</h2>
-                <button class="btn-primary" id="addEstimateBtn">+ New Estimate</button>
+                <div style="display:flex;gap:8px">
+                    <button class="btn-secondary btn-sm" id="manageCrewsBtn">Manage Crews</button>
+                    <button class="btn-primary" id="addEstimateBtn">+ New Estimate</button>
+                </div>
             </div>
 
             <div class="tabs" style="margin-bottom:16px">
@@ -129,6 +132,7 @@ window.AdminEstimates = (function () {
         });
 
         _container.querySelector('#addEstimateBtn').addEventListener('click', () => _showEstimateForm(null));
+        _container.querySelector('#manageCrewsBtn').addEventListener('click', () => _showResourceGroupManager());
 
         _container.querySelectorAll('.estimate-row').forEach(row => {
             row.addEventListener('click', e => {
@@ -279,6 +283,12 @@ window.AdminEstimates = (function () {
                 } catch (err) { Utils.showToast('Error: ' + err.message, 'error'); }
             });
         });
+        _container.querySelectorAll('.import-rg-btn').forEach(btn => {
+            btn.addEventListener('click', () => _showImportResourceGroupForm(btn.dataset.taskId));
+        });
+        _container.querySelectorAll('.refresh-rg-btn').forEach(btn => {
+            btn.addEventListener('click', () => _refreshResourceGroupRates(btn.dataset.taskId));
+        });
     }
 
     function _totalCard(label, value, highlight) {
@@ -348,7 +358,7 @@ window.AdminEstimates = (function () {
                         <tbody>
                             ${lines.map(ln => `
                                 <tr style="border-bottom:1px solid var(--border)">
-                                    <td style="padding:3px 6px"><span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${typeColors[ln.type] || '#6b7280'}22;color:${typeColors[ln.type] || '#6b7280'};font-size:0.75rem;font-weight:600;text-transform:capitalize">${ln.type}</span>${ln.labourRole ? `<br><span style="font-size:0.72rem;color:var(--text-muted)">${esc(ln.labourRole)}</span>` : ''}</td>
+                                    <td style="padding:3px 6px"><span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${typeColors[ln.type] || '#6b7280'}22;color:${typeColors[ln.type] || '#6b7280'};font-size:0.75rem;font-weight:600;text-transform:capitalize">${ln.type}</span>${ln.labourRole ? `<br><span style="font-size:0.72rem;color:var(--text-muted)">${esc(ln.labourRole)}</span>` : ''}${ln.lineSource && ln.lineSource !== 'manual' ? `<br><span style="font-size:0.68rem;background:#dbeafe;color:#1e40af;padding:0px 4px;border-radius:2px">${ln.lineSource === 'overridden' ? 'refreshed' : 'imported'}</span>` : ''}</td>
                                     <td style="padding:3px 6px">${esc(ln.description || '—')}</td>
                                     <td style="padding:3px 6px;text-align:right">${ln.quantity}</td>
                                     <td style="padding:3px 6px">${esc(ln.unit || '')}</td>
@@ -382,10 +392,12 @@ window.AdminEstimates = (function () {
                     </p>
                 ` : ''}
 
-                <div style="margin-top:8px;display:flex;gap:8px">
+                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
                     ${canEdit ? `<button class="btn-secondary btn-xs add-line-btn" data-task-id="${task.id}">+ Add Cost Line</button>` : ''}
+                    ${canEdit ? `<button class="btn-secondary btn-xs import-rg-btn" data-task-id="${task.id}">Import Crew</button>` : ''}
                     ${canEdit ? `<button class="btn-ghost btn-xs task-edit-btn" data-task-id="${task.id}">Edit Task</button>` : ''}
                     ${canEdit ? `<button class="btn-ghost btn-xs task-delete-btn" data-task-id="${task.id}" style="color:var(--accent)">Delete Task</button>` : ''}
+                    ${_hasImportedLines(task) ? `<button class="btn-ghost btn-xs refresh-rg-btn" data-task-id="${task.id}" style="color:var(--primary)">Refresh Rates</button>` : ''}
                 </div>
             </div>
         </div>
@@ -852,6 +864,218 @@ window.AdminEstimates = (function () {
                 saveBtn.textContent = isEdit ? 'Update' : 'Add Line';
             }
         });
+    }
+
+    // ── Resource group helpers ────────────────────────────────────────────────
+
+    function _hasImportedLines(task) {
+        return (task.costLines || []).some(ln => ln.lineSource && ln.lineSource !== 'manual');
+    }
+
+    // ── Import Resource Group modal ───────────────────────────────────────────
+    async function _showImportResourceGroupForm(taskId) {
+        const est  = _currentEstimate;
+        const task = (est.tasks || []).find(t => t.id === taskId);
+
+        let groups = [];
+        try {
+            groups = await _api('/api/resource-groups');
+        } catch (e) {
+            Utils.showToast('Could not load crews: ' + e.message, 'error');
+            return;
+        }
+
+        const activeGroups = groups.filter(g => g.active !== false);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+            <div class="modal" style="max-width:540px">
+                <div class="modal-header">
+                    <h3 style="margin:0">Import Crew into Task</h3>
+                    <p style="margin:4px 0 0 0;font-size:0.85rem;color:var(--text-muted)">${esc(task ? task.description : '')}</p>
+                </div>
+                <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+                    <div class="form-group">
+                        <label>Select Crew *</label>
+                        <select id="rgSelect">
+                            <option value="">— Choose a crew —</option>
+                            ${activeGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div id="rgSummary" style="background:var(--bg-light);border-radius:4px;padding:10px;margin-bottom:12px;display:none">
+                        <p style="margin:0;font-weight:600" id="rgSummaryName"></p>
+                        <div id="rgSummaryBody" style="font-size:0.85rem;margin-top:4px;color:var(--text-muted)"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Quantity (task scope)</label>
+                            <input type="number" id="rgQty" min="0" step="any" value="${task ? (task.quantity || '') : ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Production Rate (units/hr)</label>
+                            <input type="number" id="rgProdRate" min="0" step="any" placeholder="0 = direct hours">
+                        </div>
+                        <div class="form-group">
+                            <label>Unit</label>
+                            <input id="rgProdUnit" value="${esc(task ? (task.unit || '') : '')}" placeholder="m3, m2, lf…">
+                        </div>
+                    </div>
+                    <div id="rgCalcPreview" style="background:var(--bg-light);border-radius:4px;padding:10px;display:none">
+                        <p style="margin:0;font-size:0.875rem">
+                            Duration: <strong id="rgDuration">—</strong> hrs
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
+                    <button class="btn-primary" id="importBtn" disabled>Import</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const rgSelect   = overlay.querySelector('#rgSelect');
+        const summaryBox = overlay.querySelector('#rgSummary');
+        const summaryName = overlay.querySelector('#rgSummaryName');
+        const summaryBody = overlay.querySelector('#rgSummaryBody');
+        const qtyInput   = overlay.querySelector('#rgQty');
+        const rateInput  = overlay.querySelector('#rgProdRate');
+        const calcPreview = overlay.querySelector('#rgCalcPreview');
+        const durationEl = overlay.querySelector('#rgDuration');
+        const importBtn  = overlay.querySelector('#importBtn');
+
+        async function loadGroupSummary(gid) {
+            if (!gid) { summaryBox.style.display = 'none'; importBtn.disabled = true; return; }
+            try {
+                const [groupDetail, costData] = await Promise.all([
+                    _api('/api/resource-groups/' + gid),
+                    _api('/api/resource-groups/' + gid + '/cost'),
+                ]);
+                summaryName.textContent = groupDetail.name;
+                summaryBody.innerHTML = `
+                    Labour lines: ${(groupDetail.labour || []).length} |
+                    Equipment lines: ${(groupDetail.equipment || []).length} |
+                    Total $/hr: <strong>$${(costData.totalHourlyCost || 0).toFixed(2)}</strong>
+                    ${groupDetail.defaultProductionRate ? ` | Default rate: ${groupDetail.defaultProductionRate} ${esc(groupDetail.productionUnit || 'units/hr')}` : ''}
+                `;
+                summaryBox.style.display = '';
+                if (!rateInput.value && groupDetail.defaultProductionRate) {
+                    rateInput.value = groupDetail.defaultProductionRate;
+                }
+                importBtn.disabled = false;
+                recalcDuration();
+            } catch (e) {
+                summaryBox.style.display = 'none';
+            }
+        }
+
+        function recalcDuration() {
+            const qty  = parseFloat(qtyInput.value) || 0;
+            const rate = parseFloat(rateInput.value) || 0;
+            if (rate > 0 && qty > 0) {
+                const dur = qty / rate;
+                durationEl.textContent = dur.toFixed(2);
+                calcPreview.style.display = '';
+            } else {
+                calcPreview.style.display = 'none';
+            }
+        }
+
+        rgSelect.addEventListener('change', () => loadGroupSummary(rgSelect.value));
+        qtyInput.addEventListener('input', recalcDuration);
+        rateInput.addEventListener('input', recalcDuration);
+
+        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
+        importBtn.addEventListener('click', async () => {
+            const gid  = rgSelect.value;
+            if (!gid) { Utils.showToast('Please select a crew', 'error'); return; }
+
+            importBtn.disabled = true;
+            importBtn.textContent = 'Importing…';
+
+            const payload = {
+                resourceGroupId: gid,
+                quantity:        parseFloat(qtyInput.value) || 0,
+                productionRate:  parseFloat(rateInput.value) || 0,
+                productionUnit:  overlay.querySelector('#rgProdUnit').value.trim(),
+            };
+
+            try {
+                const result = await _api(
+                    `/api/estimates/${est.id}/tasks/${taskId}/import-resource-group`,
+                    { method: 'POST', body: JSON.stringify(payload) }
+                );
+                overlay.remove();
+                const dur = result.duration ? ` (${result.duration.toFixed(1)} hrs)` : '';
+                Utils.showToast(`Imported ${result.lines.length} lines${dur} — total $${(result.taskTotal || 0).toFixed(2)}`);
+                await _loadAndShowDetail(est.id);
+            } catch (err) {
+                Utils.showToast('Import failed: ' + err.message, 'error');
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import';
+            }
+        });
+    }
+
+    // ── Refresh resource group rates for a task ───────────────────────────────
+    async function _refreshResourceGroupRates(taskId) {
+        const est  = _currentEstimate;
+        const task = (est.tasks || []).find(t => t.id === taskId);
+        const importedLines = (task.costLines || []).filter(
+            ln => ln.lineSource && ln.lineSource !== 'manual' && ln.importedFromGroupId
+        );
+        if (!importedLines.length) {
+            Utils.showToast('No imported lines found on this task', 'error');
+            return;
+        }
+
+        // Find unique groups referenced by this task
+        const groupIds = [...new Set(importedLines.map(ln => ln.importedFromGroupId))];
+
+        if (!await Utils.confirm(`Refresh rates from ${groupIds.length} crew(s) for this task?`)) return;
+
+        let totalUpdated = 0;
+        try {
+            for (const gid of groupIds) {
+                const result = await _api(
+                    `/api/resource-groups/${gid}/refresh-in-estimate`,
+                    {
+                        method: 'POST',
+                        body: JSON.stringify({ estimateId: est.id, taskId })
+                    }
+                );
+                totalUpdated += (result.updated || 0);
+            }
+            Utils.showToast(`Refreshed ${totalUpdated} line(s) with current rates`);
+            await _loadAndShowDetail(est.id);
+        } catch (err) {
+            Utils.showToast('Refresh failed: ' + err.message, 'error');
+        }
+    }
+
+    // ── Resource Group Manager (full CRUD panel) ──────────────────────────────
+    function _showResourceGroupManager() {
+        if (window.ResourceGroups) {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay active';
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `
+                <div class="modal" style="max-width:900px;width:95vw;max-height:90vh;display:flex;flex-direction:column">
+                    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+                        <h3 style="margin:0">Manage Crews</h3>
+                        <button class="btn-ghost btn-sm" id="closeCrewMgrBtn">✕</button>
+                    </div>
+                    <div id="crewMgrBody" style="flex:1;overflow-y:auto;padding:0"></div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#closeCrewMgrBtn').addEventListener('click', () => overlay.remove());
+            window.ResourceGroups.render(overlay.querySelector('#crewMgrBody'));
+        } else {
+            Utils.showToast('Resource Groups module not loaded', 'error');
+        }
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
