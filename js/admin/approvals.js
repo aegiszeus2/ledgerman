@@ -355,7 +355,7 @@ window.AdminApprovals = {
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#confirmReject').addEventListener('click', function() {
+        overlay.querySelector('#confirmReject').addEventListener('click', async function() {
             const reason = overlay.querySelector('#rejectReason').value.trim();
             const sub = AppData.getSubmission(subId);
             if (!sub) { overlay.remove(); return; }
