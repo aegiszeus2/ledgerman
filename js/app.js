@@ -983,6 +983,7 @@
                 item('notifications', '🔔', 'Notifications','Notifications — service alerts', '<span class="nav-badge" id="notifBadge" style="display:none"></span>'),
                 item('photos',         '📸', 'Photos',       'Photos — job site photo log'),
                 item('reports',        '📈', 'Reports',      'Reports — cost, labour & invoice summaries'),
+                item('impact-codes',  '⚡', 'Impact Codes', 'Impact Codes — track non-productive time causes'),
                 // ── Module-gated Tier 3 ────────────────────────────────────
                 on('task_assignment',  false) ? item('task-assignment', '☑️',  'Task Assignment',  'Task Assignment — assign tasks to workers') : '',
                 on('budget_tracking',  false) ? item('budget-tracking', '💹',  'Budget Tracking',  'Budget Tracking — project budgets vs actual spending') : '',
@@ -1185,6 +1186,9 @@
                     break;
                 case 'reports':
                     if (window.AdminReports) AdminReports.render(content);
+                    break;
+                case 'impact-codes':
+                    if (window.AdminImpactCodes) AdminImpactCodes.render(content);
                     break;
                 case 'help':
                     if (window.AdminHelp) AdminHelp.render(content);

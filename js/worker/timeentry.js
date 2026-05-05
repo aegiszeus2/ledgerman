@@ -273,6 +273,7 @@ window.WorkerTimeEntry = {
             var workerRate = parseFloat(worker.defaultRate) || 0;
             var selectedExpenses = []; // Reset expense list for this form
             var selectedEquipment = []; // Reset equipment list for this form
+            var impactCodes = []; // Loaded async below
 
             var form = document.createElement('form');
             form.className = 'time-entry-form';
@@ -326,6 +327,35 @@ window.WorkerTimeEntry = {
                 '<div class="form-group">' +
                     '<label class="form-label" for="teDescription">Description of Work <span style="font-weight:400;color:var(--text2)">(required)</span></label>' +
                     '<textarea class="form-control" id="teDescription" name="description" rows="4" placeholder="Describe the work you performed today…" style="resize:vertical" required>' + esc(defaults.description || '') + '</textarea>' +
+                '</div>';
+
+            // Impact Code (optional — loaded async)
+            formHTML +=
+                '<div class="form-group" id="impactCodeSection">' +
+                    '<label class="form-label" for="teImpactCode">Impact Code <span style="font-weight:400;color:var(--text2)">(optional — non-productive time)</span></label>' +
+                    '<select class="form-control" id="teImpactCode">' +
+                        '<option value="">— None —</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div id="impactDetailsSection" style="display:none">' +
+                    '<div class="form-group">' +
+                        '<label class="form-label" for="teImpactHours">Impact Hours <span style="color:var(--accent)">*</span></label>' +
+                        '<input class="form-control" type="number" id="teImpactHours" step="0.25" min="0.25" placeholder="e.g. 2.0">' +
+                        '<div style="font-size:.78rem;color:var(--text2);margin-top:3px" id="teImpactHoursHint"></div>' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label class="form-label" for="teImpactBillable">Impact Billable Status</label>' +
+                        '<select class="form-control" id="teImpactBillable">' +
+                            '<option value="Non-Billable">Non-Billable</option>' +
+                            '<option value="Billable">Billable</option>' +
+                            '<option value="Disputed">Disputed</option>' +
+                            '<option value="To Be Reviewed">To Be Reviewed</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="form-group" id="impactDescGroup">' +
+                        '<label class="form-label" for="teImpactDesc">Impact Description <span id="teImpactDescReq" style="color:var(--text2);font-weight:400">(optional)</span></label>' +
+                        '<textarea class="form-control" id="teImpactDesc" rows="2" placeholder="Describe the impact event…"></textarea>' +
+                    '</div>' +
                 '</div>';
 
             // Units
@@ -399,6 +429,76 @@ window.WorkerTimeEntry = {
             var endInput     = form.querySelector('#teEndTime');
             var hoursDisplay = form.querySelector('#hoursDisplay');
             var hoursValue   = form.querySelector('#hoursValue');
+
+            // Impact code async load
+            (async function() {
+                try {
+                    var jwt = AppData.getJwt ? AppData.getJwt() : '';
+                    var res = await fetch(AppData.API_BASE + '/api/impact-codes?active=true', {
+                        headers: { 'Authorization': 'Bearer ' + jwt }
+                    });
+                    if (!res.ok) return;
+                    impactCodes = await res.json();
+                    var sel = form.querySelector('#teImpactCode');
+                    if (!sel) return;
+                    impactCodes.forEach(function(ic) {
+                        var opt = document.createElement('option');
+                        opt.value = ic.id;
+                        opt.textContent = (ic.code ? '[' + ic.code + '] ' : '') + ic.name + ' — ' + ic.category;
+                        opt.dataset.billable = ic.defaultBillableStatus || 'Non-Billable';
+                        sel.appendChild(opt);
+                    });
+                } catch (e2) { /* silent — impact code is optional */ }
+            })();
+
+            // Impact code toggle
+            form.querySelector('#teImpactCode').addEventListener('change', function() {
+                var detailSection = form.querySelector('#impactDetailsSection');
+                if (!this.value) {
+                    detailSection.style.display = 'none';
+                    return;
+                }
+                detailSection.style.display = '';
+                // Set default billable from code
+                var opt = this.options[this.selectedIndex];
+                var billableSel = form.querySelector('#teImpactBillable');
+                if (opt && opt.dataset.billable) {
+                    for (var i = 0; i < billableSel.options.length; i++) {
+                        if (billableSel.options[i].value === opt.dataset.billable) {
+                            billableSel.selectedIndex = i; break;
+                        }
+                    }
+                }
+                updateImpactDescRequired();
+                updateImpactHoursHint();
+            });
+
+            // Billable status → description required flag
+            form.querySelector('#teImpactBillable').addEventListener('change', updateImpactDescRequired);
+
+            function updateImpactDescRequired() {
+                var billable = form.querySelector('#teImpactBillable').value;
+                var reqSpan  = form.querySelector('#teImpactDescReq');
+                if (reqSpan) {
+                    if (billable === 'Billable' || billable === 'Disputed') {
+                        reqSpan.textContent = '(required)';
+                        reqSpan.style.color = 'var(--accent)';
+                    } else {
+                        reqSpan.textContent = '(optional)';
+                        reqSpan.style.color = 'var(--text2)';
+                    }
+                }
+            }
+
+            function updateImpactHoursHint() {
+                var hrs  = calcRoundedHours(startInput.value, endInput.value);
+                var hint = form.querySelector('#teImpactHoursHint');
+                if (hint && hrs > 0) {
+                    hint.textContent = 'Max: ' + hrs.toFixed(2) + ' hrs (total shift hours)';
+                }
+            }
+            startInput.addEventListener('change', updateImpactHoursHint);
+            endInput.addEventListener('change', updateImpactHoursHint);
 
             function calcHoursDisplay() {
                 var hrs = calcRoundedHours(startInput.value, endInput.value);
@@ -588,10 +688,31 @@ window.WorkerTimeEntry = {
                     unitOfMeasure = selOpt ? (selOpt.getAttribute('data-unit') || '') : '';
                 }
 
+                var impactCodeId      = form.querySelector('#teImpactCode').value;
+                var impactHours       = impactCodeId ? parseFloat(form.querySelector('#teImpactHours').value) : 0;
+                var impactBillable    = impactCodeId ? form.querySelector('#teImpactBillable').value : '';
+                var impactDescription = impactCodeId ? (form.querySelector('#teImpactDesc').value || '').trim() : '';
+
                 if (!dateValue) { Utils.showToast('Please select a date.', 'error'); form.querySelector('#teDate').focus(); return; }
                 if (!startTime || !endTime) { Utils.showToast('Please enter start and end time.', 'error'); startInput.focus(); return; }
                 if (!hoursWorked || hoursWorked <= 0) { Utils.showToast('End time must be after start time.', 'error'); endInput.focus(); return; }
                 if (!descValue) { Utils.showToast('Please describe the work performed.', 'error'); form.querySelector('#teDescription').focus(); return; }
+
+                // Impact code validation
+                if (impactCodeId) {
+                    if (!impactHours || impactHours <= 0) {
+                        Utils.showToast('Impact hours must be greater than 0.', 'error');
+                        form.querySelector('#teImpactHours').focus(); return;
+                    }
+                    if (impactHours > hoursWorked) {
+                        Utils.showToast('Impact hours cannot exceed total shift hours (' + hoursWorked.toFixed(2) + ').', 'error');
+                        form.querySelector('#teImpactHours').focus(); return;
+                    }
+                    if ((impactBillable === 'Billable' || impactBillable === 'Disputed') && !impactDescription) {
+                        Utils.showToast('Impact description is required for Billable or Disputed status.', 'error');
+                        form.querySelector('#teImpactDesc').focus(); return;
+                    }
+                }
 
                 var submitBtn = form.querySelector('#teSubmitBtn');
                 submitBtn.disabled = true;
@@ -671,7 +792,12 @@ window.WorkerTimeEntry = {
                                 costRate:      e.costRate,
                                 chargeOutRate: e.chargeOutRate
                             };
-                        })
+                        }),
+                        // Impact code fields
+                        impactCodeId:         impactCodeId || null,
+                        impactHours:          impactCodeId ? impactHours : null,
+                        impactBillableStatus: impactCodeId ? impactBillable : null,
+                        impactDescription:    impactCodeId ? impactDescription : null,
                     };
 
                     AppData.saveSubmission(submission);

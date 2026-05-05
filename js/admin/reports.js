@@ -17,7 +17,8 @@ window.AdminReports = {
             { id: 'expense', label: 'Expense Summary' },
             { id: 'invoice', label: 'Invoice Summary' },
             { id: 'equipment', label: 'Equipment Report' },
-            { id: 'labor-notes', label: 'Labor & Notes Report' }
+            { id: 'labor-notes', label: 'Labor & Notes Report' },
+            { id: 'impact', label: '&#9889; Impact Report' },
         ];
 
         container.innerHTML = `
@@ -59,6 +60,7 @@ window.AdminReports = {
             case 'invoice': self._renderInvoiceSummary(content); break;
             case 'equipment': self._renderEquipmentReport(content); break;
             case 'labor-notes': self._renderLaborNotesReport(content); break;
+            case 'impact': self._renderImpactReport(content); break;
         }
     },
 
@@ -1001,5 +1003,171 @@ window.AdminReports = {
         });
 
         self._downloadCsv(lines.join('\n'), 'equipment');
-    }
+    },
+
+    // ── Impact Report ─────────────────────────────────────────────────────────
+
+    _renderImpactReport(content) {
+        var self = this;
+        var esc  = Utils.escapeHtml;
+        var projects = AppData.getProjects ? AppData.getProjects() : [];
+
+        var projectOptions = '<option value="">All Projects</option>' +
+            projects.map(function(p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('');
+
+        var billableOptions = ['', 'Non-Billable', 'Billable', 'Disputed', 'To Be Reviewed']
+            .map(function(s) { return '<option value="' + esc(s) + '">' + (s || 'All Statuses') + '</option>'; }).join('');
+
+        content.innerHTML =
+            '<div class="card" style="margin-bottom:16px">' +
+                '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">' +
+                    '<div class="form-group" style="flex:1;min-width:160px;margin-bottom:0">' +
+                        '<label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px">Project</label>' +
+                        '<select class="form-control" id="irProject">' + projectOptions + '</select>' +
+                    '</div>' +
+                    '<div class="form-group" style="flex:1;min-width:140px;margin-bottom:0">' +
+                        '<label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px">Start Date</label>' +
+                        '<input class="form-control" type="date" id="irStartDate">' +
+                    '</div>' +
+                    '<div class="form-group" style="flex:1;min-width:140px;margin-bottom:0">' +
+                        '<label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px">End Date</label>' +
+                        '<input class="form-control" type="date" id="irEndDate">' +
+                    '</div>' +
+                    '<div class="form-group" style="flex:1;min-width:160px;margin-bottom:0">' +
+                        '<label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px">Billable Status</label>' +
+                        '<select class="form-control" id="irBillable">' + billableOptions + '</select>' +
+                    '</div>' +
+                    '<button class="btn btn-primary" id="irGenerateBtn" style="white-space:nowrap">Generate</button>' +
+                '</div>' +
+            '</div>' +
+            '<div id="irBody"></div>';
+
+        content.querySelector('#irGenerateBtn').addEventListener('click', function() {
+            self._fetchAndRenderImpact(content);
+        });
+
+        // Auto-generate on load
+        self._fetchAndRenderImpact(content);
+    },
+
+    async _fetchAndRenderImpact(content) {
+        var self = this;
+        var esc  = Utils.escapeHtml;
+        var body = content.querySelector('#irBody');
+
+        var projectId    = (content.querySelector('#irProject')   || {}).value || '';
+        var startDate    = (content.querySelector('#irStartDate') || {}).value || '';
+        var endDate      = (content.querySelector('#irEndDate')   || {}).value || '';
+        var billable     = (content.querySelector('#irBillable')  || {}).value || '';
+
+        body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text2)">Loading…</div>';
+
+        var params = [];
+        if (projectId) params.push('projectId=' + encodeURIComponent(projectId));
+        if (startDate) params.push('startDate=' + encodeURIComponent(startDate));
+        if (endDate)   params.push('endDate='   + encodeURIComponent(endDate));
+        if (billable)  params.push('billableStatus=' + encodeURIComponent(billable));
+        var url = '/api/reports/impact' + (params.length ? '?' + params.join('&') : '');
+
+        var records;
+        try {
+            var jwt = AppData.getJwt ? AppData.getJwt() : '';
+            var res = await fetch(AppData.API_BASE + url, {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            });
+            if (!res.ok) { var j = await res.json(); throw new Error(j.error || 'HTTP ' + res.status); }
+            records = await res.json();
+        } catch (e) {
+            body.innerHTML = '<div class="card" style="color:var(--accent);padding:16px">Failed to load impact report: ' + esc(e.message) + '</div>';
+            return;
+        }
+
+        if (records.length === 0) {
+            body.innerHTML = '<div class="card"><div style="text-align:center;padding:32px;color:var(--text2)"><h3>No Impact Records</h3><p>No timecards or equipment usage with impact codes match the selected filters.</p></div></div>';
+            return;
+        }
+
+        var totalHours = 0, totalCost = 0;
+        var rows = records.map(function(r) {
+            var hours = parseFloat(r.impactHours) || 0;
+            var cost  = parseFloat(r.impactCost)  || 0;
+            totalHours += hours;
+            totalCost  += cost;
+            var billableColor = r.billableStatus === 'Billable'     ? '#27ae60'
+                              : r.billableStatus === 'Disputed'     ? '#e67e22'
+                              : r.billableStatus === 'To Be Reviewed' ? '#f39c12'
+                              : '#7f8c8d';
+            var statusBadge = r.billableStatus
+                ? '<span style="background:' + billableColor + '22;color:' + billableColor + ';font-size:.7rem;padding:1px 8px;border-radius:10px">' + esc(r.billableStatus) + '</span>'
+                : '<span style="color:var(--text2);font-size:.8rem">—</span>';
+            var tcStatusStyle = r.status === 'approved'
+                ? 'color:var(--success,#27ae60)'
+                : r.status === 'rejected' ? 'color:var(--accent,#e74c3c)' : 'color:var(--text2)';
+            return '<tr>' +
+                '<td>' + esc(r.date || '') + '</td>' +
+                '<td>' + esc(r.workerName || r.equipmentName || '—') + '</td>' +
+                '<td>' + esc(r.projectName || r.projectId || '—') + '</td>' +
+                '<td><strong>' + esc(r.impactCode || '—') + '</strong><br><span style="font-size:.78rem;color:var(--text2)">' + esc(r.impactCategory || '') + '</span></td>' +
+                '<td style="font-size:.82rem;color:var(--text2);max-width:200px">' + esc(r.impactDescription || '—') + '</td>' +
+                '<td class="amount">' + hours.toFixed(2) + '</td>' +
+                '<td class="amount">' + Utils.formatCurrency(r.labourRate || 0) + '/hr</td>' +
+                '<td class="amount"><strong>' + Utils.formatCurrency(cost) + '</strong></td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td style="' + tcStatusStyle + ';font-size:.78rem;text-transform:capitalize">' + esc(r.status || '—') + '</td>' +
+            '</tr>';
+        }).join('');
+
+        var summaryRow =
+            '<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg2,#f8f8f8)">' +
+                '<td colspan="5" style="text-align:right">TOTAL</td>' +
+                '<td class="amount">' + totalHours.toFixed(2) + '</td>' +
+                '<td></td>' +
+                '<td class="amount">' + Utils.formatCurrency(totalCost) + '</td>' +
+                '<td colspan="2"></td>' +
+            '</tr>';
+
+        body.innerHTML =
+            '<div style="display:flex;justify-content:flex-end;margin-bottom:8px">' +
+                '<button class="btn btn-secondary btn-sm" id="irExportCsv">⬇ Export CSV</button>' +
+            '</div>' +
+            '<div class="card" style="overflow-x:auto">' +
+                '<table id="irTable">' +
+                    '<thead><tr>' +
+                        '<th>Date</th><th>Worker / Equipment</th><th>Project</th>' +
+                        '<th>Impact Code</th><th>Description</th>' +
+                        '<th class="amount">Hours</th><th class="amount">Rate</th>' +
+                        '<th class="amount">Cost</th><th>Billable</th><th>TC Status</th>' +
+                    '</tr></thead>' +
+                    '<tbody>' + rows + summaryRow + '</tbody>' +
+                '</table>' +
+            '</div>';
+
+        body.querySelector('#irExportCsv').addEventListener('click', function() {
+            self._exportImpactCsv(records, totalHours, totalCost);
+        });
+    },
+
+    _exportImpactCsv(records, totalHours, totalCost) {
+        var self = this;
+        var headers = ['Date', 'Type', 'Worker / Equipment', 'Project', 'Impact Code', 'Category', 'Description', 'Hours', 'Rate ($/hr)', 'Cost ($)', 'Billable Status', 'TC Status'];
+        var lines = [self._csvRow(headers)];
+        records.forEach(function(r) {
+            lines.push(self._csvRow([
+                r.date || '',
+                r.type || '',
+                r.workerName || r.equipmentName || '',
+                r.projectName || r.projectId || '',
+                r.impactCode || '',
+                r.impactCategory || '',
+                r.impactDescription || '',
+                (parseFloat(r.impactHours) || 0).toFixed(2),
+                (parseFloat(r.labourRate)  || 0).toFixed(2),
+                (parseFloat(r.impactCost)  || 0).toFixed(2),
+                r.billableStatus || '',
+                r.status || '',
+            ]));
+        });
+        lines.push(self._csvRow(['', '', '', '', '', '', 'TOTAL', totalHours.toFixed(2), '', totalCost.toFixed(2), '', '']));
+        self._downloadCsv(lines.join('\n'), 'impact');
+    },
 };

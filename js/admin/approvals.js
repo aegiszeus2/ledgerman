@@ -1,11 +1,42 @@
 // Admin Approvals Module
 window.AdminApprovals = {
     _tab: 'pending',
+    _impactCodes: [],  // cached impact code list
 
     render(container) {
         const self = this;
         self._container = container;
-        self._renderContent();
+        // Load impact codes in background (for display + editing)
+        self._loadImpactCodes().then(function() { self._renderContent(); });
+    },
+
+    async _loadImpactCodes() {
+        const self = this;
+        try {
+            const jwt = AppData.getJwt ? AppData.getJwt() : '';
+            const res = await fetch(AppData.API_BASE + '/api/impact-codes?active=true', {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            });
+            if (res.ok) self._impactCodes = await res.json();
+        } catch (e) { /* silent */ }
+    },
+
+    _impactCodeName(id) {
+        const self = this;
+        const ic = self._impactCodes.find(function(c) { return c.id === id; });
+        return ic ? (ic.code ? '[' + ic.code + '] ' + ic.name : ic.name) : id;
+    },
+
+    _impactBadgeHtml(sub) {
+        // sub may be an AppData submission object with impactCodeId field
+        if (!sub || !sub.impactCodeId) return '';
+        const self = this;
+        const name = self._impactCodeName(sub.impactCodeId);
+        const color = sub.impactBillableStatus === 'Billable'    ? '#e74c3c'
+                    : sub.impactBillableStatus === 'Disputed'    ? '#e67e22'
+                    : sub.impactBillableStatus === 'To Be Reviewed' ? '#f39c12'
+                    : '#7f8c8d';
+        return '<span title="Impact: ' + Utils.escapeHtml(name) + '" style="display:inline-block;background:' + color + '22;color:' + color + ';border:1px solid ' + color + '44;font-size:.7rem;padding:1px 8px;border-radius:10px;margin-left:6px">&#9889; Impact</span>';
     },
 
     _renderContent() {
@@ -148,12 +179,25 @@ window.AdminApprovals = {
                 ? '<span style="font-size:.72rem;padding:1px 7px;border-radius:10px;background:rgba(255,165,0,.18);color:#b8860b;margin-left:6px" title="' + Utils.escapeHtml(editHistory.map(function(e){ return 'Edited by ' + e.modifiedBy + (e.reason ? ': ' + e.reason : ''); }).join(' | ')) + '">✏ edited ' + editHistory.length + 'x</span>'
                 : '';
 
-            return '<div class="card" data-sub-id="' + sub.id + '" style="border-left:3px solid var(--warn)">' +
+            const impactBadge     = self._impactBadgeHtml(sub);
+            const cardBorderColor = sub.impactCodeId ? 'var(--accent,#e74c3c)' : 'var(--warn,#f39c12)';
+            const impactDetail    = sub.impactCodeId ? (function() {
+                const icName = self._impactCodeName(sub.impactCodeId);
+                return '<div style="margin-top:8px;padding:8px 10px;background:rgba(231,76,60,.07);border-radius:6px;font-size:.82rem">' +
+                    '<strong>Impact:</strong> ' + Utils.escapeHtml(icName) +
+                    (sub.impactHours ? ' &nbsp;|&nbsp; <strong>Hours:</strong> ' + sub.impactHours : '') +
+                    (sub.impactBillableStatus ? ' &nbsp;|&nbsp; <strong>Billable:</strong> ' + Utils.escapeHtml(sub.impactBillableStatus) : '') +
+                    (sub.impactDescription ? '<br><span style="color:var(--text2)">' + Utils.escapeHtml(sub.impactDescription) + '</span>' : '') +
+                '</div>';
+            })() : '';
+
+            return '<div class="card" data-sub-id="' + sub.id + '" style="border-left:3px solid ' + cardBorderColor + '">' +
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">' +
                     '<div style="flex:1;min-width:200px">' +
                         '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
                             '<strong style="font-size:1.05rem">' + Utils.escapeHtml(workerName) + '</strong>' +
                             editBadge +
+                            impactBadge +
                             '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
                             '<span style="font-size:.8rem;color:var(--text2)">' + Utils.formatDate(sub.date) + '</span>' +
                         '</div>' +
@@ -162,6 +206,7 @@ window.AdminApprovals = {
                         '<div style="font-size:.85rem;color:var(--text2)">' + amountInfo + '</div>' +
                         (sub.entryMethod ? '<div style="font-size:.78rem;margin-top:3px"><span style="padding:2px 7px;border-radius:10px;background:' + (sub.entryMethod === 'Clock In/Out' ? 'rgba(46,204,113,.15);color:var(--success)' : 'rgba(200,200,200,.15);color:var(--text2)') + '">' + sub.entryMethod + '</span></div>' : '') +
                         (sub.unitsCompleted ? '<div style="font-size:.85rem;color:var(--text2)">Units completed: ' + sub.unitsCompleted + '</div>' : '') +
+                        impactDetail +
                         '<div class="photo-thumbs" data-sub-id="' + sub.id + '" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px"></div>' +
                     '</div>' +
                     '<div style="display:flex;gap:8px;align-items:flex-start">' +
@@ -259,12 +304,14 @@ window.AdminApprovals = {
                     actionBtns += '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px">Edit</button>';
                 }
 
+                const impactBadgeHistory = self._impactBadgeHtml(sub);
                 return '<tr>' +
                     '<td>' + Utils.formatDate(sub.date) + '</td>' +
                     '<td>' + Utils.escapeHtml(worker ? worker.name : 'Unknown') + '</td>' +
                     '<td>' + Utils.escapeHtml(project ? project.name : 'Unknown') + '</td>' +
-                    '<td>' + Utils.escapeHtml(sub.description || '') + editedTag +
+                    '<td>' + Utils.escapeHtml(sub.description || '') + editedTag + impactBadgeHistory +
                         (sub.rejectionReason ? '<br><span style="font-size:.8rem;color:var(--accent)">Reason: ' + Utils.escapeHtml(sub.rejectionReason) + '</span>' : '') +
+                        (sub.impactCodeId ? '<br><span style="font-size:.77rem;color:var(--text2)">Impact: ' + Utils.escapeHtml(self._impactCodeName(sub.impactCodeId)) + (sub.impactHours ? ' (' + sub.impactHours + 'h)' : '') + '</span>' : '') +
                     '</td>' +
                     '<td class="amount">' + Utils.formatCurrency(amount) + '</td>' +
                     '<td style="font-size:.78rem;white-space:nowrap">' + (sub.entryMethod === 'Clock In/Out' ? '<span style="color:var(--success)">⏱ Clock In/Out</span>' : '<span style="color:var(--text2)">✏️ Manual</span>') + '</td>' +
