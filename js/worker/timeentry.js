@@ -401,16 +401,15 @@ window.WorkerTimeEntry = {
                     '</div>';
             }
 
-            // Photos
+            // Photos — single input, no capture="environment" (causes iPhone black screen)
+            // accept="image/*" without capture shows iOS native sheet: Take Photo / Photo Library / Files
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Photos <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-                        '<button type="button" class="camera-btn" id="teCameraBtn">&#128247; Camera</button>' +
-                        '<button type="button" class="camera-btn" id="teFileBtn">&#128206; File</button>' +
+                        '<button type="button" class="camera-btn" id="teAddPhotosBtn">&#128247; Add Photos</button>' +
                     '</div>' +
-                    '<input type="file" id="teCameraInput" accept="image/*" capture="environment" style="display:none">' +
-                    '<input type="file" id="teFileInput" accept="image/*" multiple style="display:none">' +
+                    '<input type="file" id="tePhotoInput" accept="image/*" multiple style="display:none">' +
                     '<div class="photo-preview-grid" id="photoPreviewArea"></div>' +
                 '</div>';
 
@@ -633,11 +632,9 @@ window.WorkerTimeEntry = {
                 });
             }
 
-            // Photos
-            form.querySelector('#teCameraBtn').addEventListener('click', function() { form.querySelector('#teCameraInput').click(); });
-            form.querySelector('#teFileBtn').addEventListener('click', function() { form.querySelector('#teFileInput').click(); });
-            form.querySelector('#teCameraInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
-            form.querySelector('#teFileInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
+            // Photos — single input triggers iOS native sheet (Take Photo / Photo Library / Files)
+            form.querySelector('#teAddPhotosBtn').addEventListener('click', function() { form.querySelector('#tePhotoInput').click(); });
+            form.querySelector('#tePhotoInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
 
             function handlePhotos(files) {
                 for (var i = 0; i < files.length; i++) {

@@ -60,7 +60,14 @@ function savePersistentLogin(type, credentials) {
 function getPersistentLogin() {
     try {
         const saved = localStorage.getItem('ledgeman_persistent_login');
-        return saved ? JSON.parse(saved) : null;
+        if (!saved) return null;
+        const parsed = JSON.parse(saved);
+        // Expire persistent logins older than 30 days
+        if (parsed && parsed.timestamp && (Date.now() - parsed.timestamp) > 30 * 24 * 60 * 60 * 1000) {
+            localStorage.removeItem('ledgeman_persistent_login');
+            return null;
+        }
+        return parsed;
     } catch(e) {
         console.warn('[Ledgerman] Failed to load persistent login:', e.message);
         return null;

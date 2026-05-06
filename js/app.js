@@ -100,6 +100,14 @@
                         const data = await Promise.race([AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin), timeoutPromise]);
                         await Promise.race([AppData.syncFromServer(), timeoutPromise]);
                         const worker = AppData.getWorker(data.worker.id) || data.worker;
+                        // Refresh persistent login timestamp and update JWT so expiry resets
+                        AppData.savePersistentLogin('worker', {
+                            companyName: creds.companyName,
+                            workerName: creds.workerName,
+                            pin: creds.pin,
+                            jwt: AppData.getJwt(),
+                            companyId: AppData.getCompanyId()
+                        });
                         this._completeWorkerLogin(worker, 'Restored from persistent login');
                         return;
                     } catch(err) {
@@ -729,8 +737,10 @@
         _completeWorkerLogin(worker, auditNote) {
             this.currentUser = { type: 'worker', name: worker.name, id: worker.id };
             AppData.addAuditLog(worker.name, 'Worker Login', auditNote || '');
-            // First-time login — ask for email if not on file
-            if (!worker.email) {
+            // Ask for email only if not on file AND worker hasn't already skipped this prompt
+            const emailPromptKey = 'worker_email_prompted_' + worker.id;
+            const alreadyPrompted = AppData.getData(emailPromptKey);
+            if (!worker.email && !alreadyPrompted) {
                 this._showEmailPrompt(worker);
             } else {
                 this.startWorkerPortal(worker);
@@ -765,7 +775,11 @@
                 this.startWorkerPortal(w || worker);
             };
 
-            document.getElementById('skipEmail').onclick = proceed;
+            document.getElementById('skipEmail').onclick = () => {
+                // Mark as prompted so we don't ask again on future logins
+                AppData.setData('worker_email_prompted_' + worker.id, true);
+                proceed();
+            };
 
             document.getElementById('emailPromptForm').onsubmit = (e) => {
                 e.preventDefault();
