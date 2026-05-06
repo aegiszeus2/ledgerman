@@ -652,42 +652,10 @@
     padding: var(--space-3) var(--space-6);
   }
 
-  .worker-nav {
-    display: none;
-  }
-
+  /* worker-nav stays visible on desktop — bottom fixed bar works on all screen sizes */
   .worker-content {
-    padding-bottom: var(--space-6);
-  }
-
-  /* Show navigation as horizontal bar on tablet */
-  .worker-nav-desktop {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding: 0 var(--space-6);
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .worker-nav-desktop .nav-tab,
-  .worker-nav-desktop .worker-nav-item {
-    flex-direction: row;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    font-size: 0.875rem;
-    min-height: auto;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-  }
-
-  .worker-nav-desktop .nav-tab.active,
-  .worker-nav-desktop .worker-nav-item.active {
-    border-bottom-color: var(--amber);
-  }
-
-  .worker-nav-desktop .nav-tab.active::before,
-  .worker-nav-desktop .worker-nav-item.active::before {
-    display: none;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0));
+    max-width: 860px;
+    margin: 0 auto;
   }
 }

@@ -617,7 +617,8 @@ window.WorkerTimeEntry = {
                     var sel = form.querySelector('#teEquipmentSelect');
                     var hrs = parseFloat(form.querySelector('#teEquipmentHours').value);
                     if (!sel.value) { Utils.showToast('Select equipment first', 'error'); return; }
-                    if (isNaN(hrs) || hrs <= 0) { Utils.showToast('Enter valid hours (e.g. 2, 0.5)', 'error'); return; }
+                    if (isNaN(hrs) || hrs < 0) { Utils.showToast('Equipment hours must be 0 or greater.', 'error'); return; }
+                    if (hrs === 0) { Utils.showToast('Enter valid hours greater than 0 (e.g. 0.5, 2)', 'error'); return; }
                     var opt = sel.options[sel.selectedIndex];
                     selectedEquipment.push({
                         equipmentId:    sel.value,
@@ -637,7 +638,27 @@ window.WorkerTimeEntry = {
             form.querySelector('#tePhotoInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
 
             function handlePhotos(files) {
+                var MAX_PHOTOS = 10;
+                var MAX_MB     = 10;
+                var MAX_BYTES  = MAX_MB * 1024 * 1024;
+                var oversized  = [];
+                var accepted   = [];
                 for (var i = 0; i < files.length; i++) {
+                    if (files[i].size > MAX_BYTES) {
+                        oversized.push(files[i].name);
+                    } else {
+                        accepted.push(files[i]);
+                    }
+                }
+                if (oversized.length > 0) {
+                    Utils.showToast('Photo(s) too large (max ' + MAX_MB + ' MB each): ' + oversized.join(', '), 'error');
+                }
+                var remaining = MAX_PHOTOS - selectedPhotos.length;
+                if (accepted.length > remaining) {
+                    Utils.showToast('Max ' + MAX_PHOTOS + ' photos per entry. Only the first ' + remaining + ' added.', 'error');
+                    accepted = accepted.slice(0, remaining);
+                }
+                for (var j = 0; j < accepted.length; j++) {
                     (function(file) {
                         var id = AppData.generateId();
                         var reader = new FileReader();
@@ -646,7 +667,7 @@ window.WorkerTimeEntry = {
                             renderPreviews();
                         };
                         reader.readAsDataURL(file);
-                    })(files[i]);
+                    })(accepted[j]);
                 }
             }
 
