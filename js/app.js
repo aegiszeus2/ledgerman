@@ -999,10 +999,11 @@
                 item('photos',         '📸', 'Photos',       'Photos — job site photo log'),
                 item('reports',        '📈', 'Reports',      'Reports — cost, labour & invoice summaries'),
                 item('impact-codes',  '⚡', 'Impact Codes', 'Impact Codes — track non-productive time causes'),
+                item('supervisor-reports', '📋', 'Field Reports', 'Field Reports — review and approve supervisor daily reports', '<span class="nav-badge" id="srBadge" style="display:none"></span>'),
                 // ── Module-gated Tier 3 ────────────────────────────────────
                 on('task_assignment',  false) ? item('task-assignment', '☑️',  'Task Assignment',  'Task Assignment — assign tasks to workers') : '',
                 on('budget_tracking',  false) ? item('budget-tracking', '💹',  'Budget Tracking',  'Budget Tracking — project budgets vs actual spending') : '',
-                on('daily_reports',    false) ? item('daily-reports',   '📋',  'Supervisor Reports', 'Supervisor Reports — crew summaries and site conditions') : '',
+                on('daily_reports',    false) ? item('daily-reports',   '📋',  'Legacy Reports', 'Legacy daily reports (worker-submitted entities)') : '',
                 on('punch_lists',      false) ? item('punch-lists',     '📌',  'Punch Lists',      'Punch Lists — deficiency tracking and sign-off') : '',
                 on('gantt_chart',      false) ? item('gantt-chart',     '📅',  'Project Timeline', 'Project Timeline — visual schedule of tasks and milestones') : '',
                 // ── Always-on last ─────────────────────────────────────────
@@ -1056,6 +1057,9 @@
 
             // Update notifications badge
             if (window.AdminNotifications) AdminNotifications._updateBadge();
+
+            // Update supervisor reports pending badge
+            this._updateSrBadge();
 
             // Get Started onboarding button
             const getStartedBtn = document.getElementById('getStartedBtn');
@@ -1115,6 +1119,23 @@
             } else {
                 badge.style.display = 'none';
             }
+        },
+
+        _updateSrBadge() {
+            // Fetch count of submitted supervisor reports and update the nav badge
+            const badge = document.getElementById('srBadge');
+            if (!badge) return;
+            fetch(AppData.API_BASE + '/api/supervisor-reports?status=submitted', {
+                headers: { 'Authorization': 'Bearer ' + AppData.getJwt() }
+            }).then(r => r.json()).then(reports => {
+                const count = Array.isArray(reports) ? reports.length : 0;
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }).catch(() => { /* silent */ });
         },
 
         navigate(route, params = {}) {
@@ -1208,6 +1229,9 @@
                 case 'impact-codes':
                     if (window.AdminImpactCodes) AdminImpactCodes.render(content);
                     break;
+                case 'supervisor-reports':
+                    if (window.AdminSupervisorReports) AdminSupervisorReports.render(content, params);
+                    break;
                 case 'help':
                     if (window.AdminHelp) AdminHelp.render(content);
                     break;
@@ -1281,11 +1305,13 @@
             Utils.startSessionTimer(() => this.logout());
             const app = document.getElementById('app');
             app.className = 'worker-mode';
+            // Supervisors and Approvers get an extra "Field Reports" tab
+            const isSupervisor = worker && (worker.role === 'Supervisor' || worker.role === 'Approver');
             app.innerHTML = `
                 <header class="worker-header">
                     <h3>${AppData.getCompanyName()}</h3>
                     <div class="worker-header-right">
-                        <span class="worker-name">${Utils.escapeHtml(worker.name)}</span>
+                        <span class="worker-name">${Utils.escapeHtml(worker.name)}${isSupervisor ? ' <span style="font-size:.72rem;background:rgba(52,152,219,.25);color:#3498db;padding:1px 6px;border-radius:8px;vertical-align:middle">Supervisor</span>' : ''}</span>
                         <button class="btn btn-secondary btn-sm" id="workerRefresh" title="Refresh data">↻ Refresh</button>
                         <button class="btn btn-secondary btn-sm" id="workerLogout">Logout</button>
                     </div>
@@ -1298,13 +1324,18 @@
                         <span class="worker-nav-label">Home</span>
                     </a>
                     <a class="worker-nav-item" data-route="history">
-                        <span class="worker-nav-icon">📋</span>
+                        <span class="worker-nav-icon">🕐</span>
                         <span class="worker-nav-label">History</span>
                     </a>
+                    ${isSupervisor ? `
+                    <a class="worker-nav-item" data-route="field-reports">
+                        <span class="worker-nav-icon">📋</span>
+                        <span class="worker-nav-label">Reports</span>
+                    </a>` : `
                     <a class="worker-nav-item" data-route="tasks">
                         <span class="worker-nav-icon">✅</span>
                         <span class="worker-nav-label">Tasks</span>
-                    </a>
+                    </a>`}
                     <a class="worker-nav-item" data-route="help">
                         <span class="worker-nav-icon">❓</span>
                         <span class="worker-nav-label">Help</span>
@@ -1384,6 +1415,11 @@
                     break;
                 case 'tasks':
                     if (window.WorkerTasks) WorkerTasks.render(content, worker, params);
+                    break;
+                case 'field-reports':
+                    // Supervisor/Approver only — create/edit/submit daily field reports
+                    if (window.WorkerFieldReports) WorkerFieldReports.render(content, worker);
+                    else content.innerHTML = '<div class="empty-state"><h2>Field Reports module not loaded</h2></div>';
                     break;
                 case 'help':
                     if (window.WorkerHelp) WorkerHelp.render(content);
