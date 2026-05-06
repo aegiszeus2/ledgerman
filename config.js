@@ -1,7 +1,7 @@
 // Ledgerman — API Configuration
-// Backend is at: https://ledgeman-backend.onrender.com
-// Frontend is served from: https://ledgerman.org (ledgerman-marketing on Render)
-// Admin is at: https://ledgerman-admin.onrender.com (separate service)
-// Cache bust: v20260504-1
+// Deployment: GitHub → Render (all services)
+// Frontend:   https://ledgerman.org        (Render static site — ledgerman repo)
+// Backend:    https://app.ledgerman.org    (Render web service — ledgeman-backend repo)
+// Cache bust: v20260506-1
 
 window.LEDGERMAN_API_URL = 'https://app.ledgerman.org';
