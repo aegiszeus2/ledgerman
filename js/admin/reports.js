@@ -1,38 +1,61 @@
 // Admin Reports Module
 window.AdminReports = {
-    _activeTab: 'cost',
 
     render(container) {
         const self = this;
         self._container = container;
+
+        if (!self._dateRange) {
+            const today = new Date();
+            const firstDayPrevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDayPrevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            self._dateRange = {
+                start: firstDayPrevMonth.toISOString().slice(0, 10),
+                end: lastDayPrevMonth.toISOString().slice(0, 10)
+            };
+        }
+
+        if (!self._selectedReport) {
+            self._selectedReport = 'cost';
+        }
+
         self._renderReports();
     },
 
     _renderReports() {
         const self = this;
         const container = self._container;
-        const tabs = [
-            { id: 'cost', label: 'Cost Report' },
-            { id: 'labor', label: 'Labor Report' },
-            { id: 'expense', label: 'Expense Summary' },
-            { id: 'invoice', label: 'Invoice Summary' },
-            { id: 'equipment', label: 'Equipment Report' },
-            { id: 'labor-notes', label: 'Labor & Notes Report' },
-            { id: 'impact', label: '&#9889; Impact Report' },
-        ];
 
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Reports</h2>
                 <div style="display:flex;gap:8px">
                     <button class="btn-secondary btn-sm" id="exportCsvBtn">⬇ Export CSV</button>
-                    <button class="btn-secondary btn-sm" id="printReportBtn">Print Report</button>
+                    <button class="btn-secondary btn-sm" id="printReportBtn">🖨 Print Report</button>
                 </div>
             </div>
-            <div class="tabs" style="margin-bottom:16px">
-                ${tabs.map(function(t) {
-                    return '<button class="tab-btn ' + (self._activeTab === t.id ? 'active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
-                }).join('')}
+            <div class="report-controls" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:var(--bg2,#f5f7fa);border-radius:8px;border:1px solid var(--border,#e5e7eb)">
+                <div class="form-group" style="margin:0;flex:2;min-width:180px">
+                    <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Report Type</label>
+                    <select id="reportTypeSelect" style="width:100%">
+                        <option value="cost" ${self._selectedReport === 'cost' ? 'selected' : ''}>Cost Report</option>
+                        <option value="labor" ${self._selectedReport === 'labor' ? 'selected' : ''}>Labour Report</option>
+                        <option value="expense" ${self._selectedReport === 'expense' ? 'selected' : ''}>Expense Summary</option>
+                        <option value="invoice" ${self._selectedReport === 'invoice' ? 'selected' : ''}>Invoice Summary</option>
+                        <option value="equipment" ${self._selectedReport === 'equipment' ? 'selected' : ''}>Equipment Report</option>
+                        <option value="labor-notes" ${self._selectedReport === 'labor-notes' ? 'selected' : ''}>Labor &amp; Notes Report</option>
+                        <option value="impact" ${self._selectedReport === 'impact' ? 'selected' : ''}>&#9889; Impact Report</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Start Date</label>
+                    <input type="date" id="globalStartDate" value="${self._dateRange.start}">
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">End Date</label>
+                    <input type="date" id="globalEndDate" value="${self._dateRange.end}">
+                </div>
+                <button class="btn-primary btn-sm" id="applyDateBtn" style="height:36px">Apply</button>
             </div>
             <div id="reportContent"></div>
         `;
@@ -45,26 +68,38 @@ window.AdminReports = {
             self._exportCsv();
         });
 
-        container.querySelectorAll('.tab-btn[data-tab]').forEach(function(tab) {
-            tab.addEventListener('click', function() {
-                self._activeTab = tab.dataset.tab;
-                self._renderReports();
-            });
+        container.querySelector('#reportTypeSelect').addEventListener('change', function() {
+            self._selectedReport = this.value;
+            self._renderReportContent();
         });
 
-        const content = container.querySelector('#reportContent');
-        switch (self._activeTab) {
-            case 'cost': self._renderCostReport(content); break;
-            case 'labor': self._renderLaborReport(content); break;
-            case 'expense': self._renderExpenseSummary(content); break;
-            case 'invoice': self._renderInvoiceSummary(content); break;
-            case 'equipment': self._renderEquipmentReport(content); break;
-            case 'labor-notes': self._renderLaborNotesReport(content); break;
-            case 'impact': self._renderImpactReport(content); break;
+        container.querySelector('#applyDateBtn').addEventListener('click', function() {
+            const s = container.querySelector('#globalStartDate').value;
+            const e = container.querySelector('#globalEndDate').value;
+            if (s) self._dateRange.start = s;
+            if (e) self._dateRange.end = e;
+            self._renderReportContent();
+        });
+
+        self._renderReportContent();
+    },
+
+    _renderReportContent() {
+        const self = this;
+        const content = self._container.querySelector('#reportContent');
+        switch (self._selectedReport) {
+            case 'cost':        self._renderCostReport(content);        break;
+            case 'labor':       self._renderLaborReport(content);       break;
+            case 'expense':     self._renderExpenseSummary(content);    break;
+            case 'invoice':     self._renderInvoiceSummary(content);    break;
+            case 'equipment':   self._renderEquipmentReport(content);   break;
+            case 'labor-notes': self._renderLaborNotesReport(content);  break;
+            case 'impact':      self._renderImpactReport(content);      break;
         }
     },
 
     _renderCostReport(content) {
+        const self = this;
         const projects = AppData.getProjects();
         const esc = Utils.escapeHtml;
 
@@ -81,12 +116,19 @@ window.AdminReports = {
             const body = content.querySelector('#costReportBody');
             if (!projectId) { body.innerHTML = ''; return; }
 
+            const startDate = self._dateRange ? self._dateRange.start : '';
+            const endDate = self._dateRange ? self._dateRange.end : '';
+
             const project = AppData.getProject(projectId);
             const subtasks = AppData.getSubtasks(projectId);
-            const expenses = AppData.getExpenses(projectId);
-            const submissions = AppData.getSubmissions().filter(function(s) {
+            let expenses = AppData.getExpenses(projectId);
+            if (startDate) expenses = expenses.filter(function(e) { return (e.date || '') >= startDate; });
+            if (endDate)   expenses = expenses.filter(function(e) { return (e.date || '') <= endDate; });
+            let submissions = AppData.getSubmissions().filter(function(s) {
                 return s.projectId === projectId && s.status === 'Approved';
             });
+            if (startDate) submissions = submissions.filter(function(s) { return (s.date || '') >= startDate; });
+            if (endDate)   submissions = submissions.filter(function(s) { return (s.date || '') <= endDate; });
 
             if (subtasks.length === 0) {
                 body.innerHTML = '<div class="card"><div class="empty"><h3>No Subtasks</h3><p>Add subtasks to this project to see cost data.</p></div></div>';
@@ -211,6 +253,7 @@ window.AdminReports = {
     },
 
     _renderLaborReport(content) {
+        const self = this;
         const projects = AppData.getProjects();
         const esc = Utils.escapeHtml;
 
@@ -218,31 +261,20 @@ window.AdminReports = {
             <div class="card" style="margin-bottom:16px">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Start Date</label>
-                        <input type="date" id="laborStartDate">
-                    </div>
-                    <div class="form-group">
-                        <label>End Date</label>
-                        <input type="date" id="laborEndDate">
-                    </div>
-                    <div class="form-group">
                         <label>Project (optional)</label>
                         <select id="laborProjectFilter">
                             <option value="">All Projects</option>
                             ${projects.map(function(p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('')}
                         </select>
                     </div>
-                    <div class="form-group" style="display:flex;align-items:flex-end">
-                        <button class="btn-primary btn-sm" id="laborGenerateBtn">Generate</button>
-                    </div>
                 </div>
             </div>
             <div id="laborReportBody"></div>
         `;
 
-        content.querySelector('#laborGenerateBtn').addEventListener('click', function() {
-            const startDate = content.querySelector('#laborStartDate').value;
-            const endDate = content.querySelector('#laborEndDate').value;
+        function generate() {
+            const startDate = self._dateRange ? self._dateRange.start : '';
+            const endDate = self._dateRange ? self._dateRange.end : '';
             const projectId = content.querySelector('#laborProjectFilter').value;
             const body = content.querySelector('#laborReportBody');
 
@@ -250,15 +282,9 @@ window.AdminReports = {
                 return s.status === 'Approved';
             });
 
-            if (startDate) {
-                submissions = submissions.filter(function(s) { return s.date >= startDate; });
-            }
-            if (endDate) {
-                submissions = submissions.filter(function(s) { return s.date <= endDate; });
-            }
-            if (projectId) {
-                submissions = submissions.filter(function(s) { return s.projectId === projectId; });
-            }
+            if (startDate) submissions = submissions.filter(function(s) { return s.date >= startDate; });
+            if (endDate)   submissions = submissions.filter(function(s) { return s.date <= endDate; });
+            if (projectId) submissions = submissions.filter(function(s) { return s.projectId === projectId; });
 
             if (submissions.length === 0) {
                 body.innerHTML = '<div class="card"><div class="empty"><h3>No Data</h3><p>No approved submissions found for the selected filters.</p></div></div>';
@@ -316,10 +342,14 @@ window.AdminReports = {
                 '<td class="amount">' + grandTotalHours.toFixed(1) + '</td>' +
                 '<td class="amount">' + Utils.formatCurrency(grandTotalAmount) + '</td>' +
                 '</tr></tbody></table></div>';
-        });
+        }
+
+        content.querySelector('#laborProjectFilter').addEventListener('change', generate);
+        generate();
     },
 
     _renderExpenseSummary(content) {
+        const self = this;
         const projects = AppData.getProjects();
         const esc = Utils.escapeHtml;
 
@@ -338,8 +368,12 @@ window.AdminReports = {
 
         function generate() {
             const projectId = content.querySelector('#expenseProjectFilter').value;
+            const startDate = self._dateRange ? self._dateRange.start : '';
+            const endDate = self._dateRange ? self._dateRange.end : '';
             const body = content.querySelector('#expenseReportBody');
-            const expenses = AppData.getExpenses(projectId || undefined);
+            let expenses = AppData.getExpenses(projectId || undefined);
+            if (startDate) expenses = expenses.filter(function(e) { return (e.date || '') >= startDate; });
+            if (endDate)   expenses = expenses.filter(function(e) { return (e.date || '') <= endDate; });
 
             if (expenses.length === 0) {
                 body.innerHTML = '<div class="card"><div class="empty"><h3>No Expenses</h3><p>No expenses found.</p></div></div>';
@@ -450,12 +484,14 @@ window.AdminReports = {
 
     _exportCsv() {
         var self = this;
-        switch (self._activeTab) {
-            case 'cost':      self._exportCostCsv();      break;
-            case 'labor':     self._exportLaborCsv();     break;
-            case 'expense':   self._exportExpenseCsv();   break;
-            case 'invoice':   self._exportInvoiceCsv();   break;
-            case 'equipment': self._exportEquipmentCsv(); break;
+        switch (self._selectedReport) {
+            case 'cost':        self._exportCostCsv();      break;
+            case 'labor':       self._exportLaborCsv();     break;
+            case 'expense':     self._exportExpenseCsv();   break;
+            case 'invoice':     self._exportInvoiceCsv();   break;
+            case 'equipment':   self._exportEquipmentCsv(); break;
+            case 'labor-notes': break; // PDF-only via Print Report button
+            case 'impact':      break; // uses inline Export CSV button
         }
     },
 
@@ -509,11 +545,9 @@ window.AdminReports = {
     _exportLaborCsv() {
         var self = this;
         var container = self._container;
-        var startDateEl = container.querySelector('#laborStartDate');
-        var endDateEl = container.querySelector('#laborEndDate');
         var projectFilterEl = container.querySelector('#laborProjectFilter');
-        var startDate = startDateEl ? startDateEl.value : '';
-        var endDate = endDateEl ? endDateEl.value : '';
+        var startDate = self._dateRange ? self._dateRange.start : '';
+        var endDate = self._dateRange ? self._dateRange.end : '';
         var projectId = projectFilterEl ? projectFilterEl.value : '';
 
         var submissions = AppData.getSubmissions().filter(function(s) {
@@ -547,7 +581,11 @@ window.AdminReports = {
         var container = self._container;
         var projectFilterEl = container.querySelector('#expenseProjectFilter');
         var projectId = projectFilterEl ? projectFilterEl.value : '';
+        var startDate = self._dateRange ? self._dateRange.start : '';
+        var endDate = self._dateRange ? self._dateRange.end : '';
         var expenses = AppData.getExpenses(projectId || undefined);
+        if (startDate) expenses = expenses.filter(function(e) { return (e.date || '') >= startDate; });
+        if (endDate)   expenses = expenses.filter(function(e) { return (e.date || '') <= endDate; });
 
         var headers = ['Category', 'Description', 'Amount', 'Date', 'Project', 'Note'];
         var lines = [self._csvRow(headers)];
@@ -569,7 +607,11 @@ window.AdminReports = {
 
     _exportInvoiceCsv() {
         var self = this;
+        var startDate = self._dateRange ? self._dateRange.start : '';
+        var endDate = self._dateRange ? self._dateRange.end : '';
         var invoices = AppData.getInvoices();
+        if (startDate) invoices = invoices.filter(function(inv) { return (inv.date || '') >= startDate; });
+        if (endDate)   invoices = invoices.filter(function(inv) { return (inv.date || '') <= endDate; });
 
         var headers = ['Invoice #', 'Client', 'Project', 'Issue Date', 'Due Date', 'Amount', 'Status', 'Paid Amount', 'Balance'];
         var lines = [self._csvRow(headers)];
@@ -604,11 +646,16 @@ window.AdminReports = {
     // ── End CSV Export ───────────────────────────────────────────────────────────
 
     _renderInvoiceSummary(content) {
-        const invoices = AppData.getInvoices();
+        const self = this;
+        const startDate = self._dateRange ? self._dateRange.start : '';
+        const endDate = self._dateRange ? self._dateRange.end : '';
+        let invoices = AppData.getInvoices();
+        if (startDate) invoices = invoices.filter(function(inv) { return (inv.date || '') >= startDate; });
+        if (endDate)   invoices = invoices.filter(function(inv) { return (inv.date || '') <= endDate; });
         const esc = Utils.escapeHtml;
 
         if (invoices.length === 0) {
-            content.innerHTML = '<div class="card"><div class="empty"><h3>No Invoices</h3><p>No invoices have been created yet.</p></div></div>';
+            content.innerHTML = '<div class="card"><div class="empty"><h3>No Invoices</h3><p>No invoices found for the selected date range.</p></div></div>';
             return;
         }
 
@@ -682,12 +729,9 @@ window.AdminReports = {
             '</div></div>' +
             '<div id="lnrBody"></div>';
 
-        // Set default date range: current month
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        content.querySelector('#lnrFrom').value = y + '-' + m + '-01';
-        content.querySelector('#lnrTo').value = now.toISOString().slice(0, 10);
+        // Pre-populate from shared date range
+        content.querySelector('#lnrFrom').value = self._dateRange ? self._dateRange.start : '';
+        content.querySelector('#lnrTo').value   = self._dateRange ? self._dateRange.end   : '';
 
         content.querySelector('#lnrPrint').addEventListener('click', function() { window.print(); });
 
@@ -875,6 +919,10 @@ window.AdminReports = {
             '</div>' +
             '<div id="eqReportBody"></div>';
 
+        // Pre-populate from shared date range
+        content.querySelector('#eqStartDate').value = self._dateRange ? self._dateRange.start : '';
+        content.querySelector('#eqEndDate').value   = self._dateRange ? self._dateRange.end   : '';
+
         content.querySelector('#eqGenerateBtn').addEventListener('click', function() {
             const startDate = content.querySelector('#eqStartDate').value;
             const endDate   = content.querySelector('#eqEndDate').value;
@@ -1041,6 +1089,10 @@ window.AdminReports = {
                 '</div>' +
             '</div>' +
             '<div id="irBody"></div>';
+
+        // Pre-populate from shared date range
+        content.querySelector('#irStartDate').value = self._dateRange ? self._dateRange.start : '';
+        content.querySelector('#irEndDate').value   = self._dateRange ? self._dateRange.end   : '';
 
         content.querySelector('#irGenerateBtn').addEventListener('click', function() {
             self._fetchAndRenderImpact(content);
