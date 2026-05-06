@@ -270,7 +270,6 @@ window.WorkerTimeEntry = {
             // CRITICAL: Clear contentArea completely and atomically
             contentArea.innerHTML = '';
 
-            var workerRate = parseFloat(worker.defaultRate) || 0;
             var selectedExpenses = []; // Reset expense list for this form
             var selectedEquipment = []; // Reset equipment list for this form
             var impactCodes = []; // Loaded async below
@@ -318,9 +317,6 @@ window.WorkerTimeEntry = {
                     '<div class="hours-value" id="hoursValue">0.00</div>' +
                     '<div class="hours-label">hours (rounded to nearest 15 min)</div>' +
                 '</div>';
-
-            // Hidden rate
-            formHTML += '<input type="hidden" id="teRate" value="' + esc(String(workerRate)) + '">';
 
             // Description (SINGLE occurrence only)
             formHTML +=
@@ -386,7 +382,7 @@ window.WorkerTimeEntry = {
             if (activeEquipment.length > 0) {
                 var eqOptions = '<option value="">— Select equipment —</option>' +
                     activeEquipment.map(function(eq) {
-                        return '<option value="' + esc(eq.id) + '" data-cost="' + (eq.costRate || 0) + '" data-charge="' + (eq.chargeOutRate || 0) + '" data-name="' + esc(eq.name) + '">' +
+                        return '<option value="' + esc(eq.id) + '" data-name="' + esc(eq.name) + '">' +
                             esc(eq.name) + (eq.type ? ' (' + esc(eq.type) + ')' : '') + '</option>';
                     }).join('');
                 formHTML +=
@@ -602,7 +598,6 @@ window.WorkerTimeEntry = {
                             '<div>' +
                                 '<strong>' + esc(entry.equipmentName) + '</strong>' +
                                 '<span style="color:var(--text2);font-size:.85rem;margin-left:8px">' + entry.hours + ' hr</span>' +
-                                '<span style="color:var(--text2);font-size:.75rem;margin-left:8px">Cost: $' + (entry.costRate * entry.hours).toFixed(2) + ' · Revenue: $' + (entry.chargeOutRate * entry.hours).toFixed(2) + '</span>' +
                             '</div>' +
                             '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
                         div.querySelector('button').addEventListener('click', function() {
@@ -623,9 +618,7 @@ window.WorkerTimeEntry = {
                     selectedEquipment.push({
                         equipmentId:    sel.value,
                         equipmentName:  opt.dataset.name || opt.textContent,
-                        hours:          hrs,
-                        costRate:       parseFloat(opt.dataset.cost) || 0,
-                        chargeOutRate:  parseFloat(opt.dataset.charge) || 0
+                        hours:          hrs
                     });
                     sel.value = '';
                     form.querySelector('#teEquipmentHours').value = '';
@@ -791,7 +784,6 @@ window.WorkerTimeEntry = {
                         subtaskName: subtaskName || '',
                         rateType: 'Hourly',
                         hours: hoursWorked,
-                        rate: workerRate || null,
                         flatRate: null,
                         description: descValue,
                         unitsCompleted: unitsValue,
@@ -806,9 +798,9 @@ window.WorkerTimeEntry = {
                             return {
                                 equipmentId:   e.equipmentId,
                                 equipmentName: e.equipmentName,
-                                hours:         e.hours,
-                                costRate:      e.costRate,
-                                chargeOutRate: e.chargeOutRate
+                                hours:         e.hours
+                                // costRate and chargeOutRate intentionally omitted —
+                                // rates are resolved from the equipment master record, not submitted by workers
                             };
                         }),
                         // Impact code fields
@@ -833,10 +825,8 @@ window.WorkerTimeEntry = {
                                 workerName:    worker.name,
                                 date:          dateValue,
                                 hours:         e.hours,
-                                costRate:      e.costRate,
-                                chargeOutRate: e.chargeOutRate,
-                                cost:          Math.round(e.hours * e.costRate * 100) / 100,
-                                revenue:       Math.round(e.hours * e.chargeOutRate * 100) / 100,
+                                // costRate, chargeOutRate, cost, revenue intentionally omitted —
+                                // resolved from equipment master by admin costing reports
                                 createdAt:     new Date().toISOString()
                             });
                         });
