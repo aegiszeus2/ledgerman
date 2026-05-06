@@ -401,8 +401,8 @@ window.AdminProjects = {
             return;
         }
         const esc = Utils.escapeHtml;
-        const tabs = ['tasks', 'budget', 'work-items', 'expenses', 'photos', 'invoices'];
-        const tabLabels = { 'tasks': 'Tasks', 'budget': 'Budget', 'work-items': 'Work Items', 'expenses': 'Expenses', 'photos': 'Photos', 'invoices': 'Invoices' };
+        const tabs = ['tasks', 'budget', 'work-items', 'expenses', 'photos', 'invoices', 'contract'];
+        const tabLabels = { 'tasks': 'Tasks', 'budget': 'Budget', 'work-items': 'Work Items', 'expenses': 'Expenses', 'photos': 'Photos', 'invoices': 'Invoices', 'contract': 'Contract & Billing' };
 
         container.innerHTML = `
             <div style="margin-bottom:16px">
@@ -456,6 +456,48 @@ window.AdminProjects = {
             case 'expenses': self._renderExpensesTab(tabContent, project); break;
             case 'photos': self._renderPhotosTab(tabContent, project); break;
             case 'invoices': self._renderInvoicesTab(tabContent, project); break;
+            case 'contract': self._renderContractTab(tabContent, project); break;
+        }
+    },
+
+    async _renderContractTab(tabContent, project) {
+        var self = this;
+        tabContent.innerHTML = '<div class="loading-state"><p>Loading...</p></div>';
+        var contracts = [];
+        try {
+            contracts = await AppData.apiGetContracts(project.id);
+        } catch (e) {
+            tabContent.innerHTML = '<p style="color:var(--accent)">Failed to load contract data.</p>';
+            return;
+        }
+        var esc = Utils.escapeHtml;
+        if (contracts.length === 0) {
+            tabContent.innerHTML =
+                '<div class="empty" style="text-align:center;padding:32px">' +
+                '<h3>No Contract</h3>' +
+                '<p style="color:var(--text2);margin-bottom:16px">This project has no billing contract. You can operate without one or set one up now.</p>' +
+                '<button class="btn-primary" id="setupContractBtn">Set Up Contract</button>' +
+                '</div>';
+            tabContent.querySelector('#setupContractBtn').addEventListener('click', function() {
+                App.navigate('contracts');
+                setTimeout(function() {
+                    if (window.AdminContracts) AdminContracts._showContractForm({ projectId: project.id, title: project.name, contractType: 'lump_sum_with_sov', originalValue: 0, holdbackPct: 10, status: 'Active' });
+                }, 200);
+            });
+        } else {
+            var c = contracts[0];
+            var typeLabels = { lump_sum: 'Lump Sum', lump_sum_with_sov: 'Lump Sum / SOV', unit_price: 'Unit Price', time_and_material: 'T&M', mixed: 'Mixed' };
+            tabContent.innerHTML =
+                '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">' +
+                '<div>' +
+                '<h4 style="margin:0">' + esc(c.title) + '</h4>' +
+                '<p style="font-size:.85rem;color:var(--text2);margin:4px 0">' + esc(typeLabels[c.contractType] || c.contractType) + ' &mdash; ' + Utils.formatCurrency(c.originalValue) + ' &mdash; Holdback: ' + c.holdbackPct + '%</p>' +
+                '</div>' +
+                '<button class="btn-secondary btn-sm" id="openContractBtn" data-id="' + c.id + '">Open Contract</button>' +
+                '</div>';
+            tabContent.querySelector('#openContractBtn').addEventListener('click', function() {
+                App.navigate('contracts', { contractId: c.id });
+            });
         }
     },
 

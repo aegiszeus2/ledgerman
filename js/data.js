@@ -983,6 +983,84 @@ function shouldRemindBackup() {
     return (Date.now() - new Date(last).getTime()) > 30 * 24 * 60 * 60 * 1000;
 }
 
+// ── Contract API (dedicated tables, not generic entities) ────────────────────
+
+async function apiGetContracts(projectId) {
+    var url = projectId ? '/api/contracts?projectId=' + encodeURIComponent(projectId) : '/api/contracts';
+    return _apiFetch(url);
+}
+
+async function apiGetContract(contractId) {
+    return _apiFetch('/api/contracts/' + contractId);
+}
+
+async function apiCreateContract(data) {
+    return _apiFetch('/api/contracts', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiUpdateContract(contractId, data) {
+    return _apiFetch('/api/contracts/' + contractId, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+async function apiDeleteContract(contractId) {
+    return _apiFetch('/api/contracts/' + contractId, { method: 'DELETE' });
+}
+
+async function apiGetContractItems(contractId) {
+    return _apiFetch('/api/contracts/' + contractId + '/items');
+}
+
+async function apiCreateContractItem(contractId, data) {
+    return _apiFetch('/api/contracts/' + contractId + '/items', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiUpdateContractItem(contractId, itemId, data) {
+    return _apiFetch('/api/contracts/' + contractId + '/items/' + itemId, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+async function apiDeleteContractItem(contractId, itemId) {
+    return _apiFetch('/api/contracts/' + contractId + '/items/' + itemId, { method: 'DELETE' });
+}
+
+async function apiGetCertificates(contractId) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates');
+}
+
+async function apiCreateCertificate(contractId, data) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiGetCertificate(contractId, certId) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates/' + certId);
+}
+
+async function apiUpdateCertificateLines(contractId, certId, lines) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates/' + certId, {
+        method: 'PUT',
+        body: JSON.stringify({ lines: lines })
+    });
+}
+
+async function apiSubmitCertificate(contractId, certId) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates/' + certId + '/submit', { method: 'POST' });
+}
+
+async function apiApproveCertificate(contractId, certId) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates/' + certId + '/approve', { method: 'POST' });
+}
+
+async function apiRevertCertificate(contractId, certId) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates/' + certId + '/revert', { method: 'POST' });
+}
+
+async function apiCreateInvoiceFromCertificate(contractId, certId, data) {
+    return _apiFetch('/api/contracts/' + contractId + '/certificates/' + certId + '/invoice', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiSyncContracts() {
+    return _apiFetch('/api/sync/contracts');
+}
+
 // ─── Export ────────────────────────────────────────────────────────────────
 window.AppData = {
     // API config
@@ -1044,5 +1122,13 @@ window.AppData = {
     // Budget Items
     getBudgetItems, getBudgetItem, saveBudgetItem, deleteBudgetItem,
     // Backup
-    exportAllData, importAllData, getLastBackupDate, setLastBackupDate, shouldRemindBackup
+    exportAllData, importAllData, getLastBackupDate, setLastBackupDate, shouldRemindBackup,
+    // Contracts & Progress Certificates
+    apiGetContracts, apiGetContract, apiCreateContract, apiUpdateContract, apiDeleteContract,
+    apiGetContractItems, apiCreateContractItem, apiUpdateContractItem, apiDeleteContractItem,
+    apiGetCertificates, apiCreateCertificate, apiGetCertificate,
+    apiUpdateCertificateLines,
+    apiSubmitCertificate, apiApproveCertificate, apiRevertCertificate,
+    apiCreateInvoiceFromCertificate,
+    apiSyncContracts
 };

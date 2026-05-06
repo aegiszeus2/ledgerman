@@ -987,6 +987,7 @@
                 item('approvals',      '✅', 'Approvals',    'Approvals — review worker time submissions', '<span class="nav-badge" id="approvalBadge" style="display:none"></span>'),
                 // ── Module-gated accounting ────────────────────────────────
                 on('invoicing',     true)  ? item('invoices',  '📄', 'Invoices',     'Invoices — create & track client invoices') : '',
+                item('contracts', '📋', 'Contracts', 'Contracts — billing contracts, SOV, and progress certificates'),
                 on('bid_estimates', false) ? item('estimates', '💹', 'Bid Estimates','Estimates — bid estimates and project costing') : '',
                 // ── Always-on operations ───────────────────────────────────
                 item('expenses-review','💰', 'Expenses',     'Expenses — review worker-submitted costs'),
@@ -1173,6 +1174,9 @@
                     break;
                 case 'invoices':
                     if (window.AdminInvoices) AdminInvoices.render(content, params);
+                    break;
+                case 'contracts':
+                    if (window.AdminContracts) AdminContracts.render(content, params);
                     break;
                 case 'invoice-detail':
                     if (window.AdminInvoices) AdminInvoices.renderDetail(content, params.invoiceId);
