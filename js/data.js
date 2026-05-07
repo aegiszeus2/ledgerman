@@ -174,10 +174,10 @@ async function apiRegister(companyName, password) {
     return data;
 }
 
-async function apiLoginAdmin(companyName, password) {
+async function apiLoginAdmin(companyName, password, persistent) {
     const data = await _apiFetch('/api/auth/admin', {
         method: 'POST',
-        body: JSON.stringify({ companyName: companyName, password: password })
+        body: JSON.stringify({ companyName: companyName, password: password, persistent: !!persistent })
     });
     setJwt(data.token);
     // Extract companyId from JWT payload so isApiMode() returns true for admin sessions
@@ -223,10 +223,10 @@ async function apiLoginWorkerByName(companyName, pin) {
 }
 
 
-async function apiLoginWorkerByNameAndPin(companyName, workerName, pin) {
+async function apiLoginWorkerByNameAndPin(companyName, workerName, pin, persistent) {
     const data = await _apiFetch('/api/auth/worker', {
         method: 'POST',
-        body: JSON.stringify({ companyName: companyName, workerName: workerName, pin: pin })
+        body: JSON.stringify({ companyName: companyName, workerName: workerName, pin: pin, persistent: !!persistent })
     });
     if (data.token) setJwt(data.token);
     // Store the companyId returned so session is linked
