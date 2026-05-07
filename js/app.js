@@ -79,16 +79,23 @@
                     if (creds.jwt) AppData.setJwt(creds.jwt);
                     if (creds.companyId) AppData.setCompanyId(creds.companyId);
 
+                    // Bail out immediately if the stored JWT is already expired — no network round-trip needed
+                    if (AppData.isTokenExpired(creds.jwt)) {
+                        console.log('[Ledgerman] Persistent admin JWT expired (client-side check), clearing auth state');
+                        AppData.clearAuthState();
+                        this.showAdminLogin();
+                        return;
+                    }
+
                     try {
                         await Promise.race([AppData.syncFromServer(), timeoutPromise]);
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         this.startAdminPanel();
                         return;
                     } catch(err) {
-                        // JWT expired or invalid OR timeout — clear and show login
-                        console.log('[Ledgerman] Persistent admin JWT invalid or timeout, showing login');
-                        AppData.clearPersistentLogin();
-                        AppData.setJwt('');
+                        // JWT expired or invalid OR timeout — clear ALL auth state (JWT + companyId + persistent)
+                        console.log('[Ledgerman] Persistent admin JWT invalid or timeout, clearing auth state');
+                        AppData.clearAuthState();
                         this.showAdminLogin();
                     }
                 } else if (type === 'worker') {
@@ -111,10 +118,9 @@
                         this._completeWorkerLogin(worker, 'Restored from persistent login');
                         return;
                     } catch(err) {
-                        // Credentials invalid OR timeout — clear and show login
-                        console.log('[Ledgerman] Persistent worker credentials invalid or timeout, showing login');
-                        AppData.clearPersistentLogin();
-                        AppData.setJwt('');
+                        // Credentials invalid OR timeout — clear ALL auth state (JWT + companyId + persistent)
+                        console.log('[Ledgerman] Persistent worker credentials invalid or timeout, clearing auth state');
+                        AppData.clearAuthState();
                         this.showWorkerLogin();
                     }
                 } else {
@@ -805,7 +811,13 @@
         showAdminLogin() {
             const app = document.getElementById('app');
 
-            // Parse pre-filled credentials from URL (for invitations)
+            // Clear any stale session-level auth state (companyId/jwt in sessionStorage)
+            // so the form always starts from a clean slate — this is the key desktop fix:
+            // after a failed/expired persistent-login restore the companyId was left in
+            // sessionStorage, causing the fallback apiLinkDevice path to fire on submit.
+            AppData.clearAuthState();
+
+            // Parse pre-filled credentials from URL (for invitations only — never from localStorage)
             const params = new URLSearchParams(window.location.search);
             const prefilledCompany = params.get('company') || '';
             const prefilledPassword = params.get('password') || '';
@@ -815,14 +827,16 @@
                     <div class="login-card">
                         <h2>Admin Login</h2>
                         <p class="text-muted">Enter company name and password</p>
-                        <form id="adminLoginForm">
+                        <form id="adminLoginForm" autocomplete="on">
                             <div class="form-group">
                                 <input type="text" class="form-control" id="adminCompanyName"
-                                    placeholder="Company Name" value="${Utils.escapeHtml(prefilledCompany)}" required autocomplete="off">
+                                    placeholder="Company Name" value="${Utils.escapeHtml(prefilledCompany)}" required
+                                    autocomplete="organization" name="organization">
                             </div>
                             <div class="form-group">
                                 <input type="password" class="form-control" id="adminPassword"
-                                    placeholder="Password" value="${Utils.escapeHtml(prefilledPassword)}" required autocomplete="off">
+                                    placeholder="Password" value="${Utils.escapeHtml(prefilledPassword)}" required
+                                    autocomplete="current-password" name="current-password">
                             </div>
                             <div class="form-group" style="display:flex;align-items:center;margin-bottom:16px">
                                 <input type="checkbox" id="adminKeepMeSignedIn" style="margin-right:8px;cursor:pointer">
@@ -837,7 +851,7 @@
                 </div>
             `;
 
-            // Auto-submit if both credentials are pre-filled
+            // Auto-submit only when credentials come from a URL invitation (not from localStorage/stale state)
             if (prefilledCompany && prefilledPassword) {
                 setTimeout(() => {
                     document.getElementById('adminLoginForm').dispatchEvent(new Event('submit'));
@@ -863,7 +877,9 @@
                     return;
                 }
 
-                // Always try API first if company name is provided
+                // API login: always require company name from the form (no stale companyId fallback).
+                // showAdminLogin() calls clearAuthState() before rendering, so isApiMode() is
+                // always false here — the form is always the sole source of truth.
                 if (companyName) {
                     btn.disabled = true; btn.textContent = 'Logging in…';
                     try {
@@ -883,37 +899,8 @@
                         this.startAdminPanel();
                     } catch(err) {
                         btn.disabled = false; btn.textContent = 'Login';
-                        this._loginAttempts++;
-                        if (window.LedgermanAnalytics) LedgermanAnalytics.logLoginFailure('admin');
-                        if (this._loginAttempts >= 5) {
-                            this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
-                            this._loginAttempts = 0;
-                        }
-                        errEl.textContent = err.message || 'Invalid password.';
-                        errEl.style.display = 'block';
-                        document.getElementById('adminPassword').value = '';
-                        document.getElementById('adminPassword').focus();
-                    }
-                } else if (AppData.isApiMode()) {
-                    // Fallback: If no company name and already in API mode, try with stored company ID
-                    btn.disabled = true; btn.textContent = 'Logging in…';
-                    try {
-                        await AppData.apiLinkDevice(AppData.getCompanyId(), pw);
-                        await AppData.syncFromServer();
-                        // Save persistent login if checkbox is checked
-                        if (keepMeSignedIn) {
-                            AppData.savePersistentLogin('admin', {
-                                companyName: companyName || AppData.getCompanyName(),
-                                password: pw,
-                                jwt: AppData.getJwt(),
-                                companyId: AppData.getCompanyId()
-                            });
-                        }
-                        this.currentUser = { type: 'admin', name: 'Admin' };
-                        AppData.addAuditLog('Admin', 'Admin Login', '');
-                        this.startAdminPanel();
-                    } catch(err) {
-                        btn.disabled = false; btn.textContent = 'Login';
+                        // Clear any partial auth state set during the failed attempt
+                        AppData.clearAuthState();
                         this._loginAttempts++;
                         if (window.LedgermanAnalytics) LedgermanAnalytics.logLoginFailure('admin');
                         if (this._loginAttempts >= 5) {
@@ -926,43 +913,11 @@
                         document.getElementById('adminPassword').focus();
                     }
                 } else {
-                    // Legacy localStorage mode (offline only)
-                    if (pw === AppData.getAdminPassword()) {
-                        if (keepMeSignedIn) {
-                            AppData.savePersistentLogin('admin', {
-                                companyName: companyName,
-                                password: pw
-                            });
-                        }
-                        this.currentUser = { type: 'admin', name: 'Admin' };
-                        AppData.addAuditLog('Admin', 'Admin Login', '');
-                        this.startAdminPanel();
-                    } else {
-                        const workers = AppData.getWorkers().filter(w => w.role === 'Approver' && w.status === 'Active');
-                        const approver = workers.find(w => w.pin === pw);
-                        if (approver) {
-                            if (keepMeSignedIn) {
-                                AppData.savePersistentLogin('admin', {
-                                    companyName: companyName,
-                                    password: pw
-                                });
-                            }
-                            this.currentUser = { type: 'admin', name: approver.name, id: approver.id };
-                            AppData.addAuditLog(approver.name, 'Approver Login', '');
-                            this.startAdminPanel();
-                        } else {
-                            this._loginAttempts++;
-                            if (window.LedgermanAnalytics) LedgermanAnalytics.logLoginFailure('admin');
-                            if (this._loginAttempts >= 5) {
-                                this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
-                                this._loginAttempts = 0;
-                            }
-                            errEl.textContent = 'Invalid password. Please try again.';
-                            errEl.style.display = 'block';
-                            document.getElementById('adminPassword').value = '';
-                            document.getElementById('adminPassword').focus();
-                        }
-                    }
+                    // Company name is required — show an inline error rather than falling through
+                    // to a stale-companyId path that could silently use wrong credentials.
+                    errEl.textContent = 'Please enter your company name.';
+                    errEl.style.display = 'block';
+                    document.getElementById('adminCompanyName').focus();
                 }
             };
         },

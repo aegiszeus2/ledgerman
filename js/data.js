@@ -34,6 +34,12 @@ function openDB() {
 // ─── JWT / CompanyId Storage ───────────────────────────────────────────────
 // sessionStorage: persists during the browser session (tab stays logged in on refresh)
 // but clears when the browser/tab is closed — no cross-session pre-population of company
+//
+// Auth state key inventory (for clearAuthState):
+//   sessionStorage: ledgeman_jwt, ledgeman_companyId
+//   localStorage:   ledgeman_persistent_login
+//                   ledgeman_<entity> (workers, projects, tasks, etc. — data cache, not cleared)
+//                   ledgeman_adminPassword (legacy offline only)
 function getJwt() { return sessionStorage.getItem('ledgeman_jwt') || ''; }
 function setJwt(token) {
     if (token) sessionStorage.setItem('ledgeman_jwt', token);
@@ -45,6 +51,40 @@ function setCompanyId(id) {
     else sessionStorage.removeItem('ledgeman_companyId');
 }
 function isApiMode() { return !!(getCompanyId()); }
+
+/**
+ * isTokenExpired(token)
+ * Decodes the JWT payload and checks whether the `exp` claim is in the past.
+ * Returns true if the token is expired OR unparseable; false if valid and not yet expired.
+ */
+function isTokenExpired(token) {
+    if (!token) return true;
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return true;
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (!payload.exp) return false; // no expiry claim — treat as non-expiring
+        return (payload.exp * 1000) < Date.now();
+    } catch (e) {
+        return true; // unparseable → treat as expired
+    }
+}
+
+/**
+ * clearAuthState()
+ * Removes all session/persistent auth keys so the login form is shown clean.
+ * Does NOT clear data-cache keys (ledgeman_workers, ledgeman_projects, etc.)
+ * or offline settings — only the auth identifiers.
+ */
+function clearAuthState() {
+    try {
+        sessionStorage.removeItem('ledgeman_jwt');
+        sessionStorage.removeItem('ledgeman_companyId');
+        localStorage.removeItem('ledgeman_persistent_login');
+    } catch (e) {
+        console.warn('[Ledgerman] clearAuthState failed:', e.message);
+    }
+}
 
 // ─── Persistent Storage (Keep Me Signed In) ────────────────────────────────
 function savePersistentLogin(type, credentials) {
@@ -1067,6 +1107,7 @@ window.AppData = {
     API_BASE: API_BASE,
     // Auth / session
     getJwt, setJwt, getCompanyId, setCompanyId, isApiMode,
+    isTokenExpired, clearAuthState,
     getPersistentLogin, savePersistentLogin, clearPersistentLogin,
     apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin, apiVerify2FA,
     apiCreateInvite, apiGetInvite, apiUseInvite,
