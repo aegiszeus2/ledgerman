@@ -75,44 +75,72 @@
 
             try {
                 if (type === 'admin') {
-                    // Restore admin JWT and try to sync
-                    if (creds.jwt) AppData.setJwt(creds.jwt);
+                    // Set companyId so isApiMode() is true during re-auth
                     if (creds.companyId) AppData.setCompanyId(creds.companyId);
 
                     try {
+                        // Re-authenticate with stored credentials to get a fresh JWT.
+                        // This correctly handles the 24-hour expiry — no stale-token problem.
+                        if (creds.companyName && creds.password) {
+                            await Promise.race([AppData.apiLoginAdmin(creds.companyName, creds.password), timeoutPromise]);
+                        } else if (creds.jwt) {
+                            // Legacy format (no credentials stored) — fall back to stored JWT
+                            AppData.setJwt(creds.jwt);
+                        } else {
+                            throw new Error('No admin credentials or JWT in persistent storage');
+                        }
                         await Promise.race([AppData.syncFromServer(), timeoutPromise]);
+                        // Refresh stored persistent login with the new JWT (resets effective expiry)
+                        AppData.savePersistentLogin('admin', {
+                            companyName: creds.companyName,
+                            password:    creds.password,
+                            jwt:         AppData.getJwt(),
+                            companyId:   AppData.getCompanyId()
+                        });
                         this.currentUser = { type: 'admin', name: 'Admin' };
                         this.startAdminPanel();
                         return;
                     } catch(err) {
-                        // JWT expired or invalid OR timeout — clear and show login
-                        console.log('[Ledgerman] Persistent admin JWT invalid or timeout, showing login');
+                        // Auth failed or timeout — clear and show login
+                        console.log('[Ledgerman] Persistent admin restore failed:', err.message);
                         AppData.clearPersistentLogin();
                         AppData.setJwt('');
                         this.showAdminLogin();
                     }
                 } else if (type === 'worker') {
-                    // Restore worker JWT and try to sync
-                    if (creds.jwt) AppData.setJwt(creds.jwt);
                     if (creds.companyId) AppData.setCompanyId(creds.companyId);
 
                     try {
                         const data = await Promise.race([AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin), timeoutPromise]);
+
+                        // 2FA required — route to 2FA prompt instead of crashing on data.worker
+                        if (data.twoFARequired) {
+                            this._worker2FAData = {
+                                companyName:    creds.companyName,
+                                workerName:     creds.workerName,
+                                pin:            creds.pin,
+                                keepMeSignedIn: true,
+                                workerId:       data.workerId
+                            };
+                            this._show2FAStep({ id: data.workerId, name: data.workerName });
+                            return;
+                        }
+
                         await Promise.race([AppData.syncFromServer(), timeoutPromise]);
                         const worker = AppData.getWorker(data.worker.id) || data.worker;
-                        // Refresh persistent login timestamp and update JWT so expiry resets
+                        // Refresh persistent login with fresh JWT so expiry resets
                         AppData.savePersistentLogin('worker', {
                             companyName: creds.companyName,
-                            workerName: creds.workerName,
-                            pin: creds.pin,
-                            jwt: AppData.getJwt(),
-                            companyId: AppData.getCompanyId()
+                            workerName:  creds.workerName,
+                            pin:         creds.pin,
+                            jwt:         AppData.getJwt(),
+                            companyId:   AppData.getCompanyId()
                         });
                         this._completeWorkerLogin(worker, 'Restored from persistent login');
                         return;
                     } catch(err) {
                         // Credentials invalid OR timeout — clear and show login
-                        console.log('[Ledgerman] Persistent worker credentials invalid or timeout, showing login');
+                        console.log('[Ledgerman] Persistent worker restore failed:', err.message);
                         AppData.clearPersistentLogin();
                         AppData.setJwt('');
                         this.showWorkerLogin();
@@ -240,7 +268,7 @@
                     const loginBtn = document.querySelector('#workerLoginForm button[type="submit"]');
                     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Logging in…'; }
                     try {
-                        const data = await AppData.apiLoginWorkerByNameAndPin(companyName, workerName, pin);
+                        const data = await AppData.apiLoginWorkerByNameAndPin(companyName, workerName, pin, keepMeSignedIn);
                         if (data.twoFARequired) {
                             // Server says 2FA needed — store for later and go to verification step
                             this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn, workerId: data.workerId, workerName: data.workerName };
@@ -867,7 +895,7 @@
                 if (companyName) {
                     btn.disabled = true; btn.textContent = 'Logging in…';
                     try {
-                        await AppData.apiLoginAdmin(companyName, pw);
+                        await AppData.apiLoginAdmin(companyName, pw, keepMeSignedIn);
                         await AppData.syncFromServer();
                         // Save persistent login if checkbox is checked
                         if (keepMeSignedIn) {
@@ -898,7 +926,7 @@
                     // Fallback: If no company name and already in API mode, try with stored company ID
                     btn.disabled = true; btn.textContent = 'Logging in…';
                     try {
-                        await AppData.apiLinkDevice(AppData.getCompanyId(), pw);
+                        await AppData.apiLinkDevice(AppData.getCompanyId(), pw); // apiLinkDevice doesn't support persistent (companyId path)
                         await AppData.syncFromServer();
                         // Save persistent login if checkbox is checked
                         if (keepMeSignedIn) {
@@ -1013,7 +1041,7 @@
         },
 
         startAdminPanel() {
-            Utils.startSessionTimer(() => this.logout());
+            Utils.startSessionTimer(() => this._sessionTimeout());
             const app = document.getElementById('app');
             app.className = 'admin-mode';
             app.innerHTML = `
@@ -1302,7 +1330,7 @@
         // ============ WORKER PORTAL ============
 
         startWorkerPortal(worker) {
-            Utils.startSessionTimer(() => this.logout());
+            Utils.startSessionTimer(() => this._sessionTimeout());
             const app = document.getElementById('app');
             app.className = 'worker-mode';
             // Supervisors and Approvers get an extra "Field Reports" tab
@@ -1479,8 +1507,26 @@
             this.currentUser = null;
             this.currentView = null;
             this.currentProjectId = null;
-            AppData.setJwt(''); // clear JWT — require fresh login next time
-            AppData.clearPersistentLogin(); // clear persistent login on logout
+            AppData.setJwt(''); // clear JWT
+            AppData.clearPersistentLogin(); // explicit logout — clear "keep me signed in" too
+            Utils.stopSessionTimer();
+            const app = document.getElementById('app');
+            app.className = '';
+            this.showLogin();
+        },
+
+        // Called by the inactivity session timer — different from explicit logout.
+        // Clears the active session but preserves "Keep me signed in" in localStorage
+        // so the user is auto-restored on the next page load / browser open.
+        _sessionTimeout() {
+            if (this.currentUser) {
+                AppData.addAuditLog(this.currentUser.name, 'Session Timeout', '');
+            }
+            this.currentUser = null;
+            this.currentView = null;
+            this.currentProjectId = null;
+            AppData.setJwt(''); // clear active JWT only
+            // Do NOT call AppData.clearPersistentLogin() — keep "Keep me signed in" intact
             Utils.stopSessionTimer();
             const app = document.getElementById('app');
             app.className = '';
