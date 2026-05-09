@@ -76,7 +76,7 @@ window.AdminUsers = {
                                     '<td style="font-size:.85rem;color:var(--text2)">' + (w.phone ? Utils.escapeHtml(w.phone) : '<span style="color:var(--border)">—</span>') + '</td>' +
                                     (function() {
                                         var p = w.pin || '';
-                                        var isHash = p.startsWith('$2b$') || p.startsWith('$2a$');
+                                        var isHash = p.startsWith('$2b$') || p.startsWith('$2a$') || p === '[hashed]';
                                         if (isHash) {
                                             return '<td style="white-space:nowrap;font-size:.8rem;color:var(--text2)">Reset required <button class="btn-ghost btn-sm reset-pin-worker" data-id="' + w.id + '" style="font-size:.75rem;padding:2px 6px;color:var(--warn)">Reset</button></td>';
                                         }
@@ -406,7 +406,7 @@ window.AdminUsers = {
                 id: isEdit ? worker.id : AppData.generateId(),
                 name: fd.name.trim(),
                 role: fd.role || 'Worker',
-                pin: pinChanged ? fd.pin : (isEdit ? worker.pin : fd.pin),
+                pin: pinChanged ? fd.pin : (isEdit ? '' : fd.pin),
                 status: fd.status || 'Active',
                 email: (fd.email || '').trim() || (isEdit ? worker.email || '' : ''),
                 phone: (fd.phone || '').trim(),
