@@ -48,21 +48,21 @@ window.AdminApprovals = {
         const rejected = submissions.filter(function(s) { return s.status === 'Rejected'; });
 
         container.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-                <h2>Approvals</h2>
-                <div style="display:flex;gap:8px">
-                    ${pending.length > 1 ? '<button class="btn btn-primary btn-sm" id="bulkApproveBtn">Approve All (' + pending.length + ')</button>' : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+                <h2 style="margin:0">Time Approvals</h2>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <button class="btn-secondary btn-sm" id="approvalsExportCsvBtn">Export CSV</button>
-                    <button class="btn-secondary btn-sm" id="approvalsPrintBtn">Print / PDF</button>
+                    <button class="btn-secondary btn-sm" id="approvalsPrintBtn">Print</button>
+                    <button class="btn-primary btn-sm" id="bulkApproveBtn">Bulk Approve</button>
                 </div>
             </div>
 
-            <div class="tabs">
+            <div class="tabs" style="margin-bottom:16px">
                 <button class="tab-btn ${self._tab === 'pending' ? 'active' : ''}" data-tab="pending">
-                    Pending ${pending.length > 0 ? '<span style="background:var(--amber);color:#000;font-size:.7rem;padding:1px 6px;border-radius:10px;margin-left:4px">' + pending.length + '</span>' : ''}
+                    Pending ${pending.length > 0 ? '<span class="badge-gold" style="margin-left:6px">' + pending.length + '</span>' : ''}
                 </button>
                 <button class="tab-btn ${self._tab === 'history' ? 'active' : ''}" data-tab="history">
-                    Approved / Rejected (${approved.length + rejected.length})
+                    History (${approved.length + rejected.length})
                 </button>
             </div>
 

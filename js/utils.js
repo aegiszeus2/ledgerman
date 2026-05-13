@@ -66,6 +66,8 @@ const Utils = {
         if (!container) {
             container = document.createElement('div');
             container.className = 'toast-container';
+            container.setAttribute('aria-live', 'polite');
+            container.setAttribute('aria-atomic', 'false');
             document.body.appendChild(container);
         }
         const toast = document.createElement('div');
@@ -85,11 +87,11 @@ const Utils = {
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay active';
             overlay.innerHTML = `
-                <div class="modal" style="max-width:400px">
-                    <div class="modal-header"><h3>Confirm</h3></div>
+                <div class="modal" style="max-width:420px" role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+                    <div class="modal-header"><h3 id="confirmDialogTitle">Confirm</h3></div>
                     <div class="modal-body"><p>${Utils.escapeHtml(message)}</p></div>
                     <div class="modal-footer">
-                        <button class="btn btn-secondary" id="confirmNo">Cancel</button>
+                        <button class="btn btn-quiet" id="confirmNo">Cancel</button>
                         <button class="btn btn-primary" id="confirmYes">Confirm</button>
                     </div>
                 </div>

@@ -214,12 +214,12 @@ window.LedgermanOnboarding = {
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
                         <button id="onboardNoviceBtn" style="border:2px solid #e5e7eb;border-radius:12px;padding:20px 14px;background:#fff;cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">🌱</div>
-                            <div style="font-weight:700;color:#1a1a2e;font-size:.95rem;margin-bottom:4px">Basic PM</div>
+                            <div style="font-weight:700;color:var(--text-primary);font-size:.95rem;margin-bottom:4px">Basic PM</div>
                             <div style="font-size:.8rem;color:#888;line-height:1.4">New to Ledgerman? Learn the essentials — projects, workers, time, and invoicing in 10 steps.</div>
                         </button>
                         <button id="onboardAdvancedBtn" style="border:2px solid #e5e7eb;border-radius:12px;padding:20px 14px;background:#fff;cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">⚡</div>
-                            <div style="font-weight:700;color:#1a1a2e;font-size:.95rem;margin-bottom:4px">Advanced PM</div>
+                            <div style="font-weight:700;color:var(--text-primary);font-size:.95rem;margin-bottom:4px">Advanced PM</div>
                             <div style="font-size:.8rem;color:#888;line-height:1.4">Experienced PM? Explore the full platform — budgets, Gantt, punch lists, reports and more.</div>
                         </button>
                     </div>
@@ -300,7 +300,7 @@ window.LedgermanOnboarding = {
                 <div style="padding:20px 24px 24px;flex:1">
                     <div style="text-align:center;margin-bottom:18px">
                         <div style="font-size:3rem;margin-bottom:10px">${step.icon}</div>
-                        <h3 style="margin:0 0 4px;color:#1a1a2e;font-size:1.2rem">${step.title}</h3>
+                        <h3 style="margin:0 0 4px;color:var(--text-primary);font-size:1.2rem">${step.title}</h3>
                         <div style="font-size:.85rem;color:${levelColor};font-weight:600">${step.subtitle}</div>
                     </div>
                     <p style="color:#555;font-size:.92rem;line-height:1.65;margin:0 0 20px;text-align:center">${step.body}</p>

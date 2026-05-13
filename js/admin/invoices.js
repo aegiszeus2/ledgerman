@@ -1197,10 +1197,13 @@ window.AdminInvoices = {
 
         var overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'editInvoiceTitle');
         overlay.style.display = 'flex';
         overlay.innerHTML =
             '<div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">' +
-                '<h3 style="margin-bottom:16px">Edit Invoice</h3>' +
+                '<h3 id="editInvoiceTitle" style="margin-bottom:16px">Edit Invoice</h3>' +
                 '<form id="editInvoiceForm" novalidate>' +
                     '<div class="form-group" style="margin-bottom:16px;padding:12px;background:#f0f4ff;border-radius:8px;border:1px solid #c7d2fe">' +
                         '<label style="font-weight:700;color:#1a3a5c">Project</label>' +
@@ -1238,7 +1241,7 @@ window.AdminInvoices = {
                         '</tr></thead>' +
                         '<tbody id="editLineItemsBody"></tbody>' +
                     '</table>' +
-                    '<button type="button" id="addCustomItem" style="background:#f9fafb;border:1px dashed #9ca3af;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:.85rem;color:#374151;margin-bottom:20px">+ Add Custom Line Item</button>' +
+                    '<button type="button" id="addCustomItem" style="background:var(--bg-surface);border:1px dashed var(--border-color);padding:6px 14px;border-radius:4px;cursor:pointer;font-size:.85rem;color:var(--text-secondary);margin-bottom:20px">+ Add Custom Line Item</button>' +
 
                     '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:10px">Add from Project Expenses</h4>' +
                     '<div id="availableExpensesSection" style="margin-bottom:20px"></div>' +
@@ -1278,11 +1281,11 @@ window.AdminInvoices = {
             var t = calcTotals();
             var el = overlay.querySelector('#editTotals');
             if (!el) return;
-            var html = '<div style="color:#374151"><strong>Subtotal:</strong> ' + Utils.formatCurrency(t.subtotal) + '</div>';
-            if (hstEnabled) html += '<div style="color:#374151">HST (' + hstRate + '%): ' + Utils.formatCurrency(t.hstAmt) + '</div>';
+            var html = '<div style="color:var(--text-secondary)"><strong>Subtotal:</strong> ' + Utils.formatCurrency(t.subtotal) + '</div>';
+            if (hstEnabled) html += '<div style="color:var(--text-secondary)">HST (' + hstRate + '%): ' + Utils.formatCurrency(t.hstAmt) + '</div>';
             html += '<div style="color:#111111"><strong>Total:</strong> ' + Utils.formatCurrency(t.total) + '</div>';
             if (holdbackEnabled) {
-                html += '<div style="color:#374151">Holdback (' + holdbackRate + '%): &minus;' + Utils.formatCurrency(t.hbAmt) + '</div>';
+                html += '<div style="color:var(--text-secondary)">Holdback (' + holdbackRate + '%): &minus;' + Utils.formatCurrency(t.hbAmt) + '</div>';
                 html += '<div style="font-weight:700;font-size:1rem;color:#e94560;margin-top:4px">Net Payable: ' + Utils.formatCurrency(t.net) + '</div>';
             } else {
                 html += '<div style="font-weight:700;font-size:1rem;color:#e94560;margin-top:4px">Total Due: ' + Utils.formatCurrency(t.total) + '</div>';
@@ -1363,11 +1366,11 @@ window.AdminInvoices = {
                         desc = (vd ? esc(vd) + ' &ndash; ' : '') + esc(e.description || '');
                     }
                     return '<tr style="border-top:1px solid #f0f0f0">' +
-                        '<td style="padding:6px 8px;color:#374151">' + Utils.formatDate(e.date) + '</td>' +
+                        '<td style="padding:6px 8px;color:var(--text-secondary)">' + Utils.formatDate(e.date) + '</td>' +
                         '<td style="padding:6px 8px;color:#111111">' + desc + '</td>' +
-                        '<td style="padding:6px 8px;color:#374151">' + (e.category || 'Material') + '</td>' +
+                        '<td style="padding:6px 8px;color:var(--text-secondary)">' + (e.category || 'Material') + '</td>' +
                         '<td style="padding:6px 8px;text-align:right;color:#111111">' + Utils.formatCurrency(e.amount) + '</td>' +
-                        '<td style="padding:6px 8px"><button type="button" class="add-exp-btn" data-id="' + e.id + '" style="background:#1a3a5c;color:#fff;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.8rem;white-space:nowrap">+ Add</button></td>' +
+                        '<td style="padding:6px 8px"><button type="button" class="add-exp-btn" data-id="' + e.id + '" style="background:var(--bg-surface-hover);color:var(--text-primary);border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.8rem;white-space:nowrap">+ Add</button></td>' +
                     '</tr>';
                 }).join('') +
                 '</tbody></table>';
@@ -1533,10 +1536,13 @@ window.AdminInvoices = {
         var self = this;
         var overlay = document.createElement('div');
         overlay.className = 'modal-overlay active';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'recordPaymentTitle');
         overlay.style.display = 'flex';
         overlay.innerHTML =
             '<div class="modal" style="max-width:450px">' +
-                '<h3>Record Payment</h3>' +
+                '<h3 id="recordPaymentTitle">Record Payment</h3>' +
                 '<form id="paymentForm" novalidate>' +
                     '<div class="form-row">' +
                         '<div class="form-group">' +

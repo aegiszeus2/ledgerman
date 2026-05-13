@@ -176,7 +176,7 @@ window.WorkerTimeEntry = {
                     '<div style="font-size:3rem;margin-bottom:8px">⏱</div>' +
                     '<p style="color:var(--text2);margin-bottom:4px">Current time</p>' +
                     '<div id="liveClockDisplay" style="font-size:2.5rem;font-weight:700;letter-spacing:2px;margin-bottom:24px">' + formatTimeAmPm(now) + '</div>' +
-                    '<button id="clockInBtn" style="background:var(--success);color:#fff;border:none;border-radius:var(--radius);padding:18px 48px;font-size:1.2rem;font-weight:700;cursor:pointer;min-width:200px;box-shadow:0 4px 14px rgba(46,204,113,.3)">Clock In</button>' +
+                    '<button id="clockInBtn" class="btn-primary btn-tap btn-block" style="min-height:56px">Clock In</button>' +
                     '<p style="color:var(--text2);font-size:.82rem;margin-top:16px">Tap when your shift starts. We\'ll track your time.</p>';
                 contentArea.appendChild(card);
 
@@ -210,7 +210,7 @@ window.WorkerTimeEntry = {
                     '<p style="color:var(--success);font-weight:600;margin-bottom:2px">Clocked in</p>' +
                     '<p style="color:var(--text2);font-size:.85rem;margin-bottom:12px">Since ' + formatTimeAmPm(clockedTime) + ' on ' + Utils.formatDate(clockedDate) + '</p>' +
                     '<div id="elapsedDisplay" style="font-size:2.2rem;font-weight:700;margin-bottom:24px;letter-spacing:1px">—</div>' +
-                    '<button id="clockOutBtn" style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:18px 48px;font-size:1.2rem;font-weight:700;cursor:pointer;min-width:200px;box-shadow:0 4px 14px rgba(233,69,96,.3)">Clock Out</button>' +
+                    '<button id="clockOutBtn" class="btn-danger btn-tap btn-block" style="min-height:56px">Clock Out</button>' +
                     '<p style="color:var(--text2);font-size:.82rem;margin-top:16px">Tap when your shift ends to log your hours.</p>';
                 contentArea.appendChild(elapsedCard);
 
@@ -298,7 +298,7 @@ window.WorkerTimeEntry = {
                 });
                 formHTML +=
                     '<div class="form-group">' +
-                        '<label class="form-label" for="teSubtask">Work Item</label>' +
+                        '<label class="form-label eyebrow" for="teSubtask">TASK</label>' +
                         '<select class="form-control" id="teSubtask" name="subtask">' + stOptions + '</select>' +
                     '</div>';
             }
@@ -314,14 +314,14 @@ window.WorkerTimeEntry = {
                     '</div>' +
                 '</div>' +
                 '<div class="hours-display" id="hoursDisplay" style="display:none">' +
-                    '<div class="hours-value" id="hoursValue">0.00</div>' +
+                    '<div class="hero-num gold" id="hoursValue">0.00</div>' +
                     '<div class="hours-label">hours (rounded to nearest 15 min)</div>' +
                 '</div>';
 
             // Description (SINGLE occurrence only)
             formHTML +=
                 '<div class="form-group">' +
-                    '<label class="form-label" for="teDescription">Description of Work <span style="font-weight:400;color:var(--text2)">(required)</span></label>' +
+                    '<label class="form-label eyebrow" for="teDescription">NOTES <span style="font-weight:400;color:var(--text2);text-transform:none;letter-spacing:0">(required)</span></label>' +
                     '<textarea class="form-control" id="teDescription" name="description" rows="4" placeholder="Describe the work you performed today…" style="resize:vertical" required>' + esc(defaults.description || '') + '</textarea>' +
                 '</div>';
 
@@ -371,7 +371,7 @@ window.WorkerTimeEntry = {
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
                         '<input class="form-control" type="text" id="teExpenseDesc" placeholder="Expense description (e.g. Gas, Tools)" style="flex:1;min-width:150px">' +
                         '<input class="form-control" type="number" id="teExpenseAmount" placeholder="$0.00" step="0.01" min="0" style="width:100px">' +
-                        '<button type="button" class="btn btn-secondary" id="teExpenseFileBtn" style="padding:10px 16px;white-space:nowrap">📎 Attach</button>' +
+                        '<button type="button" class="btn btn-secondary" id="teExpenseFileBtn" style="padding:10px 16px;white-space:nowrap" aria-label="Attach file to expense">📎 Attach</button>' +
                         '<button type="button" class="btn btn-secondary" id="addExpenseBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
                     '</div>' +
                     '<input type="file" id="teExpenseInput" style="display:none">' +
@@ -401,9 +401,9 @@ window.WorkerTimeEntry = {
             // accept="image/*" without capture shows iOS native sheet: Take Photo / Photo Library / Files
             formHTML +=
                 '<div class="form-group">' +
-                    '<label class="form-label">Photos <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
+                    '<label class="form-label eyebrow">ATTACH PHOTO <span style="font-weight:400;color:var(--text2);text-transform:none;letter-spacing:0">(optional)</span></label>' +
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-                        '<button type="button" class="camera-btn" id="teAddPhotosBtn">&#128247; Add Photos</button>' +
+                        '<button type="button" class="camera-btn" id="teAddPhotosBtn" aria-label="Add photos">&#128247; Add Photos</button>' +
                     '</div>' +
                     '<input type="file" id="tePhotoInput" accept="image/*" multiple style="display:none">' +
                     '<div class="photo-preview-grid" id="photoPreviewArea"></div>' +
@@ -411,7 +411,7 @@ window.WorkerTimeEntry = {
 
             // Submit
             formHTML +=
-                '<button type="submit" class="submit-btn-large" id="teSubmitBtn">&#10003; Submit Time Entry</button>';
+                '<button type="submit" class="btn-primary btn-tap btn-block" id="teSubmitBtn" style="min-height:56px">&#10003; Submit for Approval</button>';
 
             // Set form HTML all at once
             form.innerHTML = formHTML;
@@ -920,7 +920,7 @@ window.WorkerTimeEntry = {
                 '<h2 style="color:var(--success);margin-bottom:8px">Submitted!</h2>' +
                 '<p style="color:var(--text2);margin-bottom:28px">Your entry is pending approval.</p>' +
                 '<div style="display:flex;flex-direction:column;gap:10px;max-width:280px;margin:0 auto">' +
-                    '<button class="submit-btn-large" id="teAnother">Log Another Entry</button>' +
+                    '<button class="btn-primary btn-tap btn-block" id="teAnother" style="min-height:56px">Log Another Entry</button>' +
                     '<button class="btn btn-secondary" id="teHome" style="min-height:48px">Back to Home</button>' +
                 '</div>';
             container.appendChild(card);

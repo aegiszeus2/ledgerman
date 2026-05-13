@@ -5,10 +5,10 @@
 
 /* --- Admin Sidebar --- */
 .admin-sidebar {
-  width: 240px;
+  width: 232px;
   flex-shrink: 0;
-  background-color: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent 30%), var(--bg-secondary);
+  border-right: 1px solid var(--border-color-soft);
   height: 100vh;
   position: fixed;
   top: 0;
@@ -25,138 +25,157 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-5);
-  border-bottom: 1px solid var(--border-color);
-  font-size: 1.1rem;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color-soft);
+  font-family: var(--font-display);
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--amber);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
+  letter-spacing: -0.01em;
 }
 
 .admin-sidebar .sidebar-brand .brand-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--amber);
+  background: linear-gradient(140deg, var(--amber-hover), var(--amber-deep));
   color: var(--text-inverse);
   border-radius: var(--radius);
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 0.875rem;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 1px 4px rgba(0,0,0,0.4);
 }
 
 .admin-sidebar nav {
   flex: 1;
-  padding: var(--space-3) 0;
+  padding: 10px 12px;
   overflow-y: auto;
   overflow-x: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-/* Nav Groups */
-.nav-group {
-  margin-bottom: var(--space-2);
-}
-
+/* Nav group label */
 .nav-group-label {
-  padding: var(--space-2) var(--space-5);
-  font-size: 0.6875rem;
+  padding: 14px 10px 6px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  color: var(--text-subtle);
   white-space: nowrap;
   overflow: hidden;
 }
+.nav-group-label:first-child { padding-top: 4px; }
 
 /* Nav Items */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0.5rem var(--space-5);
-  margin: 1px var(--space-2);
-  font-size: 0.875rem;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  border-radius: var(--radius);
   cursor: pointer;
-  transition: background-color var(--transition-fast),
-    color var(--transition-fast);
+  position: relative;
+  text-decoration: none;
+  transition: background var(--transition-fast),
+              color var(--transition-fast);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nav-item:hover {
-  background-color: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-.nav-item.active {
-  background-color: var(--amber-muted);
-  color: var(--amber);
 }
 
 .nav-item .nav-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-muted);
 }
+
+.nav-item .nav-icon svg { display: block; }
 
 .nav-item .nav-label {
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
 }
 
-/* Nav tooltips — show on hover when label is visible or as a fallback */
-.nav-item {
-  position: relative;
+.nav-item:hover:not(.active) {
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
+.nav-item:hover:not(.active) .nav-icon { color: var(--text-secondary); }
+
+.nav-item.active {
+  background: linear-gradient(90deg, var(--amber-muted), transparent);
+  color: var(--amber-hover);
+}
+.nav-item.active .nav-icon { color: var(--amber-hover); }
+.nav-item.active::before {
+  content: "";
+  position: absolute; left: -12px; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--amber-hover), var(--amber-deep));
+}
+
+/* Nav tooltips */
 .nav-item[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
   left: calc(100% + 12px);
   top: 50%;
   transform: translateY(-50%);
-  background: var(--bg-elevated, #1e1e2e);
-  color: var(--text-primary, #e0e0e0);
-  font-size: 0.78rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   padding: 5px 10px;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  box-shadow: var(--shadow);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
   z-index: 1000;
 }
-.nav-item[data-tooltip]:hover::after {
-  opacity: 1;
+.nav-item[data-tooltip]:hover::after { opacity: 1; }
+
+/* Nav badge counter */
+.nav-item .nav-badge,
+.nav-item .count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: var(--amber);
+  color: var(--text-inverse);
 }
 
-.nav-item .nav-badge {
-  margin-left: auto;
-  background-color: var(--danger);
-  color: #fff;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  min-width: 20px;
-  text-align: center;
-  flex-shrink: 0;
+/* Nav separator before Help */
+.nav-sep {
+  border: none;
+  border-top: 1px solid var(--border-color-soft);
+  margin: 8px 0;
 }
 
 /* --- Admin Main Wrapper --- */
 .admin-main {
-  margin-left: 240px;
+  margin-left: 232px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -389,7 +408,7 @@
   background-color: #ffffff;
   color: #1a1a2e;
   border-radius: var(--radius-lg);
-  padding: var(--space-8);
+  padding: var(--space-7);
   max-width: 800px;
   box-shadow: var(--shadow-lg);
 }

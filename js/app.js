@@ -1,3 +1,26 @@
+// ── Stroke SVG icon set — used in sidebar nav ────────────────────
+window.LMIcons = {
+  grid:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  folder:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  check:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+  doc:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>',
+  contract:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h6"/></svg>',
+  receipt:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3v18l2-1.5L9 21l2-1.5L13 21l2-1.5L17 21l2-1.5V3l-2 1.5L15 3l-2 1.5L11 3 9 4.5 7 3z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  users:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c1-3 3-4.5 6-4.5s5 1.5 6 4.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 20c.5-2 1.5-3 3-3s2.5 1 3 3"/></svg>',
+  truck:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>',
+  clipboard: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11h6M9 15h6"/></svg>',
+  chart:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M12 16V9M16 16v-3"/></svg>',
+  flag:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h10l-2 3 2 3H5"/></svg>',
+  gear:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.3 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7 4.3l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 19.7 7l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  help:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 1 1 3.7 2.3c-.8.4-1.2 1-1.2 1.7v.3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>',
+  clock:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  warn:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2 20h20z"/><path d="M12 10v5"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg>',
+  camera:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  money:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+  bell:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+  pin:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/></svg>',
+};
+
 // Main Application Controller
 (function() {
     const App = {
@@ -961,38 +984,51 @@
         _buildNavHtml() {
             const m = (AppData.getSettings().modules) || {};
             const on = (key, def) => (m[key] !== undefined ? m[key] : def);
-            const item = (route, icon, label, tooltip, extra) =>
-                `<a class="nav-item" data-route="${route}" data-tooltip="${tooltip}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${extra || ''}</a>`;
+            const ic = (key) => `<span class="nav-icon">${LMIcons[key] || ''}</span>`;
+            const item = (route, iconKey, label, tooltip, extra) =>
+                `<a class="nav-item" data-route="${route}" data-tooltip="${tooltip}" role="menuitem">${ic(iconKey)}<span class="nav-label">${label}</span>${extra || ''}</a>`;
+            const group = (label) => `<div class="nav-group-label">${label}</div>`;
 
             return [
-                // ── Always-on core ─────────────────────────────────────────
-                item('dashboard',      '📊', 'Dashboard',    'Dashboard — overview & quick actions'),
-                item('projects',       '🏗️', 'Projects',     'Projects — manage active jobs'),
-                item('approvals',      '✅', 'Approvals',    'Approvals — review worker time submissions', '<span class="nav-badge" id="approvalBadge" style="display:none"></span>'),
-                // ── Module-gated accounting ────────────────────────────────
-                on('invoicing',     true)  ? item('invoices',  '📄', 'Invoices',     'Invoices — create & track client invoices') : '',
-                item('contracts', '📋', 'Contracts', 'Contracts — billing contracts, SOV, and progress certificates'),
-                on('bid_estimates', false) ? item('estimates', '💹', 'Bid Estimates','Estimates — bid estimates and project costing') : '',
-                // ── Always-on operations ───────────────────────────────────
-                item('expenses-review','💰', 'Expenses',     'Expenses — review worker-submitted costs'),
-                item('vendors',        '🏢', 'Vendors',      'Vendors — suppliers & subcontractors'),
-                item('clients',        '👥', 'Clients',      'Clients — your client address book'),
-                item('users',          '👷', 'Workers',      'Workers — manage team & PINs'),
-                item('equipment',     '🔧', 'Equipment',    'Equipment — manage tools & machinery rates'),
-                item('notifications', '🔔', 'Notifications','Notifications — service alerts', '<span class="nav-badge" id="notifBadge" style="display:none"></span>'),
-                item('photos',         '📸', 'Photos',       'Photos — job site photo log'),
-                item('reports',        '📈', 'Reports',      'Reports — cost, labour & invoice summaries'),
-                item('impact-codes',  '⚡', 'Impact Codes', 'Impact Codes — track non-productive time causes'),
-                item('supervisor-reports', '📋', 'Field Reports', 'Field Reports — review and approve supervisor daily reports', '<span class="nav-badge" id="srBadge" style="display:none"></span>'),
+                // ── Work ───────────────────────────────────────────────────
+                group('Work'),
+                item('dashboard',   'grid',     'Dashboard',   'Dashboard — overview & quick actions'),
+                item('projects',    'folder',   'Projects',    'Projects — manage active jobs'),
+                item('approvals',   'check',    'Approvals',   'Approvals — review worker time submissions',
+                     '<span class="nav-badge" id="approvalBadge" style="display:none"></span>'),
+                on('invoicing', true) ? item('invoices', 'doc', 'Invoices', 'Invoices — create & track client invoices') : '',
+                item('contracts',   'contract', 'Contracts',   'Contracts — billing contracts, SOV & progress certificates'),
+                on('bid_estimates', false) ? item('estimates', 'money', 'Estimates', 'Estimates — bid estimates and project costing') : '',
+
+                // ── Operations ─────────────────────────────────────────────
+                group('Operations'),
+                item('expenses-review', 'receipt',   'Expenses',     'Expenses — review worker-submitted costs'),
+                item('vendors',         'clipboard', 'Vendors',      'Vendors — suppliers & subcontractors'),
+                item('clients',         'users',     'Clients',      'Clients — your client address book'),
+                item('users',           'users',     'Crew',         'Crew — manage workers & PINs'),
+                item('equipment',       'truck',     'Equipment',    'Equipment — manage tools & machinery rates'),
+                item('photos',          'camera',    'Photos',       'Photos — job site photo log'),
+                item('supervisor-reports', 'clipboard', 'Field Reports', 'Field Reports — review & approve daily reports',
+                     '<span class="nav-badge" id="srBadge" style="display:none"></span>'),
+                item('notifications',   'bell',      'Notifications','Notifications — service alerts',
+                     '<span class="nav-badge" id="notifBadge" style="display:none"></span>'),
+
+                // ── Back office ────────────────────────────────────────────
+                group('Back office'),
+                item('reports',       'chart', 'Reports',      'Reports — cost, labour & invoice summaries'),
+                item('impact-codes',  'flag',  'Impact Codes', 'Impact Codes — track non-productive time causes'),
+
                 // ── Module-gated Tier 3 ────────────────────────────────────
-                on('task_assignment',  false) ? item('task-assignment', '☑️',  'Task Assignment',  'Task Assignment — assign tasks to workers') : '',
-                on('budget_tracking',  false) ? item('budget-tracking', '💹',  'Budget Tracking',  'Budget Tracking — project budgets vs actual spending') : '',
-                on('daily_reports',    false) ? item('daily-reports',   '📋',  'Legacy Reports', 'Legacy daily reports (worker-submitted entities)') : '',
-                on('punch_lists',      false) ? item('punch-lists',     '📌',  'Punch Lists',      'Punch Lists — deficiency tracking and sign-off') : '',
-                on('gantt_chart',      false) ? item('gantt-chart',     '📅',  'Project Timeline', 'Project Timeline — visual schedule of tasks and milestones') : '',
+                on('task_assignment', false) ? item('task-assignment', 'check',  'Task Assignment', 'Task Assignment — assign tasks to workers') : '',
+                on('budget_tracking', false) ? item('budget-tracking', 'chart',  'Budget Tracking', 'Budget Tracking — project budgets vs actual') : '',
+                on('daily_reports',   false) ? item('daily-reports',   'doc',    'Legacy Reports',  'Legacy daily reports (worker-submitted entities)') : '',
+                on('punch_lists',     false) ? item('punch-lists',     'pin',    'Punch Lists',     'Punch Lists — deficiency tracking and sign-off') : '',
+                on('gantt_chart',     false) ? item('gantt-chart',     'clock',  'Timeline',        'Project Timeline — visual schedule of milestones') : '',
+
                 // ── Always-on last ─────────────────────────────────────────
-                item('settings', '⚙️', 'Settings', 'Settings — company info, modules, password & backups'),
-                item('help',     '❓', 'Help',      'Help — how to use Ledgerman'),
+                '<hr class="nav-sep">',
+                item('settings', 'gear', 'Settings', 'Settings — company info, modules, password & backups'),
+                item('help',     'help', 'Help',      'Help — how to use Ledgerman'),
             ].join('\n');
         },
 
@@ -1001,18 +1037,21 @@
             const app = document.getElementById('app');
             app.className = 'admin-mode';
             app.innerHTML = `
-                <div class="admin-sidebar" id="adminSidebar">
+                <a href="#adminContent" class="skip-link">Skip to content</a>
+                <aside class="admin-sidebar" id="adminSidebar" role="navigation" aria-label="Main">
                     <div class="sidebar-brand">
                         <div class="brand-icon" id="sidebarLogo">L</div>
                         <span class="brand-text">${AppData.getCompanyName()}</span>
                     </div>
-                    <nav id="adminNav">${this._buildNavHtml()}</nav>
-                </div>
+                    <nav id="adminNav" role="menu" aria-label="Admin navigation">${this._buildNavHtml()}</nav>
+                </aside>
                 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
                 <div class="admin-main">
                     <header class="admin-header">
                         <div class="header-left">
-                            <button class="btn btn-icon sidebar-toggle" id="sidebarToggle">☰</button>
+                            <button class="btn btn-icon sidebar-toggle" id="sidebarToggle" aria-label="Toggle navigation">
+                                ${LMIcons.grid}
+                            </button>
                             <span class="header-title">${AppData.getCompanyName()}</span>
                         </div>
                         <div class="header-right">
@@ -1021,7 +1060,7 @@
                             <button class="btn btn-secondary btn-sm" id="adminLogout">Logout</button>
                         </div>
                     </header>
-                    <main class="admin-content" id="adminContent">
+                    <main class="admin-content" id="adminContent" tabindex="-1">
                     </main>
                 </div>
             `;
@@ -1133,9 +1172,15 @@
             const content = document.getElementById('adminContent');
             if (!content) return;
 
-            // Update active nav
+            // Update active nav + aria-current
             document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.toggle('active', item.dataset.route === route);
+                const isActive = item.dataset.route === route;
+                item.classList.toggle('active', isActive);
+                if (isActive) {
+                    item.setAttribute('aria-current', 'page');
+                } else {
+                    item.removeAttribute('aria-current');
+                }
             });
 
             // Close mobile sidebar + backdrop
@@ -1302,26 +1347,26 @@
                 </header>
                 <main class="worker-content" id="workerContent">
                 </main>
-                <nav class="worker-nav">
-                    <a class="worker-nav-item active" data-route="home">
-                        <span class="worker-nav-icon">🏠</span>
+                <nav class="worker-nav" role="navigation" aria-label="Worker navigation">
+                    <a class="worker-nav-item active" data-route="home" aria-current="page">
+                        <span class="worker-nav-icon">${LMIcons.grid}</span>
                         <span class="worker-nav-label">Home</span>
                     </a>
                     <a class="worker-nav-item" data-route="history">
-                        <span class="worker-nav-icon">🕐</span>
+                        <span class="worker-nav-icon">${LMIcons.clock}</span>
                         <span class="worker-nav-label">History</span>
                     </a>
                     ${isSupervisor ? `
                     <a class="worker-nav-item" data-route="field-reports">
-                        <span class="worker-nav-icon">📋</span>
+                        <span class="worker-nav-icon">${LMIcons.clipboard}</span>
                         <span class="worker-nav-label">Reports</span>
                     </a>` : `
                     <a class="worker-nav-item" data-route="tasks">
-                        <span class="worker-nav-icon">✅</span>
+                        <span class="worker-nav-icon">${LMIcons.check}</span>
                         <span class="worker-nav-label">Tasks</span>
                     </a>`}
                     <a class="worker-nav-item" data-route="help">
-                        <span class="worker-nav-icon">❓</span>
+                        <span class="worker-nav-icon">${LMIcons.help}</span>
                         <span class="worker-nav-label">Help</span>
                     </a>
                 </nav>
