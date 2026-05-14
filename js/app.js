@@ -1211,7 +1211,7 @@ window.LMIcons = {
             }).catch(() => { /* silent */ });
         },
 
-        async _launchSpecSearch(container) {
+        _launchSpecSearch(container) {
             const baseUrl = this._specSearchUrl;
             if (!baseUrl) {
                 container.innerHTML = `
@@ -1222,41 +1222,46 @@ window.LMIcons = {
                 return;
             }
 
-            // Show loading state
-            container.innerHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px">
-                    <div style="width:36px;height:36px;border:3px solid var(--border-color-soft);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite"></div>
-                    <p style="color:var(--text-muted);font-size:14px">Signing you in to Spec Search…</p>
-                </div>`;
+            const origin = (() => { try { return new URL(baseUrl).origin; } catch(_) { return baseUrl; } })();
+            const frameUrl = baseUrl.replace(/\/$/, '') + '/projects';
+            const jwt = AppData.getJwt();
 
-            try {
-                const res = await fetch(AppData.API_BASE + '/api/modules/spec-search/token', {
-                    headers: { 'Authorization': 'Bearer ' + AppData.getJwt() }
-                });
-                const data = await res.json();
-                if (!res.ok || !data.ssoToken) {
-                    throw new Error(data.error || 'Failed to get SSO token');
+            // Embed Spec Search as a native module in the content panel.
+            // No new tab, no SSO redirect — the LedgerMan JWT is delivered to the
+            // iframe via postMessage and validated directly by the SpecSearch backend.
+            container.innerHTML = `<div style="margin:0;padding:0;height:100%"><iframe
+                id="spec-search-frame"
+                src="${frameUrl}"
+                style="width:100%;height:100%;min-height:calc(100vh - 64px);border:none;display:block;background:#09090b"
+                allow="clipboard-read; clipboard-write"
+            ></iframe></div>`;
+
+            const frame = document.getElementById('spec-search-frame');
+
+            // Deliver the JWT once the iframe document is ready, then retry every
+            // 800 ms until the iframe acknowledges (handles slow hydration).
+            let ackReceived = false;
+            const sendAuth = () => {
+                if (!ackReceived && frame.contentWindow) {
+                    try { frame.contentWindow.postMessage({ type: 'lm-auth', token: jwt }, origin); } catch(_) {}
                 }
-                // Open spec search with SSO token in a new tab
-                const ssoUrl = baseUrl.replace(/\/$/, '') + '/sso?token=' + encodeURIComponent(data.ssoToken);
-                window.open(ssoUrl, '_blank', 'noopener,noreferrer');
+            };
 
-                // Show success state with a direct link fallback
-                container.innerHTML = `
-                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;text-align:center;padding:24px">
-                        <div style="width:56px;height:56px;background:var(--bg-surface);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px">🔍</div>
-                        <h2 style="margin:0">Spec Search</h2>
-                        <p style="color:var(--text-muted);font-size:14px;max-width:360px;margin:0">Spec Search opened in a new tab. If it didn't open, click the button below.</p>
-                        <a href="${Utils.escapeHtml(ssoUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Open Spec Search</a>
-                    </div>`;
-            } catch (err) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <h2>Spec Search</h2>
-                        <p class="text-muted" style="color:var(--danger)">${Utils.escapeHtml(err.message || 'Unable to launch Spec Search')}</p>
-                        <button class="btn btn-secondary" style="margin-top:16px" onclick="App.navigate('spec-search')">Retry</button>
-                    </div>`;
-            }
+            window.addEventListener('message', function onAck(e) {
+                if (e.data && e.data.type === 'lm-auth-ack' && e.origin === origin) {
+                    ackReceived = true;
+                    window.removeEventListener('message', onAck);
+                }
+            });
+
+            frame.addEventListener('load', () => {
+                sendAuth();
+                const interval = setInterval(() => {
+                    if (ackReceived) { clearInterval(interval); return; }
+                    sendAuth();
+                }, 800);
+                setTimeout(() => clearInterval(interval), 15000); // give up after 15 s
+            }, { once: true });
         },
 
         navigate(route, params = {}) {
