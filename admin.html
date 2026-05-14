@@ -646,9 +646,9 @@ document.addEventListener('blur', async function(e) {
         }
         
         try {
-            const result = await apiFetch('/api/superadmin/companies/' + companyId, {
-                method: 'PATCH',
-                body: JSON.stringify({ adminPassword: newPassword })
+            const result = await apiFetch('/api/superadmin/companies/' + companyId + '/reset-password', {
+                method: 'POST',
+                body: JSON.stringify({ password: newPassword })
             });
             if (result.success) {
                 toast('Password updated', 'success');
@@ -691,9 +691,9 @@ async function updateCompanyPassword(id) {
     }
 
     try {
-        await apiFetch('/api/superadmin/companies/' + id, {
-            method: 'PATCH',
-            body: { adminPassword: newPassword }
+        await apiFetch('/api/superadmin/companies/' + id + '/reset-password', {
+            method: 'POST',
+            body: JSON.stringify({ password: newPassword })
         });
         toast('Password updated.', 'success');
         pwdField.value = '';
