@@ -329,32 +329,39 @@ window.AdminSettings = {
             });
         });
 
-        // Password form
-        container.querySelector('#passwordForm').addEventListener('submit', function(e) {
+        // Password form — calls dedicated backend endpoint (POST /api/auth/admin/change-password)
+        container.querySelector('#passwordForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const current = container.querySelector('#pwCurrent').value;
             const newPw = container.querySelector('#pwNew').value;
             const confirm = container.querySelector('#pwConfirm').value;
-            if (current !== AppData.getAdminPassword()) {
-                Utils.showToast('Current password is incorrect', 'error');
+            if (!current) {
+                Utils.showToast('Current password is required', 'error');
+                return;
+            }
+            if (newPw.length < 8) {
+                Utils.showToast('New password must be at least 8 characters', 'error');
                 return;
             }
             if (newPw !== confirm) {
                 Utils.showToast('New passwords do not match', 'error');
                 return;
             }
-            const pwCheck = Utils.validatePassword(newPw);
-            if (!pwCheck.valid) {
-                Utils.showToast('Password requirements: ' + pwCheck.errors.join(', '), 'error');
-                return;
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Updating…'; }
+            try {
+                await AppData.changeAdminPassword(current, newPw);
+                const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+                AppData.addAuditLog(username, 'Password Changed', 'Admin password was changed');
+                Utils.showToast('Password updated successfully');
+                container.querySelector('#pwCurrent').value = '';
+                container.querySelector('#pwNew').value = '';
+                container.querySelector('#pwConfirm').value = '';
+            } catch (err) {
+                Utils.showToast(err.message || 'Password change failed', 'error');
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Change Password'; }
             }
-            AppData.setAdminPassword(newPw);
-            const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
-            AppData.addAuditLog(username, 'Password Changed', 'Admin password was changed');
-            Utils.showToast('Password changed successfully');
-            container.querySelector('#pwCurrent').value = '';
-            container.querySelector('#pwNew').value = '';
-            container.querySelector('#pwConfirm').value = '';
         });
 
         // Export

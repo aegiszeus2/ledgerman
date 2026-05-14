@@ -34,6 +34,10 @@ window.LMIcons = {
         _specSearchUrl: '',    // spec search tunnel URL from /api/company/modules
 
         init() {
+            // One-time cleanup: remove legacy adminPassword from localStorage
+            localStorage.removeItem('adminPassword');
+            localStorage.removeItem('ledgeman_adminPassword');
+
             // Initialize analytics (cookie consent + friction monitoring)
             if (window.LedgermanAnalytics) {
                 LedgermanAnalytics.init();

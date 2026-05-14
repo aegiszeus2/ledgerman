@@ -769,8 +769,23 @@ function addAuditLog(user, action, details) {
 function getAuditLog() { return _getList('auditLog'); }
 
 // ─── Admin Password (legacy — server manages passwords in API mode) ─────────
+// @deprecated getAdminPassword / setAdminPassword are legacy offline-only helpers.
+// In API mode, use changeAdminPassword() which calls POST /api/auth/admin/change-password.
+// Do NOT call setAdminPassword() or include adminPassword in settings payloads.
 function getAdminPassword() { return getData('adminPassword') || null; }
 function setAdminPassword(pw) { setData('adminPassword', pw); }
+
+async function changeAdminPassword(currentPassword, newPassword) {
+    if (!isApiMode() || !getJwt()) {
+        throw new Error('Must be logged in to change password');
+    }
+    const resp = await _apiFetch('/api/auth/admin/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword })
+    });
+    if (resp && resp.error) throw new Error(resp.error);
+    return resp;
+}
 
 // ─── First Run / Setup ─────────────────────────────────────────────────────
 function isFirstRun() {
@@ -1145,7 +1160,8 @@ window.AppData = {
     // Audit
     addAuditLog, getAuditLog,
     // Admin password (legacy)
-    getAdminPassword, setAdminPassword,
+    // Admin password (legacy — deprecated for API mode; use changeAdminPassword)
+    getAdminPassword, setAdminPassword, changeAdminPassword,
     // Setup
     isFirstRun, markSetupDone,
     // Invites
