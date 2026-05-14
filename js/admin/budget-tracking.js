@@ -166,7 +166,7 @@ window.AdminBudgetTracking = {
             <!-- Project Budget Table -->
             <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0">
                 <table class="table" style="width:100%;margin:0;border-collapse:collapse">
-                    <thead style="background:#f5f5f5">
+                    <thead style="background:var(--bg-tertiary)">
                         <tr>
                             <th style="padding:11px 14px;text-align:left;border-bottom:2px solid #e0e0e0">Project</th>
                             <th style="padding:11px 14px;text-align:right;border-bottom:2px solid #e0e0e0">Budgeted</th>
@@ -206,7 +206,7 @@ window.AdminBudgetTracking = {
                                         ? `<span style="padding:3px 8px;border-radius:10px;font-size:.78em;background:#e8f5e9;color:#2e7d32">
                                                ${d.versionCount} version${d.versionCount !== 1 ? 's' : ''}
                                            </span>`
-                                        : `<span style="padding:3px 8px;border-radius:10px;font-size:.78em;background:#fff3e0;color:#e65100">No budget</span>`
+                                        : `<span style="padding:3px 8px;border-radius:10px;font-size:.78em;background:var(--warning-bg);color:var(--warning)">No budget</span>`
                                     }
                                 </td>
                                 <td style="padding:12px 14px;text-align:center">
@@ -315,14 +315,14 @@ window.AdminBudgetTracking = {
                         const statusColors = { draft: '#f39c12', approved: '#2ecc71', superseded: '#aaa' };
                         const statusBg    = { draft: '#fff8e1', approved: '#e8f5e9', superseded: '#f5f5f5' };
                         return `
-                        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                        <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
                             <div style="flex:1;min-width:180px">
                                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
                                     <span style="font-weight:600;font-size:1em">${Utils.escapeHtml(v.name || 'Budget v' + v.version)}</span>
-                                    <span style="padding:2px 8px;border-radius:10px;font-size:.78em;background:${statusBg[v.status]||'#f5f5f5'};color:${statusColors[v.status]||'#666'};font-weight:600">${v.status}</span>
+                                    <span style="padding:2px 8px;border-radius:10px;font-size:.78em;background:${statusBg[v.status]||'var(--bg-surface)'};color:${statusColors[v.status]||'var(--text-muted)'};font-weight:600">${v.status}</span>
                                 </div>
                                 <div style="font-size:.82em;color:#999">
-                                    ${items.length} line item${items.length !== 1 ? 's' : ''} · Total: <strong style="color:#333">$${self._fmt(total)}</strong>
+                                    ${items.length} line item${items.length !== 1 ? 's' : ''} · Total: <strong style="color:var(--text-secondary)">$${self._fmt(total)}</strong>
                                     ${v.approvedAt ? ' · Approved ' + Utils.formatDate(v.approvedAt) : ''}
                                     ${v.notes ? ' · ' + Utils.escapeHtml(v.notes) : ''}
                                 </div>
@@ -429,8 +429,8 @@ window.AdminBudgetTracking = {
 
             <!-- Category Summary Bar -->
             ${total > 0 ? `
-            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:14px;margin-bottom:16px">
-                <div style="font-size:.82em;color:#666;margin-bottom:8px;font-weight:600">BREAKDOWN BY CATEGORY</div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:14px;margin-bottom:16px">
+                <div style="font-size:.82em;color:var(--text-muted);margin-bottom:8px;font-weight:600">BREAKDOWN BY CATEGORY</div>
                 <div style="display:flex;gap:16px;flex-wrap:wrap">
                     ${self.CATEGORIES.filter(c => catTotals[c] > 0).map(c => {
                         const pct = (catTotals[c] / total * 100).toFixed(1);
@@ -448,7 +448,7 @@ window.AdminBudgetTracking = {
             <!-- Work Items Table -->
             <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0;margin-bottom:16px">
                 <table class="table" style="width:100%;margin:0;border-collapse:collapse;font-size:.88em">
-                    <thead style="background:#f5f5f5">
+                    <thead style="background:var(--bg-tertiary)">
                         <tr>
                             <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #ddd;white-space:nowrap">Cost Code</th>
                             <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #ddd">Description</th>
@@ -495,7 +495,7 @@ window.AdminBudgetTracking = {
                         `}
                     </tbody>
                     ${items.length > 0 ? `
-                    <tfoot style="background:#f9f9f9;font-weight:700">
+                    <tfoot style="background:var(--bg-surface);font-weight:700">
                         <tr>
                             <td colspan="${isLocked ? 6 : 6}" style="padding:10px 12px;text-align:right;border-top:2px solid #ddd">TOTAL</td>
                             <td style="padding:10px 12px;text-align:right;border-top:2px solid #ddd;font-size:1.05em">$${self._fmt(total)}</td>
@@ -683,7 +683,7 @@ window.AdminBudgetTracking = {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
 
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:10px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
+            <div style="background:var(--bg-secondary);border-radius:10px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
                 <h3 style="margin-bottom:20px">${isNew ? 'Add Work Item' : 'Edit Work Item'}</h3>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -731,7 +731,7 @@ window.AdminBudgetTracking = {
                     </div>
                     <div>
                         <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Total ($)</label>
-                        <input id="fi_total" type="number" min="0" step="any" value="${item.total !== undefined ? parseFloat(item.total).toFixed(2) : ''}" placeholder="Auto-calc" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em;background:#f9f9f9">
+                        <input id="fi_total" type="number" min="0" step="any" value="${item.total !== undefined ? parseFloat(item.total).toFixed(2) : ''}" placeholder="Auto-calc" style="width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;box-sizing:border-box;font-size:.9em;background:var(--bg-input);color:var(--text-primary)">
                         <div style="font-size:.75em;color:#999;margin-top:2px">Leave blank to auto-calculate</div>
                     </div>
                 </div>
@@ -741,7 +741,7 @@ window.AdminBudgetTracking = {
                     <input id="fi_notes" type="text" value="${Utils.escapeHtml(item.notes || '')}" placeholder="Additional notes" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
                 </div>
 
-                <div id="fi_error" style="display:none;margin-top:12px;padding:8px 12px;background:#fce4e4;border-radius:6px;color:#c62828;font-size:.85em"></div>
+                <div id="fi_error" style="display:none;margin-top:12px;padding:8px 12px;background:var(--danger-bg);border-radius:6px;color:var(--danger);font-size:.85em"></div>
 
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
                     <button class="btn-secondary" id="fi_cancel">Cancel</button>
@@ -845,12 +845,12 @@ window.AdminBudgetTracking = {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
 
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:10px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
+            <div style="background:var(--bg-secondary);border-radius:10px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
                 <h3 style="margin-bottom:6px">🤖 AI Budget Generator</h3>
                 <div id="ai_mode_badge" style="margin-bottom:12px">
                     <span style="padding:3px 10px;border-radius:10px;font-size:.78em;background:#e8f5e9;color:#2e7d32">Checking Ollama…</span>
                 </div>
-                <p style="color:#666;font-size:.88em;margin-bottom:14px">
+                <p style="color:var(--text-muted);font-size:.88em;margin-bottom:14px">
                     Paste a contract section, email, scope description, or work item list.
                     AI will extract structured line items. <strong>Review and edit before committing.</strong>
                 </p>
@@ -859,7 +859,7 @@ window.AdminBudgetTracking = {
                     <button class="btn-secondary" id="ai_cancel">Cancel</button>
                     <button class="btn-primary" id="ai_parse">Extract Items →</button>
                 </div>
-                <div id="ai_status" style="display:none;margin-top:12px;text-align:center;color:#666;font-size:.88em">
+                <div id="ai_status" style="display:none;margin-top:12px;text-align:center;color:var(--text-muted);font-size:.88em">
                     <div style="display:inline-block;width:16px;height:16px;border:2px solid #3498db;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px"></div>
                     <span id="ai_status_text">Sending to Ollama…</span>
                 </div>
@@ -880,7 +880,7 @@ window.AdminBudgetTracking = {
             })
             .catch(() => {
                 overlay.querySelector('#ai_mode_badge').innerHTML =
-                    '<span style="padding:3px 10px;border-radius:10px;font-size:.78em;background:#fff3e0;color:#e65100">🟡 Basic parser (Ollama offline) — structured text only</span>';
+                    '<span style="padding:3px 10px;border-radius:10px;font-size:.78em;background:var(--warning-bg);color:var(--warning)">🟡 Basic parser (Ollama offline) — structured text only</span>';
             });
 
         overlay.querySelector('#ai_cancel').onclick = () => document.body.removeChild(overlay);
@@ -1099,7 +1099,7 @@ window.AdminBudgetTracking = {
                 </div>
                 <div style="overflow-x:auto;border:1px solid #e0e0e0;border-radius:6px;margin-bottom:14px">
                     <table style="width:100%;border-collapse:collapse;font-size:.82em">
-                        <thead style="background:#f5f5f5">
+                        <thead style="background:var(--bg-tertiary)">
                             <tr>
                                 <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #ddd">Description</th>
                                 <th style="padding:8px 10px;text-align:center;border-bottom:1px solid #ddd">Cat</th>
@@ -1222,15 +1222,15 @@ window.AdminBudgetTracking = {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
 
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:10px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
+            <div style="background:var(--bg-secondary);border-radius:10px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
                 <h3 style="margin-bottom:8px">📂 Import from CSV</h3>
-                <p style="color:#666;font-size:.88em;margin-bottom:16px">Upload a CSV file with budget work items. <a id="downloadTplBtn" href="#" style="color:#3498db">Download template</a></p>
-                <div style="padding:12px;background:#f5f5f5;border-radius:6px;font-size:.82em;color:#555;margin-bottom:16px">
+                <p style="color:var(--text-muted);font-size:.88em;margin-bottom:16px">Upload a CSV file with budget work items. <a id="downloadTplBtn" href="#" style="color:#3498db">Download template</a></p>
+                <div style="padding:12px;background:var(--bg-surface);border-radius:6px;font-size:.82em;color:var(--text-secondary);margin-bottom:16px">
                     <strong>Expected columns:</strong> cost_code, division, description*, category, quantity*, unit, unit_cost*, total, notes<br>
                     <span style="color:#999">* required · total auto-calculated if blank · category: Labour/Material/Equipment/Subcontract/Other</span>
                 </div>
                 <input type="file" id="csv_file" accept=".csv,.txt" style="width:100%;padding:10px;border:2px dashed #ddd;border-radius:6px;font-size:.9em;box-sizing:border-box;cursor:pointer">
-                <div id="csv_status" style="margin-top:10px;font-size:.85em;color:#666"></div>
+                <div id="csv_status" style="margin-top:10px;font-size:.85em;color:var(--text-muted)"></div>
                 <div id="csv_preview" style="display:none;margin-top:16px"></div>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
                     <button class="btn-secondary" id="csv_cancel">Cancel</button>
@@ -1423,7 +1423,7 @@ window.AdminBudgetTracking = {
     },
 
     _summaryCard(label, value, sub, color) {
-        return `<div style="padding:16px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+        return `<div style="padding:16px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
             <div style="color:#999;font-size:.82em;text-transform:uppercase;margin-bottom:6px">${label}</div>
             <div style="font-size:1.5em;font-weight:bold;color:${color}">${value}</div>
             <div style="font-size:.82em;color:#999;margin-top:4px">${sub}</div>

@@ -67,15 +67,15 @@ window.AdminDailyReports = {
 
             <!-- Summary Cards -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
-                <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
                     <div style="color:#999;font-size:0.8em;text-transform:uppercase;margin-bottom:4px">Today's Reports</div>
                     <div style="font-size:1.8em;font-weight:bold;color:#3498db">${todayCount}</div>
                 </div>
-                <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
                     <div style="color:#999;font-size:0.8em;text-transform:uppercase;margin-bottom:4px">Total Reports</div>
-                    <div style="font-size:1.8em;font-weight:bold;color:#333">${reports.length}</div>
+                    <div style="font-size:1.8em;font-weight:bold;color:var(--text-secondary)">${reports.length}</div>
                 </div>
-                <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
                     <div style="color:#999;font-size:0.8em;text-transform:uppercase;margin-bottom:4px">Pending Review</div>
                     <div style="font-size:1.8em;font-weight:bold;color:#f39c12">${reports.filter(r => r.status !== 'Approved').length}</div>
                 </div>
@@ -106,9 +106,9 @@ window.AdminDailyReports = {
             </div>
 
             <!-- Reports List -->
-            <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0">
+            <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border-color)">
                 <table class="table" style="width:100%;margin:0;border-collapse:collapse">
-                    <thead style="background:#f5f5f5">
+                    <thead style="background:var(--bg-tertiary)">
                         <tr>
                             <th style="padding:12px;text-align:left;border-bottom:2px solid #e0e0e0">Date</th>
                             <th style="padding:12px;text-align:left;border-bottom:2px solid #e0e0e0">Project</th>
@@ -286,15 +286,15 @@ window.AdminDailyReports = {
                 </div>
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
-                    <div style="padding:12px;background:#f9f9f9;border-radius:6px">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm)">
                         <div style="font-size:0.8em;color:#999;text-transform:uppercase">Crew Count</div>
                         <div style="font-size:1.8em;font-weight:bold">${report.crewCount || 0}</div>
                     </div>
-                    <div style="padding:12px;background:#f9f9f9;border-radius:6px">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm)">
                         <div style="font-size:0.8em;color:#999;text-transform:uppercase">Total Hours</div>
                         <div style="font-size:1.8em;font-weight:bold">${report.totalHours || 0}h</div>
                     </div>
-                    <div style="padding:12px;background:#f9f9f9;border-radius:6px">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm)">
                         <div style="font-size:0.8em;color:#999;text-transform:uppercase">Equipment Expense</div>
                         <div style="font-size:1.8em;font-weight:bold">$${(report.equipmentExpense || 0).toFixed(2)}</div>
                     </div>
@@ -307,9 +307,9 @@ window.AdminDailyReports = {
                 ` : ''}
 
                 ${report.issues ? `
-                    <div style="padding:12px;background:#fff3cd;border-radius:6px;margin-bottom:16px;border-left:4px solid #ffc107">
-                        <strong style="font-size:0.9em;color:#856404">⚠️ Issues:</strong>
-                        <p style="margin:6px 0 0;color:#856404">${Utils.escapeHtml(report.issues)}</p>
+                    <div style="padding:12px;background:var(--warning-bg);border-radius:6px;margin-bottom:16px;border-left:4px solid var(--warning)">
+                        <strong style="font-size:0.9em;color:var(--warning)">⚠️ Issues:</strong>
+                        <p style="margin:6px 0 0;color:var(--warning)">${Utils.escapeHtml(report.issues)}</p>
                     </div>
                 ` : ''}
 
@@ -321,13 +321,13 @@ window.AdminDailyReports = {
                 ` : ''}
 
                 ${report.notes ? `
-                    <div style="padding:12px;background:#f5f5f5;border-radius:6px;margin-bottom:16px">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:16px">
                         <strong style="font-size:0.9em">Notes:</strong>
-                        <p style="margin:6px 0 0;color:#666">${Utils.escapeHtml(report.notes)}</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted)">${Utils.escapeHtml(report.notes)}</p>
                     </div>
                 ` : ''}
 
-                <div style="padding:12px;background:#f9f9f9;border-radius:6px;margin-bottom:20px;font-size:0.9em">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:20px;font-size:0.9em">
                     <div style="color:#999;margin-bottom:8px"><strong>Status:</strong></div>
                     <div style="display:flex;gap:8px">
                         <button class="btn-primary ${report.status === 'Reviewed' ? 'btn-success' : ''}" data-action="mark-reviewed" style="font-size:0.85em">
@@ -339,7 +339,7 @@ window.AdminDailyReports = {
                     </div>
                 </div>
 
-                <div style="padding:12px;background:#f0f0f0;border-radius:6px;font-size:0.85em;color:#666">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius-sm);font-size:0.85em;color:var(--text-muted)">
                     <strong>Submitted:</strong> ${reportDate.toLocaleString()}
                 </div>
             </div>

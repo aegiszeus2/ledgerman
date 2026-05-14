@@ -477,7 +477,7 @@ window.AdminApprovals = {
         // Build edit history HTML
         let historyHtml = '';
         if (editHistory.length > 0) {
-            historyHtml = '<div style="background:var(--bg2,#f8f8f8);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.8rem">' +
+            historyHtml = '<div style="background:var(--bg-surface);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.8rem">' +
                 '<strong style="display:block;margin-bottom:6px;color:var(--text2)">Edit History</strong>' +
                 editHistory.map(function(e) {
                     const changeLines = Object.keys(e.changes || {}).map(function(k) {

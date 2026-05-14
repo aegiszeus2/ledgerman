@@ -93,12 +93,15 @@ table {
   --border-color-light:  var(--border-color-soft);  /* legacy alias */
 
   /* ── Legacy aliases — used in inline styles across JS modules ── */
-  --accent: var(--danger);
-  --warn:   var(--warning);
-  --text:   var(--text-primary);
-  --text2:  var(--text-muted);
-  --card:   var(--bg-secondary);
-  --border: var(--border-color);
+  --accent:   var(--danger);
+  --warn:     var(--warning);
+  --text:     var(--text-primary);
+  --text2:    var(--text-muted);
+  --card:     var(--bg-secondary);
+  --border:   var(--border-color);
+  /* --primary / --bg2 used in settings.js analytics & module sliders */
+  --primary:  var(--amber);
+  --bg2:      var(--bg-surface);
 
   /* ── Radii ────────────────────────────────────────────── */
   --radius-sm:  6px;
@@ -132,7 +135,9 @@ table {
   --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* ── Z-index ──────────────────────────────────────────── */
-  --z-dropdown: 100;
+  /* IMPORTANT: dropdown MUST be above sticky (sidebar) so custom
+     dropdowns/overlays don't appear behind the fixed sidebar */
+  --z-dropdown: 300;
   --z-sticky:   200;
   --z-modal:    500;
   --z-toast:    600;
@@ -389,11 +394,10 @@ select.form-control {
   color-scheme: dark;
 }
 
-.form-group label,
-.form-label {
+.form-group label {
   display: block;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-bottom: 6px;
   font-weight: 500;
 }
@@ -478,6 +482,66 @@ textarea.form-control {
 .was-validated .form-control:invalid ~ .invalid-feedback,
 .form-control.is-invalid ~ .invalid-feedback {
   display: block;
+}
+
+/* ── Global input normalization ──────────────────────────────────────────────
+   Catches raw <input>/<select>/<textarea> elements in JS template strings that
+   don't carry the .form-control class. Without this they inherit the body's
+   light text color (#f4f6fb) but render on the browser's default white/gray
+   background, making typed text nearly invisible.
+   ────────────────────────────────────────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+select,
+textarea {
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  line-height: 1.5;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-muted);
+}
+
+select {
+  color-scheme: dark;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237587a8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+/* Autofill — override browser's yellow background on dark inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text-primary) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-input) inset !important;
+  caret-color: var(--text-primary);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* .form-control always wins over the global rule above */
+.form-control {
+  background-color: var(--bg-input) !important;
+  color: var(--text-primary) !important;
 }
 
 /* --- Cards --- */

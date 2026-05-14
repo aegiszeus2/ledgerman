@@ -656,12 +656,237 @@ window.AIAssistant = (function () {
     };
 }());
 
+// ── Worker AI Assistant — limited, field-worker-safe chat widget ─────────────
+window.WorkerAIAssistant = (function () {
+    'use strict';
+
+    var _history = [];
+    var _open = false;
+    var _pending = false;
+
+    function _genId(prefix) {
+        return (prefix || 'w') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    // Build minimal worker context (no financial data)
+    function _buildWorkerContext() {
+        // Context is built server-side from the JWT — we send empty here
+        // The server enriches it with worker-scoped data only
+        return {};
+    }
+
+    function _send(msgText) {
+        if (_pending) return;
+        msgText = msgText.trim();
+        if (!msgText) return;
+
+        _addMessage('user', msgText);
+        _history.push({ role: 'user', content: msgText });
+        _clearInput();
+        _setThinking(true);
+        _pending = true;
+
+        var token = sessionStorage.getItem('ledgeman_jwt') || '';
+        var apiBase = (window.AppData && AppData.API_BASE) || (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://ledgerman-backend.onrender.com');
+
+        fetch(apiBase + '/api/ai/worker-chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({
+                message: msgText,
+                history: _history.slice(-8)
+            })
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            _pending = false;
+            _setThinking(false);
+
+            if (data.error) {
+                _addMessage('assistant', '⚠️ ' + data.error);
+                return;
+            }
+
+            // Only execute navigate_to actions
+            (data.actions || []).forEach(function (a) {
+                if (a.type === 'navigate_to' && a.data && a.data.module && window.App && App.navigateTo) {
+                    App.navigateTo(a.data.module);
+                }
+            });
+
+            var reply = data.message || '';
+            _addMessage('assistant', reply);
+            _history.push({ role: 'assistant', content: data.message || '' });
+        })
+        .catch(function (err) {
+            _pending = false;
+            _setThinking(false);
+            _addMessage('assistant', '⚠️ Connection error: ' + err.message);
+        });
+    }
+
+    function _clearInput() {
+        var el = document.getElementById('waiChatInput');
+        if (el) { el.value = ''; el.style.height = 'auto'; }
+    }
+
+    function _setThinking(on) {
+        var el = document.getElementById('waiThinkingIndicator');
+        if (el) el.style.display = on ? 'flex' : 'none';
+        var btn = document.getElementById('waiSendBtn');
+        if (btn) btn.style.opacity = on ? '0.4' : '1';
+    }
+
+    function _renderText(text) {
+        if (!text) return '';
+        var esc = window.Utils && Utils.escapeHtml ? Utils.escapeHtml : function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+        var lines = text.split('\n');
+        var out = [];
+        lines.forEach(function (line) {
+            var e = esc(line)
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>');
+            if (/^\s*[-•]\s/.test(line)) {
+                out.push('<div style="padding-left:10px">• ' + e.replace(/^\s*[-•]\s*/, '') + '</div>');
+            } else if (e.trim() === '') {
+                out.push('<div style="height:6px"></div>');
+            } else {
+                out.push('<div>' + e + '</div>');
+            }
+        });
+        return out.join('');
+    }
+
+    function _addMessage(role, text) {
+        var el = document.getElementById('waiChatMessages');
+        if (!el) return;
+        var div = document.createElement('div');
+        div.style.cssText = 'margin-bottom:10px;display:flex;flex-direction:column;' +
+            (role === 'user' ? 'align-items:flex-end' : 'align-items:flex-start');
+        var bubble = document.createElement('div');
+        bubble.style.cssText = 'max-width:88%;padding:9px 12px;border-radius:14px;font-size:.875rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;' +
+            (role === 'user'
+                ? 'background:#1a6b3a;color:#fff;border-bottom-right-radius:4px'
+                : 'background:#f0f4f0;color:#1a1a1a;border-bottom-left-radius:4px');
+        bubble.innerHTML = _renderText(text);
+        div.appendChild(bubble);
+        el.appendChild(div);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function _open_() {
+        _open = true;
+        var panel = document.getElementById('waiAssistantWidget');
+        if (panel) { panel.style.display = 'flex'; return; }
+        _buildPanel();
+        _addMessage('assistant', 'Hi! I can help you:\n- **Log your time** — tap Time Entry in the menu\n- **Describe your work** clearly and professionally\n- **Check your tasks** and assignments\n\nWhat do you need?');
+    }
+
+    function _close() {
+        _open = false;
+        var panel = document.getElementById('waiAssistantWidget');
+        if (panel) panel.style.display = 'none';
+    }
+
+    function _buildPanel() {
+        var panel = document.createElement('div');
+        panel.id = 'waiAssistantWidget';
+        panel.style.cssText = [
+            'position:fixed', 'bottom:80px', 'right:24px', 'z-index:8999',
+            'width:320px', 'max-width:calc(100vw - 32px)',
+            'height:480px', 'max-height:calc(100vh - 100px)',
+            'display:flex', 'flex-direction:column',
+            'background:#fff', 'border-radius:16px',
+            'box-shadow:0 8px 40px rgba(0,0,0,.2)', 'border:1px solid #dde4e0',
+            'overflow:hidden', 'font-family:inherit'
+        ].join(';');
+
+        panel.innerHTML = [
+            '<div style="background:#1a6b3a;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">',
+            '  <div style="display:flex;align-items:center;gap:8px">',
+            '    <div style="width:7px;height:7px;border-radius:50%;background:#4ade80"></div>',
+            '    <strong style="font-size:.9rem">Field Assistant</strong>',
+            '  </div>',
+            '  <button id="waiCloseBtn" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem;line-height:1;padding:2px 4px">&times;</button>',
+            '</div>',
+            '<div id="waiChatMessages" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:0;scroll-behavior:smooth"></div>',
+            '<div id="waiThinkingIndicator" style="display:none;padding:0 14px 6px;align-items:center;gap:5px">',
+            '  <span style="width:6px;height:6px;border-radius:50%;background:#1a6b3a;animation:aiDot 1.2s infinite .0s both;display:inline-block"></span>',
+            '  <span style="width:6px;height:6px;border-radius:50%;background:#1a6b3a;animation:aiDot 1.2s infinite .2s both;display:inline-block"></span>',
+            '  <span style="width:6px;height:6px;border-radius:50%;background:#1a6b3a;animation:aiDot 1.2s infinite .4s both;display:inline-block"></span>',
+            '  <span style="font-size:.75rem;color:#6b7280;margin-left:4px">Thinking...</span>',
+            '</div>',
+            '<div style="padding:8px 12px 10px;display:flex;gap:6px;align-items:flex-end;flex-shrink:0;border-top:1px solid #dde4e0">',
+            '  <textarea id="waiChatInput" rows="1" placeholder="Ask me anything..." style="flex:1;resize:none;border:1px solid #dde4e0;border-radius:10px;padding:8px 11px;font-size:.875rem;font-family:inherit;line-height:1.4;outline:none;max-height:100px;overflow-y:auto;background:#fff;color:#1a1a1a"></textarea>',
+            '  <button id="waiSendBtn" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:#1a6b3a;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center">',
+            '    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+            '  </button>',
+            '</div>'
+        ].join('');
+
+        document.body.appendChild(panel);
+
+        // Inject dot keyframes if needed
+        if (!document.getElementById('aiAssistantStyles')) {
+            var s = document.createElement('style');
+            s.id = 'aiAssistantStyles';
+            s.textContent = '@keyframes aiDot{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}';
+            document.head.appendChild(s);
+        }
+
+        document.getElementById('waiCloseBtn').addEventListener('click', _close);
+        document.getElementById('waiSendBtn').addEventListener('click', function () {
+            var inp = document.getElementById('waiChatInput');
+            if (inp) _send(inp.value);
+        });
+        var inputEl = document.getElementById('waiChatInput');
+        inputEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _send(inputEl.value); }
+        });
+        inputEl.addEventListener('input', function () {
+            inputEl.style.height = 'auto';
+            inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+        });
+    }
+
+    function init() {
+        if (document.getElementById('waiAssistantFab')) return;
+        var fab = document.createElement('button');
+        fab.id = 'waiAssistantFab';
+        fab.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-size:.8rem;font-weight:600">Help</span>';
+        fab.style.cssText = [
+            'position:fixed', 'bottom:80px', 'right:24px', 'z-index:9000',
+            'display:flex', 'align-items:center', 'gap:6px', 'padding:9px 14px',
+            'border-radius:24px', 'border:none', 'cursor:pointer',
+            'background:#1a6b3a', 'color:#fff',
+            'box-shadow:0 4px 16px rgba(0,0,0,.25)', 'font-family:inherit',
+            'transition:transform .15s,box-shadow .15s'
+        ].join(';');
+        fab.addEventListener('mouseenter', function () { fab.style.transform = 'scale(1.05)'; });
+        fab.addEventListener('mouseleave', function () { fab.style.transform = ''; });
+        fab.addEventListener('click', _open_);
+        document.body.appendChild(fab);
+    }
+
+    return { init: init, open: _open_, close: _close };
+}());
+
 // Auto-init — show FAB only for admin, hide/remove for workers
 (function () {
     function _removeFab() {
         var fab = document.getElementById('aiAssistantFab');
         if (fab) fab.remove();
         var panel = document.getElementById('aiAssistantWidget');
+        if (panel) panel.remove();
+    }
+
+    function _removeWorkerFab() {
+        var fab = document.getElementById('waiAssistantFab');
+        if (fab) fab.remove();
+        var panel = document.getElementById('waiAssistantWidget');
         if (panel) panel.remove();
     }
 
@@ -674,15 +899,18 @@ window.AIAssistant = (function () {
             return;
         }
 
-        // Worker portal — remove button and stop
+        // Worker portal — show limited worker FAB, remove admin FAB
         if (user.type === 'worker') {
             _removeFab();
-            // Keep polling in case user logs out and admin logs back in
+            if (window.WorkerAIAssistant && !document.getElementById('waiAssistantFab')) {
+                WorkerAIAssistant.init();
+            }
             setTimeout(_checkUser, 3000);
             return;
         }
 
-        // Admin — check module flag
+        // Admin — remove worker FAB, check module flag
+        _removeWorkerFab();
         var modules = window.AppData && AppData.getSettings ? AppData.getSettings().modules : null;
         if (modules && modules['ai_assistant'] === false) {
             _removeFab();

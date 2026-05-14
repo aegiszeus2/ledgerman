@@ -67,15 +67,15 @@ window.AdminPunchLists = {
 
             <!-- Summary Cards -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px">
-                <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
                     <div style="color:#999;font-size:0.8em;text-transform:uppercase;margin-bottom:4px">Total Items</div>
-                    <div style="font-size:1.6em;font-weight:bold;color:#333">${items.length}</div>
+                    <div style="font-size:1.6em;font-weight:bold;color:var(--text-secondary)">${items.length}</div>
                 </div>
-                <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0;border-color:#e74c3c">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:8px;border:1px solid #e74c3c">
                     <div style="color:#999;font-size:0.8em;text-transform:uppercase;margin-bottom:4px">Open/In Progress</div>
                     <div style="font-size:1.6em;font-weight:bold;color:#e74c3c">${openCount}</div>
                 </div>
-                <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                <div style="padding:12px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
                     <div style="color:#999;font-size:0.8em;text-transform:uppercase;margin-bottom:4px">Signed Off</div>
                     <div style="font-size:1.6em;font-weight:bold;color:#2ecc71">${items.filter(i => i.status === 'Signed Off').length}</div>
                 </div>
@@ -107,9 +107,9 @@ window.AdminPunchLists = {
             </div>
 
             <!-- Items Table -->
-            <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0">
+            <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border-color)">
                 <table class="table" style="width:100%;margin:0;border-collapse:collapse">
-                    <thead style="background:#f5f5f5">
+                    <thead style="background:var(--bg-tertiary)">
                         <tr>
                             <th style="padding:12px;text-align:left;border-bottom:2px solid #e0e0e0">Description</th>
                             <th style="padding:12px;text-align:left;border-bottom:2px solid #e0e0e0">Project</th>
@@ -328,7 +328,7 @@ window.AdminPunchLists = {
             <div style="max-width:600px;margin:0 auto">
                 <h2 style="margin-bottom:20px">${isNew ? 'New Deficiency' : 'Edit Deficiency'}</h2>
 
-                <form id="punchForm" style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;background:#f9f9f9">
+                <form id="punchForm" style="border:1px solid var(--border-color);border-radius:8px;padding:16px;background:var(--bg-surface)">
                     <div style="margin-bottom:16px">
                         <label style="display:block;font-weight:500;margin-bottom:6px">Project *</label>
                         <select id="projectSelect" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px" required>
@@ -374,7 +374,7 @@ window.AdminPunchLists = {
                         <label style="display:block;font-weight:500;margin-bottom:6px">📷 Photo</label>
                         <div id="punchPhotoPreview" style="margin-bottom:8px">${photoId ? '<em style="color:#94a9c4;font-size:0.85em">Loading existing photo…</em>' : ''}</div>
                         <input type="file" id="punchPhotoInput" accept="image/*" capture="environment"
-                               style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:0.9em;background:#fff" />
+                               style="width:100%;padding:6px;border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;background:var(--bg-input)" />
                         <div style="font-size:0.8em;color:#94a9c4;margin-top:4px">Take a photo or select from gallery. Max 10 MB.</div>
                     </div>
 

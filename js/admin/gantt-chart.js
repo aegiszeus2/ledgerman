@@ -11,8 +11,8 @@ window.AdminGanttChart = {
 
         if (projects.length === 0) {
             container.innerHTML = `
-                <div style="padding:32px;text-align:center;color:#333">
-                    <h2 style="color:#111">No projects to visualize</h2>
+                <div style="padding:32px;text-align:center;color:var(--text-secondary)">
+                    <h2 style="color:var(--text-primary)">No projects to visualize</h2>
                     <p>Create projects first to view them on the Gantt chart.</p>
                 </div>
             `;
@@ -27,7 +27,7 @@ window.AdminGanttChart = {
         const selectedProject = AppData.getProject(selectedProjectId);
 
         if (!selectedProject) {
-            container.innerHTML = `<div style="padding:32px;text-align:center;color:#333;font-weight:600">Project not found</div>`;
+            container.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-secondary);font-weight:600">Project not found</div>`;
             return;
         }
 
@@ -84,28 +84,28 @@ window.AdminGanttChart = {
         container.innerHTML = `
             <div style="margin-bottom:16px">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-                    <h2 style="color:#111">Project Timeline</h2>
+                    <h2 style="color:var(--text-primary)">Project Timeline</h2>
                     <div style="display:flex;gap:8px">
                         <button class="btn-secondary btn-sm" id="ganttExportCsvBtn">Export CSV</button>
                         <button class="btn-secondary btn-sm" id="ganttExportPdfBtn">Export PDF</button>
                         <button class="btn-secondary btn-sm" id="refreshGanttBtn">↻ Refresh</button>
                     </div>
                 </div>
-                <p style="color:#333;margin:0">Visual project schedule with task progress</p>
+                <p style="color:var(--text-secondary);margin:0">Visual project schedule with task progress</p>
             </div>
 
             <!-- Project Selector -->
-            <div style="margin-bottom:16px;padding:12px;background:#f0f0f0;border-radius:6px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                <label style="font-weight:600;color:#111">Project:</label>
-                <select id="projectSelector" style="padding:6px 8px;border-radius:4px;border:1px solid #aaa;font-size:0.9em;color:#111;background:#fff">
+            <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface);border-radius:6px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <label style="font-weight:600;color:var(--text-primary)">Project:</label>
+                <select id="projectSelector" style="padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border-color);font-size:0.9em;color:var(--text-primary);background:var(--bg-input);color-scheme:dark">
                     ${AppData.getProjects().map(p => `
                         <option value="${p.id}" ${self._selectedProject === p.id ? 'selected' : ''}>
                             ${esc(p.name)}
                         </option>
                     `).join('')}
                 </select>
-                <div style="flex:1;min-width:160px;border-left:2px solid #aaa;padding-left:12px">
-                    <strong style="color:#111">${esc(selectedProject.name)}</strong>
+                <div style="flex:1;min-width:160px;border-left:2px solid var(--border-color);padding-left:12px">
+                    <strong style="color:var(--text-primary)">${esc(selectedProject.name)}</strong>
                     <div style="font-size:0.85em;color:#555;margin-top:2px">
                         ${projectTasks.length} task${projectTasks.length !== 1 ? 's' : ''}
                         &nbsp;•&nbsp; Status: ${selectedProject.status || 'Active'}
@@ -120,11 +120,11 @@ window.AdminGanttChart = {
 
             <!-- Task List Table -->
             <div class="card" style="margin-bottom:20px;overflow-x:auto">
-                <h3 style="font-size:.95em;font-weight:700;color:#111;margin-bottom:12px;padding:16px 16px 0">Task Schedule</h3>
+                <h3 style="font-size:.95em;font-weight:700;color:var(--text-primary);margin-bottom:12px;padding:16px 16px 0">Task Schedule</h3>
                 ${hasTasks ? `
                 <table style="width:100%;font-size:.88rem;border-collapse:collapse">
                     <thead>
-                        <tr style="background:#f5f5f5">
+                        <tr style="background:var(--bg-tertiary)">
                             <th style="padding:10px 16px;text-align:left;border-bottom:2px solid #ddd">#</th>
                             <th style="padding:10px 16px;text-align:left;border-bottom:2px solid #ddd">Task</th>
                             <th style="padding:10px 16px;text-align:left;border-bottom:2px solid #ddd">Work Item</th>
@@ -167,14 +167,14 @@ window.AdminGanttChart = {
             </div>
 
             <!-- Legend -->
-            <div style="padding:14px 16px;background:#f8f8f8;border-radius:6px;border:1px solid #e0e0e0;display:flex;gap:20px;flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:8px;font-size:.88em;color:#111">
+            <div style="padding:14px 16px;background:var(--bg-surface);border-radius:6px;border:1px solid var(--border-color);display:flex;gap:20px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:8px;font-size:.88em;color:var(--text-secondary)">
                     <div style="width:22px;height:10px;background:#4285F4;border-radius:2px"></div><span>Open</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;font-size:.88em;color:#111">
+                <div style="display:flex;align-items:center;gap:8px;font-size:.88em;color:var(--text-secondary)">
                     <div style="width:22px;height:10px;background:#e67e00;border-radius:2px"></div><span>In Progress</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;font-size:.88em;color:#111">
+                <div style="display:flex;align-items:center;gap:8px;font-size:.88em;color:var(--text-secondary)">
                     <div style="width:22px;height:10px;background:#1a8a3a;border-radius:2px"></div><span>Completed</span>
                 </div>
                 <div style="margin-left:auto;font-size:.82em;color:#777">
@@ -228,7 +228,7 @@ window.AdminGanttChart = {
                 }
             } else {
                 document.getElementById(chartId).innerHTML =
-                    `<div style="padding:32px;text-align:center;color:#333;font-weight:600">Gantt chart library not loaded. Please refresh.</div>`;
+                    `<div style="padding:32px;text-align:center;color:var(--text-secondary);font-weight:600">Gantt chart library not loaded. Please refresh.</div>`;
             }
         }, 100);
 
@@ -322,7 +322,7 @@ body{font-family:"Segoe UI",Arial,sans-serif;font-size:12px;color:#111;backgroun
 .doc-label{text-align:right}
 .doc-label h2{font-size:12px;font-weight:600;color:#c9a84c;text-transform:uppercase;letter-spacing:1px}
 .doc-label p{font-size:10px;color:#aaa;margin-top:3px}
-.gold-banner{background:#c9a84c;color:#111;text-align:center;padding:9px 32px;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.gold-banner{background:#e9a23b;color:#111;text-align:center;padding:9px 32px;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
 .body{padding:20px 32px}
 .meta{background:#f4f4f8;border-left:4px solid #c9a84c;padding:10px 14px;margin-bottom:20px;display:flex;gap:24px;flex-wrap:wrap}
 .meta-item{font-size:11px;color:#555}
