@@ -31,7 +31,7 @@ window.LMIcons = {
         _loginAttempts: 0,
         _loginLockoutUntil: 0,
         _modules: {},          // populated by fetchModules() — platform-level module flags
-        _specSearchUrl: '',    // spec search tunnel URL from /api/company/modules
+        _specSearchUrl: '',    // deprecated — kept for backwards compat, no longer used
 
         init() {
             // One-time cleanup: remove legacy adminPassword from localStorage
@@ -1052,8 +1052,7 @@ window.LMIcons = {
                 });
                 if (!res.ok) return;
                 const data = await res.json();
-                this._modules      = data;
-                this._specSearchUrl = data.specSearchUrl || '';
+                this._modules = data;
             } catch (e) {
                 console.warn('[Ledgerman] fetchModules failed:', e.message);
             }
@@ -1211,58 +1210,8 @@ window.LMIcons = {
             }).catch(() => { /* silent */ });
         },
 
-        _launchSpecSearch(container) {
-            const baseUrl = this._specSearchUrl;
-            if (!baseUrl) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <h2>Spec Search</h2>
-                        <p class="text-muted">Spec Search URL is not configured. Contact your administrator.</p>
-                    </div>`;
-                return;
-            }
-
-            const origin = (() => { try { return new URL(baseUrl).origin; } catch(_) { return baseUrl; } })();
-            const frameUrl = baseUrl.replace(/\/$/, '') + '/projects';
-            const jwt = AppData.getJwt();
-
-            // Embed Spec Search as a native module in the content panel.
-            // No new tab, no SSO redirect — the LedgerMan JWT is delivered to the
-            // iframe via postMessage and validated directly by the SpecSearch backend.
-            container.innerHTML = `<div style="margin:0;padding:0;height:100%"><iframe
-                id="spec-search-frame"
-                src="${frameUrl}"
-                style="width:100%;height:100%;min-height:calc(100vh - 64px);border:none;display:block;background:#09090b"
-                allow="clipboard-read; clipboard-write"
-            ></iframe></div>`;
-
-            const frame = document.getElementById('spec-search-frame');
-
-            // Deliver the JWT once the iframe document is ready, then retry every
-            // 800 ms until the iframe acknowledges (handles slow hydration).
-            let ackReceived = false;
-            const sendAuth = () => {
-                if (!ackReceived && frame.contentWindow) {
-                    try { frame.contentWindow.postMessage({ type: 'lm-auth', token: jwt }, origin); } catch(_) {}
-                }
-            };
-
-            window.addEventListener('message', function onAck(e) {
-                if (e.data && e.data.type === 'lm-auth-ack' && e.origin === origin) {
-                    ackReceived = true;
-                    window.removeEventListener('message', onAck);
-                }
-            });
-
-            frame.addEventListener('load', () => {
-                sendAuth();
-                const interval = setInterval(() => {
-                    if (ackReceived) { clearInterval(interval); return; }
-                    sendAuth();
-                }, 800);
-                setTimeout(() => clearInterval(interval), 15000); // give up after 15 s
-            }, { once: true });
-        },
+        // _launchSpecSearch removed — Spec Search is now a native module (AdminSpecSearch).
+        // No iframe, no external domain, no SSO. See js/admin/spec-search.js.
 
         navigate(route, params = {}) {
             // Authwall: block navigation if not authenticated
@@ -1383,7 +1332,7 @@ window.LMIcons = {
                     if (window.AdminGanttChart) AdminGanttChart.render(content, params);
                     break;
                 case 'spec-search':
-                    this._launchSpecSearch(content);
+                    if (window.AdminSpecSearch) AdminSpecSearch.render(content);
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
