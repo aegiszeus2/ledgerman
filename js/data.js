@@ -1159,7 +1159,6 @@ window.AppData = {
     getPayments, savePayment,
     // Audit
     addAuditLog, getAuditLog,
-    // Admin password (legacy)
     // Admin password (legacy — deprecated for API mode; use changeAdminPassword)
     getAdminPassword, setAdminPassword, changeAdminPassword,
     // Setup
