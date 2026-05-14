@@ -17,3 +17,8 @@ services:
       - path: /css/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
+    routes:
+      - type: redirect
+        source: /*
+        destination: https://app.ledgerman.org/:splat
+        action: 301
