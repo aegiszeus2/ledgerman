@@ -82,15 +82,15 @@ window.AdminSupervisorReports = {
 
                 <!-- Summary cards -->
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">
-                    <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
                         <div style="color:#999;font-size:.78rem;text-transform:uppercase;margin-bottom:4px">Total</div>
-                        <div style="font-size:1.8em;font-weight:bold;color:#333">${totalCount}</div>
+                        <div style="font-size:1.8em;font-weight:bold;color:var(--text-secondary)">${totalCount}</div>
                     </div>
-                    <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
                         <div style="color:#999;font-size:.78rem;text-transform:uppercase;margin-bottom:4px">Pending Review</div>
                         <div style="font-size:1.8em;font-weight:bold;color:#3498db">${submittedCount}</div>
                     </div>
-                    <div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0">
+                    <div style="padding:12px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
                         <div style="color:#999;font-size:.78rem;text-transform:uppercase;margin-bottom:4px">Drafts</div>
                         <div style="font-size:1.8em;font-weight:bold;color:#888">${draftCount}</div>
                     </div>
@@ -125,9 +125,9 @@ window.AdminSupervisorReports = {
             </div>
 
             <!-- Table -->
-            <div style="overflow-x:auto;border-radius:8px;border:1px solid #e0e0e0">
+            <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border-color)">
                 <table class="table" style="width:100%;margin:0;border-collapse:collapse">
-                    <thead style="background:#f5f5f5">
+                    <thead style="background:var(--bg-tertiary)">
                         <tr>
                             <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e0e0e0">Date</th>
                             <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e0e0e0">Project</th>
@@ -234,7 +234,7 @@ window.AdminSupervisorReports = {
         const sc = statusColors[report.status] || '#888';
 
         const section = (title, content) => `
-            <div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0;margin-bottom:12px">
+            <div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color);margin-bottom:12px">
                 <div style="font-size:.78rem;font-weight:700;text-transform:uppercase;color:#94a9c4;margin-bottom:8px">${title}</div>
                 ${content}
             </div>`;
@@ -293,17 +293,17 @@ window.AdminSupervisorReports = {
                         <div style="color:#999;font-size:.72rem;text-transform:uppercase">Supervisor</div>
                         <div style="font-weight:600;margin-top:4px;font-size:.9rem">${Utils.escapeHtml(supName)}</div>
                     </div>
-                    <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e0e0e0;text-align:center">
+                    <div style="padding:10px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color);text-align:center">
                         <div style="color:#999;font-size:.72rem;text-transform:uppercase">Workers</div>
                         <div style="font-size:1.5em;font-weight:bold;color:#3498db">${cs.totalWorkers || 0}</div>
                     </div>
-                    <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e0e0e0;text-align:center">
+                    <div style="padding:10px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color);text-align:center">
                         <div style="color:#999;font-size:.72rem;text-transform:uppercase">Labour Hours</div>
-                        <div style="font-size:1.5em;font-weight:bold;color:#333">${(cs.totalRegHours || 0) + (cs.totalOtHours || 0)}h</div>
+                        <div style="font-size:1.5em;font-weight:bold;color:var(--text-secondary)">${(cs.totalRegHours || 0) + (cs.totalOtHours || 0)}h</div>
                     </div>
-                    <div style="padding:10px;background:#fff;border-radius:8px;border:1px solid #e0e0e0;text-align:center">
+                    <div style="padding:10px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color);text-align:center">
                         <div style="color:#999;font-size:.72rem;text-transform:uppercase">Equipment Hours</div>
-                        <div style="font-size:1.5em;font-weight:bold;color:#333">${cs.totalEquipmentHours || 0}h</div>
+                        <div style="font-size:1.5em;font-weight:bold;color:var(--text-secondary)">${cs.totalEquipmentHours || 0}h</div>
                     </div>
                     ${report.hasSafetyIncident || report.isNearMiss ? `<div style="padding:10px;background:#fdf0f0;border-radius:8px;border:1px solid #e74c3c;text-align:center">
                         <div style="color:#e74c3c;font-size:.72rem;text-transform:uppercase">Safety Flags</div>
@@ -319,7 +319,7 @@ window.AdminSupervisorReports = {
                         ${report.siteConditions ? `<span style="color:#666">${Utils.escapeHtml(report.siteConditions)}</span>` : ''}
                     </div>`) : ''}
 
-                ${report.delayNotes ? section('Delays / Impact', `<div style="border-left:3px solid #f39c12;padding-left:10px;color:#856404">${Utils.escapeHtml(report.delayNotes)}</div>`) : ''}
+                ${report.delayNotes ? section('Delays / Impact', `<div style="border-left:3px solid var(--warning);padding-left:10px;color:var(--warning)">${Utils.escapeHtml(report.delayNotes)}</div>`) : ''}
 
                 ${report.hasSafetyIncident || report.isNearMiss || report.safetyNotes ? section('Safety', `
                     ${report.hasSafetyIncident ? '<div style="color:#e74c3c;font-weight:600;margin-bottom:6px">⚠️ Safety Incident Reported</div>' : ''}
@@ -400,7 +400,7 @@ window.AdminSupervisorReports = {
 
                 <!-- Approve / Reject (admin only, submitted reports) -->
                 ${report.status === 'submitted' ? `
-                <div style="padding:16px;background:#fff;border-radius:8px;border:2px solid #3498db;margin-top:8px">
+                <div style="padding:16px;background:var(--bg-surface);border-radius:8px;border:2px solid #3498db;margin-top:8px">
                     <h4 style="margin:0 0 12px;color:#3498db">Admin Review</h4>
                     <div style="margin-bottom:10px">
                         <label style="font-size:.85rem;display:block;margin-bottom:4px">Review Notes (optional)</label>

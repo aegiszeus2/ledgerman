@@ -34,7 +34,7 @@ window.AdminReports = {
                     <button class="btn-secondary btn-sm" id="printReportBtn">🖨 Print Report</button>
                 </div>
             </div>
-            <div class="report-controls" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:var(--bg2,#f5f7fa);border-radius:8px;border:1px solid var(--border,#e5e7eb)">
+            <div class="report-controls" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)">
                 <div class="form-group" style="margin:0;flex:2;min-width:180px">
                     <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Report Type</label>
                     <select id="reportTypeSelect" style="width:100%">
@@ -813,7 +813,7 @@ window.AdminReports = {
                 const dates = Object.keys(grouped[pid]).sort();
                 dates.forEach(function(date) {
                     html += '<div style="margin-bottom:16px">' +
-                        '<div style="font-weight:700;font-size:.95rem;color:#333;background:#f5f7fa;padding:6px 10px;border-radius:4px;margin-bottom:10px">📅 ' + Utils.formatDate(date) + '</div>';
+                        '<div style="font-weight:700;font-size:.95rem;color:var(--text-secondary);background:var(--bg-surface);padding:6px 10px;border-radius:4px;margin-bottom:10px">📅 ' + Utils.formatDate(date) + '</div>';
 
                     grouped[pid][date].forEach(function(s) {
                         const worker = allWorkers.find(function(w) { return w.id === s.workerId; });
@@ -836,7 +836,7 @@ window.AdminReports = {
                             '</div>';
 
                         if (notes) {
-                            html += '<div style="font-size:.9rem;color:#333;margin-bottom:8px;padding:6px 8px;background:#fafafa;border-radius:4px;border-left:3px solid #1a3a5c">' +
+                            html += '<div style="font-size:.9rem;color:var(--text-secondary);margin-bottom:8px;padding:6px 8px;background:var(--bg-surface);border-radius:4px;border-left:3px solid var(--info)">' +
                                 '<strong>Notes:</strong> ' + esc(notes) + '</div>';
                         }
 
@@ -1170,7 +1170,7 @@ window.AdminReports = {
         }).join('');
 
         var summaryRow =
-            '<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg2,#f8f8f8)">' +
+            '<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-surface)">' +
                 '<td colspan="5" style="text-align:right">TOTAL</td>' +
                 '<td class="amount">' + totalHours.toFixed(2) + '</td>' +
                 '<td></td>' +

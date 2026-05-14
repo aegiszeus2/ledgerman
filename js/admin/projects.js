@@ -709,19 +709,19 @@ window.AdminProjects = {
 
         // Summary cards
         html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0">';
-        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Contract Value</div><div style="font-size:1.4em;font-weight:700;color:#333">' + Utils.formatCurrency(projectBudget || totalBudgeted) + '</div></div>';
-        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Budgeted (WIs)</div><div style="font-size:1.4em;font-weight:700;color:#333">' + Utils.formatCurrency(totalBudgeted) + '</div></div>';
-        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Labour (actual)</div><div style="font-size:1.4em;font-weight:700;color:#e67e00">' + Utils.formatCurrency(totalLabour) + '</div></div>';
-        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Materials (actual)</div><div style="font-size:1.4em;font-weight:700;color:#e74c3c">' + Utils.formatCurrency(totalExpenses) + '</div></div>';
-        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Total Actual</div><div style="font-size:1.4em;font-weight:700;color:#e74c3c">' + Utils.formatCurrency(totalActual) + '</div></div>';
-        html += '<div style="padding:14px;background:#fff;border-radius:8px;border:1px solid #e0e0e0"><div style="font-size:.78rem;text-transform:uppercase;color:#999;margin-bottom:4px">Variance</div><div style="font-size:1.4em;font-weight:700;color:' + (projectVariance >= 0 ? '#1a8a3a' : '#e74c3c') + '">' + (projectVariance >= 0 ? '+' : '') + Utils.formatCurrency(projectVariance) + '</div></div>';
+        html += '<div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)"><div style="font-size:.78rem;text-transform:uppercase;color:var(--text-subtle);margin-bottom:4px">Contract Value</div><div style="font-size:1.4em;font-weight:700;color:var(--text-secondary)">' + Utils.formatCurrency(projectBudget || totalBudgeted) + '</div></div>';
+        html += '<div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)"><div style="font-size:.78rem;text-transform:uppercase;color:var(--text-subtle);margin-bottom:4px">Budgeted (WIs)</div><div style="font-size:1.4em;font-weight:700;color:var(--text-secondary)">' + Utils.formatCurrency(totalBudgeted) + '</div></div>';
+        html += '<div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)"><div style="font-size:.78rem;text-transform:uppercase;color:var(--text-subtle);margin-bottom:4px">Labour (actual)</div><div style="font-size:1.4em;font-weight:700;color:var(--amber)">' + Utils.formatCurrency(totalLabour) + '</div></div>';
+        html += '<div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)"><div style="font-size:.78rem;text-transform:uppercase;color:var(--text-subtle);margin-bottom:4px">Materials (actual)</div><div style="font-size:1.4em;font-weight:700;color:var(--danger)">' + Utils.formatCurrency(totalExpenses) + '</div></div>';
+        html += '<div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)"><div style="font-size:.78rem;text-transform:uppercase;color:var(--text-subtle);margin-bottom:4px">Total Actual</div><div style="font-size:1.4em;font-weight:700;color:var(--danger)">' + Utils.formatCurrency(totalActual) + '</div></div>';
+        html += '<div style="padding:14px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-color)"><div style="font-size:.78rem;text-transform:uppercase;color:var(--text-subtle);margin-bottom:4px">Variance</div><div style="font-size:1.4em;font-weight:700;color:' + (projectVariance >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + (projectVariance >= 0 ? '+' : '') + Utils.formatCurrency(projectVariance) + '</div></div>';
         html += '</div>';
 
         if (workItems.length === 0) {
             html += '<div class="card"><div class="empty"><h3>No Work Items</h3><p>Add Work Items on the Work Items tab to track budget vs. actual per scope item.</p></div></div>';
         } else {
             html += '<div class="card" style="overflow-x:auto">';
-            html += '<table style="width:100%;font-size:.88rem"><thead><tr style="background:#f5f5f5">';
+            html += '<table style="width:100%;font-size:.88rem"><thead><tr style="background:var(--bg-tertiary)">';
             html += '<th style="padding:10px;text-align:left">Work Item</th>';
             html += '<th style="padding:10px;text-align:center">Unit</th>';
             html += '<th style="padding:10px;text-align:right">Budgeted Qty</th>';
@@ -742,25 +742,25 @@ window.AdminProjects = {
                 const variance = (parseFloat(wi.budgetedCost) || 0) - actualTotal;
                 const varianceColor = variance >= 0 ? '#1a8a3a' : '#e74c3c';
                 const pct = wi.budgetedCost > 0 ? Math.min(100, (actualTotal / wi.budgetedCost * 100)).toFixed(0) : 0;
-                const barColor = pct >= 100 ? '#e74c3c' : (pct >= 80 ? '#e67e00' : '#1a8a3a');
+                const barColor = pct >= 100 ? 'var(--danger)' : (pct >= 80 ? 'var(--amber)' : 'var(--success)');
 
-                html += '<tr style="border-bottom:1px solid #eee">';
+                html += '<tr style="border-bottom:1px solid var(--border-color-soft)">';
                 html += '<td style="padding:10px"><strong>' + Utils.escapeHtml(wi.name) + '</strong>' +
-                    (wi.startDate ? '<div style="font-size:.75rem;color:#999">Start: ' + Utils.formatDate(wi.startDate) + (wi.endDate ? ' → ' + Utils.formatDate(wi.endDate) : '') + '</div>' : '') +
+                    (wi.startDate ? '<div style="font-size:.75rem;color:var(--text-subtle)">Start: ' + Utils.formatDate(wi.startDate) + (wi.endDate ? ' → ' + Utils.formatDate(wi.endDate) : '') + '</div>' : '') +
                 '</td>';
                 html += '<td style="padding:10px;text-align:center">' + Utils.escapeHtml(wi.unitOfMeasure || '—') + '</td>';
                 html += '<td style="padding:10px;text-align:right">' + (parseFloat(wi.budgetedQty) || 0) + '</td>';
                 html += '<td style="padding:10px;text-align:right">' + Utils.formatCurrency(wi.budgetedCost) + '</td>';
                 html += '<td style="padding:10px;text-align:right">' + actualQty.toFixed(1) + '</td>';
-                html += '<td style="padding:10px;text-align:right;color:#e67e00">' + Utils.formatCurrency(labour) + '</td>';
-                html += '<td style="padding:10px;text-align:right;color:#e74c3c">' + Utils.formatCurrency(material) + '</td>';
+                html += '<td style="padding:10px;text-align:right;color:var(--amber)">' + Utils.formatCurrency(labour) + '</td>';
+                html += '<td style="padding:10px;text-align:right;color:var(--danger)">' + Utils.formatCurrency(material) + '</td>';
                 html += '<td style="padding:10px;text-align:right">' +
                     '<div style="font-weight:600">' + Utils.formatCurrency(actualTotal) + '</div>' +
-                    '<div style="height:3px;background:#eee;border-radius:2px;margin-top:4px"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:2px"></div></div>' +
-                    '<div style="font-size:.7rem;color:#999">' + pct + '% of budget</div>' +
+                    '<div style="height:3px;background:var(--bg-surface);border-radius:2px;margin-top:4px"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:2px"></div></div>' +
+                    '<div style="font-size:.7rem;color:var(--text-subtle)">' + pct + '% of budget</div>' +
                 '</td>';
                 html += '<td style="padding:10px;text-align:right;font-weight:600;color:' + varianceColor + '">' + (variance >= 0 ? '+' : '') + Utils.formatCurrency(variance) + '</td>';
-                html += '<td style="padding:10px;text-align:center">' + (wi.changeOrder ? '<span style="color:#e67e00;font-weight:700;font-size:.8rem">CO</span>' : '') + '</td>';
+                html += '<td style="padding:10px;text-align:center">' + (wi.changeOrder ? '<span style="color:var(--amber);font-weight:700;font-size:.8rem">CO</span>' : '') + '</td>';
                 html += '</tr>';
             });
 
@@ -768,19 +768,19 @@ window.AdminProjects = {
             const totBudgetedCost = workItems.reduce(function(s, wi) { return s + (parseFloat(wi.budgetedCost) || 0); }, 0);
             const totActual = workItems.reduce(function(s, wi) { return s + labourCostForWorkItem(wi.id) + expenseCostForWorkItem(wi.id); }, 0);
             const totVariance = totBudgetedCost - totActual;
-            html += '<tr style="background:#f5f5f5;font-weight:700;border-top:2px solid #ddd">';
+            html += '<tr style="background:var(--bg-surface);font-weight:700;border-top:2px solid #ddd">';
             html += '<td style="padding:10px" colspan="3">TOTALS</td>';
             html += '<td style="padding:10px;text-align:right">' + Utils.formatCurrency(totBudgetedCost) + '</td>';
             html += '<td style="padding:10px"></td>';
             html += '<td style="padding:10px;text-align:right;color:#e67e00">' + Utils.formatCurrency(workItems.reduce(function(s, wi) { return s + labourCostForWorkItem(wi.id); }, 0)) + '</td>';
-            html += '<td style="padding:10px;text-align:right;color:#e74c3c">' + Utils.formatCurrency(workItems.reduce(function(s, wi) { return s + expenseCostForWorkItem(wi.id); }, 0)) + '</td>';
+            html += '<td style="padding:10px;text-align:right;color:var(--danger)">' + Utils.formatCurrency(workItems.reduce(function(s, wi) { return s + expenseCostForWorkItem(wi.id); }, 0)) + '</td>';
             html += '<td style="padding:10px;text-align:right">' + Utils.formatCurrency(totActual) + '</td>';
             html += '<td style="padding:10px;text-align:right;color:' + (totVariance >= 0 ? '#1a8a3a' : '#e74c3c') + '">' + (totVariance >= 0 ? '+' : '') + Utils.formatCurrency(totVariance) + '</td>';
             html += '<td></td>';
             html += '</tr>';
             html += '</tbody></table></div>';
 
-            html += '<div style="margin-top:12px;padding:10px 14px;background:#e8f4f8;border-left:4px solid #3498db;border-radius:4px;font-size:.85rem;color:#333">';
+            html += '<div style="margin-top:12px;padding:10px 14px;background:var(--info-bg);border-left:4px solid var(--info);border-radius:4px;font-size:.85rem;color:var(--text-secondary)">';
             html += '<strong>Note:</strong> Labour cost uses each worker\'s Cost Rate. Set Cost Rate in the Workers module. Materials are from expenses linked to each Work Item.';
             html += '</div>';
         }
@@ -1136,7 +1136,7 @@ window.AdminProjects = {
                         '.doc-header .doc-label p{font-size:10px;color:#aaa;margin-top:3px}' +
 
                         /* Gold banner */
-                        '.gold-banner{background:#c9a84c;color:#111111;text-align:center;padding:9px 32px;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase}' +
+                        '.gold-banner{background:#e9a23b;color:#111111;text-align:center;padding:9px 32px;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase}' +
 
                         /* Body */
                         '.body{padding:20px 32px}' +

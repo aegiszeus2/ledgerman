@@ -204,7 +204,7 @@ window.LedgermanOnboarding = {
         overlay.className = 'modal-overlay active';
         overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;z-index:10000';
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:16px;max-width:520px;width:92%;box-shadow:0 24px 80px rgba(0,0,0,.22);overflow:hidden">
+            <div style="background:var(--bg-secondary);border-radius:16px;max-width:520px;width:92%;box-shadow:0 24px 80px rgba(0,0,0,.22);overflow:hidden;color:var(--text-primary)">
                 <div style="background:linear-gradient(135deg,#1a1a2e 0%,#2d2d5e 100%);padding:32px;text-align:center">
                     <div style="font-size:2.8rem;margin-bottom:12px">🏗️</div>
                     <h2 style="color:#fff;margin:0 0 8px;font-size:1.4rem">Welcome to Ledgerman</h2>
@@ -212,34 +212,34 @@ window.LedgermanOnboarding = {
                 </div>
                 <div style="padding:28px">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-                        <button id="onboardNoviceBtn" style="border:2px solid #e5e7eb;border-radius:12px;padding:20px 14px;background:#fff;cursor:pointer;text-align:center;transition:all .2s">
+                        <button id="onboardNoviceBtn" style="border:2px solid var(--border-color);border-radius:12px;padding:20px 14px;background:var(--bg-surface);color:var(--text-primary);cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">🌱</div>
                             <div style="font-weight:700;color:var(--text-primary);font-size:.95rem;margin-bottom:4px">Basic PM</div>
-                            <div style="font-size:.8rem;color:#888;line-height:1.4">New to Ledgerman? Learn the essentials — projects, workers, time, and invoicing in 10 steps.</div>
+                            <div style="font-size:.8rem;color:var(--text-muted);line-height:1.4">New to Ledgerman? Learn the essentials — projects, workers, time, and invoicing in 10 steps.</div>
                         </button>
-                        <button id="onboardAdvancedBtn" style="border:2px solid #e5e7eb;border-radius:12px;padding:20px 14px;background:#fff;cursor:pointer;text-align:center;transition:all .2s">
+                        <button id="onboardAdvancedBtn" style="border:2px solid var(--border-color);border-radius:12px;padding:20px 14px;background:var(--bg-surface);color:var(--text-primary);cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">⚡</div>
                             <div style="font-weight:700;color:var(--text-primary);font-size:.95rem;margin-bottom:4px">Advanced PM</div>
-                            <div style="font-size:.8rem;color:#888;line-height:1.4">Experienced PM? Explore the full platform — budgets, Gantt, punch lists, reports and more.</div>
+                            <div style="font-size:.8rem;color:var(--text-muted);line-height:1.4">Experienced PM? Explore the full platform — budgets, Gantt, punch lists, reports and more.</div>
                         </button>
                     </div>
-                    <button id="onboardSkipBtn" style="width:100%;padding:10px;border:none;background:none;color:#aaa;font-size:.85rem;cursor:pointer">Skip for now</button>
+                    <button id="onboardSkipBtn" style="width:100%;padding:10px;border:none;background:none;color:var(--text-muted);font-size:.85rem;cursor:pointer">Skip for now</button>
                 </div>
             </div>
         `;
         document.body.appendChild(overlay);
 
         overlay.querySelector('#onboardNoviceBtn').addEventListener('mouseenter', function() {
-            this.style.borderColor = '#4f46e5'; this.style.background = '#f8f7ff';
+            this.style.borderColor = 'var(--amber)'; this.style.background = 'var(--bg-surface-hover)';
         });
         overlay.querySelector('#onboardNoviceBtn').addEventListener('mouseleave', function() {
-            this.style.borderColor = '#e5e7eb'; this.style.background = '#fff';
+            this.style.borderColor = 'var(--border-color)'; this.style.background = 'var(--bg-surface)';
         });
         overlay.querySelector('#onboardAdvancedBtn').addEventListener('mouseenter', function() {
-            this.style.borderColor = '#4f46e5'; this.style.background = '#f8f7ff';
+            this.style.borderColor = 'var(--amber)'; this.style.background = 'var(--bg-surface-hover)';
         });
         overlay.querySelector('#onboardAdvancedBtn').addEventListener('mouseleave', function() {
-            this.style.borderColor = '#e5e7eb'; this.style.background = '#fff';
+            this.style.borderColor = 'var(--border-color)'; this.style.background = 'var(--bg-surface)';
         });
 
         overlay.querySelector('#onboardNoviceBtn').addEventListener('click', function() {
@@ -279,21 +279,21 @@ window.LedgermanOnboarding = {
         if (step.switchToAdvanced) {
             switchBtnHtml = `<button id="tourSwitchBtn" style="margin-top:8px;width:100%;padding:10px;border:2px solid #6366f1;background:none;border-radius:8px;color:#6366f1;font-weight:600;font-size:.88rem;cursor:pointer">⚡ Switch to Advanced Guide</button>`;
         } else if (step.switchToNovice) {
-            switchBtnHtml = `<button id="tourSwitchBtn" style="margin-top:8px;width:100%;padding:10px;border:2px solid #10b981;background:none;border-radius:8px;color:#10b981;font-weight:600;font-size:.88rem;cursor:pointer">🌱 View Basic Guide</button>`;
+            switchBtnHtml = `<button id="tourSwitchBtn" style="margin-top:8px;width:100%;padding:10px;border:2px solid var(--success);background:none;border-radius:8px;color:var(--success);font-weight:600;font-size:.88rem;cursor:pointer">🌱 View Basic Guide</button>`;
         }
 
         overlay.innerHTML = `
-            <div style="background:#fff;border-radius:16px;max-width:520px;width:92%;box-shadow:0 24px 80px rgba(0,0,0,.22);overflow:hidden;display:flex;flex-direction:column">
+            <div style="background:var(--bg-secondary);border-radius:16px;max-width:520px;width:92%;box-shadow:0 24px 80px rgba(0,0,0,.22);overflow:hidden;display:flex;flex-direction:column;color:var(--text-primary)">
 
                 <!-- Progress bar -->
-                <div style="height:4px;background:#f1f1f1">
+                <div style="height:4px;background:var(--bg-surface)">
                     <div style="height:100%;width:${progressPct}%;background:${levelColor};transition:width .3s"></div>
                 </div>
 
                 <!-- Header -->
                 <div style="padding:18px 22px 0;display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:.75rem;font-weight:600;color:${levelColor};letter-spacing:.4px;text-transform:uppercase">${levelLabel}</span>
-                    <span style="font-size:.75rem;color:#aaa">${index + 1} of ${total}</span>
+                    <span style="font-size:.75rem;color:var(--text-muted)">${index + 1} of ${total}</span>
                 </div>
 
                 <!-- Step content -->
@@ -303,16 +303,16 @@ window.LedgermanOnboarding = {
                         <h3 style="margin:0 0 4px;color:var(--text-primary);font-size:1.2rem">${step.title}</h3>
                         <div style="font-size:.85rem;color:${levelColor};font-weight:600">${step.subtitle}</div>
                     </div>
-                    <p style="color:#555;font-size:.92rem;line-height:1.65;margin:0 0 20px;text-align:center">${step.body}</p>
+                    <p style="color:var(--text-secondary);font-size:.92rem;line-height:1.65;margin:0 0 20px;text-align:center">${step.body}</p>
                     ${actionBtnHtml ? '<div style="text-align:center;margin-bottom:10px">' + actionBtnHtml + '</div>' : ''}
                     ${switchBtnHtml}
                 </div>
 
                 <!-- Navigation -->
-                <div style="padding:14px 22px;border-top:1px solid #f1f1f1;display:flex;justify-content:space-between;align-items:center;gap:10px">
-                    <button id="tourPrevBtn" style="padding:9px 18px;border:1px solid #e5e7eb;background:#fff;border-radius:8px;font-size:.88rem;cursor:pointer;color:#555;${isFirst ? 'opacity:.35;pointer-events:none' : ''}">← Back</button>
+                <div style="padding:14px 22px;border-top:1px solid var(--border-color-soft);display:flex;justify-content:space-between;align-items:center;gap:10px">
+                    <button id="tourPrevBtn" style="padding:9px 18px;border:1px solid var(--border-color);background:var(--bg-surface);border-radius:8px;font-size:.88rem;cursor:pointer;color:var(--text-secondary);${isFirst ? 'opacity:.35;pointer-events:none' : ''}">← Back</button>
                     <div style="display:flex;gap:5px">
-                        ${steps.map((_, i) => `<div style="width:${i === index ? 18 : 7}px;height:7px;border-radius:4px;background:${i === index ? levelColor : '#e5e7eb'};transition:all .25s"></div>`).join('')}
+                        ${steps.map((_, i) => `<div style="width:${i === index ? 18 : 7}px;height:7px;border-radius:4px;background:${i === index ? levelColor : 'var(--border-color)'};transition:all .25s"></div>`).join('')}
                     </div>
                     ${isLast
                         ? `<button id="tourDoneBtn" style="padding:9px 18px;background:${levelColor};color:#fff;border:none;border-radius:8px;font-size:.88rem;font-weight:600;cursor:pointer">Done ✓</button>`

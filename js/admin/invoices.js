@@ -706,7 +706,7 @@ window.AdminInvoices = {
                 '</div>' +
                 '<div style="text-align:right">' +
                     '<h2>INVOICE</h2>' +
-                    '<div style="font-size:1.1rem;color:#e94560;font-weight:700">' + esc(wd.invoiceNumber || '') + '</div>' +
+                    '<div style="font-size:1.1rem;color:var(--amber-hover);font-weight:700">' + esc(wd.invoiceNumber || '') + '</div>' +
                     '<div style="font-size:.9rem;color:#555;margin-top:4px">Date: ' + Utils.formatDate(wd.invoiceDate) + '</div>' +
                     (wd.billingStart && wd.billingEnd ? '<div style="font-size:.85rem;color:#555">Period: ' + Utils.formatDate(wd.billingStart) + ' - ' + Utils.formatDate(wd.billingEnd) + '</div>' : '') +
                 '</div>' +
@@ -1025,7 +1025,7 @@ window.AdminInvoices = {
                         '</div>' +
                         '<div style="text-align:right">' +
                             '<h2 style="color:#1a1a2e;font-weight:800;margin:0 0 4px">INVOICE</h2>' +
-                            '<div style="font-size:1.1rem;color:#e94560;font-weight:700">' + esc(inv.invoiceNumber) + '</div>' +
+                            '<div style="font-size:1.1rem;color:var(--amber-hover);font-weight:700">' + esc(inv.invoiceNumber) + '</div>' +
                             '<div style="font-size:.9rem;color:#555;margin-top:4px">Date: ' + Utils.formatDate(invoiceDate) + '</div>' +
                             (billingStart && billingEnd ? '<div style="font-size:.85rem;color:#555">Period: ' + Utils.formatDate(billingStart) + ' - ' + Utils.formatDate(billingEnd) + '</div>' : '') +
                         '</div>' +
@@ -1283,12 +1283,12 @@ window.AdminInvoices = {
             if (!el) return;
             var html = '<div style="color:var(--text-secondary)"><strong>Subtotal:</strong> ' + Utils.formatCurrency(t.subtotal) + '</div>';
             if (hstEnabled) html += '<div style="color:var(--text-secondary)">HST (' + hstRate + '%): ' + Utils.formatCurrency(t.hstAmt) + '</div>';
-            html += '<div style="color:#111111"><strong>Total:</strong> ' + Utils.formatCurrency(t.total) + '</div>';
+            html += '<div style="color:var(--text-primary)"><strong>Total:</strong> ' + Utils.formatCurrency(t.total) + '</div>';
             if (holdbackEnabled) {
                 html += '<div style="color:var(--text-secondary)">Holdback (' + holdbackRate + '%): &minus;' + Utils.formatCurrency(t.hbAmt) + '</div>';
-                html += '<div style="font-weight:700;font-size:1rem;color:#e94560;margin-top:4px">Net Payable: ' + Utils.formatCurrency(t.net) + '</div>';
+                html += '<div style="font-weight:700;font-size:1rem;color:var(--amber-hover);margin-top:4px">Net Payable: ' + Utils.formatCurrency(t.net) + '</div>';
             } else {
-                html += '<div style="font-weight:700;font-size:1rem;color:#e94560;margin-top:4px">Total Due: ' + Utils.formatCurrency(t.total) + '</div>';
+                html += '<div style="font-weight:700;font-size:1rem;color:var(--amber-hover);margin-top:4px">Total Due: ' + Utils.formatCurrency(t.total) + '</div>';
             }
             el.innerHTML = html;
         }
@@ -1297,19 +1297,19 @@ window.AdminInvoices = {
             var tbody = overlay.querySelector('#editLineItemsBody');
             if (!tbody) return;
             if (editItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:16px;font-size:.85rem">No line items. Add from project expenses or add a custom item.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;font-size:.85rem">No line items. Add from project expenses or add a custom item.</td></tr>';
                 return;
             }
             tbody.innerHTML = editItems.map(function(item, idx) {
-                return '<tr data-idx="' + idx + '" style="border-bottom:1px solid #f0f0f0">' +
-                    '<td style="padding:5px 4px"><input type="text" class="li-desc" style="width:100%;border:1px solid #d1d5db;padding:5px 6px;font-size:.85rem;border-radius:3px;color:#111" value="' + esc(item.description || '') + '"></td>' +
-                    '<td style="padding:5px 4px"><select class="li-cat" style="border:1px solid #d1d5db;padding:5px 4px;font-size:.85rem;border-radius:3px;color:#111;width:100%">' +
+                return '<tr data-idx="' + idx + '" style="border-bottom:1px solid var(--border-color-soft)">' +
+                    '<td style="padding:5px 4px"><input type="text" class="li-desc" style="width:100%;border:1px solid var(--border-color);padding:5px 6px;font-size:.85rem;border-radius:3px;background:var(--bg-input);color:var(--text-primary)" value="' + esc(item.description || '') + '"></td>' +
+                    '<td style="padding:5px 4px"><select class="li-cat" style="border:1px solid var(--border-color);padding:5px 4px;font-size:.85rem;border-radius:3px;background:var(--bg-input);color:var(--text-primary);color-scheme:dark;width:100%">' +
                         ['Labor','Equipment','Material'].map(function(c) {
                             return '<option value="' + c + '"' + (item.category === c ? ' selected' : '') + '>' + c + '</option>';
                         }).join('') +
                     '</select></td>' +
-                    '<td style="padding:5px 4px"><input type="number" class="li-amt" step="0.01" min="0" style="width:95px;border:1px solid #d1d5db;padding:5px 6px;font-size:.85rem;border-radius:3px;text-align:right;color:#111" value="' + (parseFloat(item.amount) || 0).toFixed(2) + '"></td>' +
-                    '<td style="padding:5px 4px;text-align:center"><button type="button" class="li-remove" data-idx="' + idx + '" style="background:#fee2e2;color:#dc2626;border:none;width:26px;height:26px;border-radius:3px;cursor:pointer;font-size:.85rem;line-height:1">✕</button></td>' +
+                    '<td style="padding:5px 4px"><input type="number" class="li-amt" step="0.01" min="0" style="width:95px;border:1px solid var(--border-color);padding:5px 6px;font-size:.85rem;border-radius:3px;text-align:right;background:var(--bg-input);color:var(--text-primary)" value="' + (parseFloat(item.amount) || 0).toFixed(2) + '"></td>' +
+                    '<td style="padding:5px 4px;text-align:center"><button type="button" class="li-remove" data-idx="' + idx + '" style="background:var(--danger-bg);color:var(--danger);border:none;width:26px;height:26px;border-radius:3px;cursor:pointer;font-size:.85rem;line-height:1">✕</button></td>' +
                 '</tr>';
             }).join('');
 
@@ -1365,11 +1365,11 @@ window.AdminInvoices = {
                         var vd = e.vendorName || e.vendor || '';
                         desc = (vd ? esc(vd) + ' &ndash; ' : '') + esc(e.description || '');
                     }
-                    return '<tr style="border-top:1px solid #f0f0f0">' +
+                    return '<tr style="border-top:1px solid var(--border-color-soft)">' +
                         '<td style="padding:6px 8px;color:var(--text-secondary)">' + Utils.formatDate(e.date) + '</td>' +
-                        '<td style="padding:6px 8px;color:#111111">' + desc + '</td>' +
+                        '<td style="padding:6px 8px;color:var(--text-primary)">' + desc + '</td>' +
                         '<td style="padding:6px 8px;color:var(--text-secondary)">' + (e.category || 'Material') + '</td>' +
-                        '<td style="padding:6px 8px;text-align:right;color:#111111">' + Utils.formatCurrency(e.amount) + '</td>' +
+                        '<td style="padding:6px 8px;text-align:right;color:var(--text-primary)">' + Utils.formatCurrency(e.amount) + '</td>' +
                         '<td style="padding:6px 8px"><button type="button" class="add-exp-btn" data-id="' + e.id + '" style="background:var(--bg-surface-hover);color:var(--text-primary);border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.8rem;white-space:nowrap">+ Add</button></td>' +
                     '</tr>';
                 }).join('') +
