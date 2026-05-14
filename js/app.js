@@ -19,6 +19,7 @@ window.LMIcons = {
   money:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
   bell:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
   pin:       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/></svg>',
+  search:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>',
 };
 
 // Main Application Controller
@@ -29,6 +30,8 @@ window.LMIcons = {
         currentProjectId: null, // for project detail views
         _loginAttempts: 0,
         _loginLockoutUntil: 0,
+        _modules: {},          // populated by fetchModules() — platform-level module flags
+        _specSearchUrl: '',    // spec search tunnel URL from /api/company/modules
 
         init() {
             // Initialize analytics (cookie consent + friction monitoring)
@@ -1025,11 +1028,51 @@ window.LMIcons = {
                 on('punch_lists',     false) ? item('punch-lists',     'pin',    'Punch Lists',     'Punch Lists — deficiency tracking and sign-off') : '',
                 on('gantt_chart',     false) ? item('gantt-chart',     'clock',  'Timeline',        'Project Timeline — visual schedule of milestones') : '',
 
+                // ── AI Tools (platform-level modules from /api/company/modules) ─
+                this._modules.specSearch ? group('AI Tools') : '',
+                this._modules.specSearch ? item('spec-search', 'search', 'Spec Search', 'Spec Search — AI-powered specification search') : '',
+
                 // ── Always-on last ─────────────────────────────────────────
                 '<hr class="nav-sep">',
                 item('settings', 'gear', 'Settings', 'Settings — company info, modules, password & backups'),
                 item('help',     'help', 'Help',      'Help — how to use Ledgerman'),
             ].join('\n');
+        },
+
+        async fetchModules() {
+            // Fetch platform-level module flags from /api/company/modules
+            // (separate from settings.modules which is the local feature-flag set)
+            try {
+                const res = await fetch(AppData.API_BASE + '/api/company/modules', {
+                    headers: { 'Authorization': 'Bearer ' + AppData.getJwt() }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                this._modules      = data;
+                this._specSearchUrl = data.specSearchUrl || '';
+            } catch (e) {
+                console.warn('[Ledgerman] fetchModules failed:', e.message);
+            }
+        },
+
+        _rebuildNav() {
+            const nav = document.getElementById('adminNav');
+            if (!nav) return;
+            nav.innerHTML = this._buildNavHtml();
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.onclick = (e) => {
+                    e.preventDefault();
+                    this.navigate(item.dataset.route);
+                };
+            });
+            Utils.initTooltips();
+            // Re-mark the current active route
+            document.querySelectorAll('.nav-item').forEach(item => {
+                const isActive = item.dataset.route === this.currentView;
+                item.classList.toggle('active', isActive);
+                if (isActive) item.setAttribute('aria-current', 'page');
+                else item.removeAttribute('aria-current');
+            });
         },
 
         startAdminPanel() {
@@ -1123,6 +1166,9 @@ window.LMIcons = {
             // Navigate to dashboard
             this.navigate('dashboard');
 
+            // Fetch platform-level module flags (spec search, etc.) and rebuild nav
+            this.fetchModules().then(() => this._rebuildNav());
+
             // Backup reminder
             if (this._pendingBackupReminder) {
                 this._pendingBackupReminder = false;
@@ -1159,6 +1205,54 @@ window.LMIcons = {
                     badge.style.display = 'none';
                 }
             }).catch(() => { /* silent */ });
+        },
+
+        async _launchSpecSearch(container) {
+            const baseUrl = this._specSearchUrl;
+            if (!baseUrl) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>Spec Search</h2>
+                        <p class="text-muted">Spec Search URL is not configured. Contact your administrator.</p>
+                    </div>`;
+                return;
+            }
+
+            // Show loading state
+            container.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px">
+                    <div style="width:36px;height:36px;border:3px solid var(--border-color-soft);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+                    <p style="color:var(--text-muted);font-size:14px">Signing you in to Spec Search…</p>
+                </div>`;
+
+            try {
+                const res = await fetch(AppData.API_BASE + '/api/modules/spec-search/token', {
+                    headers: { 'Authorization': 'Bearer ' + AppData.getJwt() }
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ssoToken) {
+                    throw new Error(data.error || 'Failed to get SSO token');
+                }
+                // Open spec search with SSO token in a new tab
+                const ssoUrl = baseUrl.replace(/\/$/, '') + '/sso?token=' + encodeURIComponent(data.ssoToken);
+                window.open(ssoUrl, '_blank', 'noopener,noreferrer');
+
+                // Show success state with a direct link fallback
+                container.innerHTML = `
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;text-align:center;padding:24px">
+                        <div style="width:56px;height:56px;background:var(--bg-surface);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px">🔍</div>
+                        <h2 style="margin:0">Spec Search</h2>
+                        <p style="color:var(--text-muted);font-size:14px;max-width:360px;margin:0">Spec Search opened in a new tab. If it didn't open, click the button below.</p>
+                        <a href="${Utils.escapeHtml(ssoUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Open Spec Search</a>
+                    </div>`;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>Spec Search</h2>
+                        <p class="text-muted" style="color:var(--danger)">${Utils.escapeHtml(err.message || 'Unable to launch Spec Search')}</p>
+                        <button class="btn btn-secondary" style="margin-top:16px" onclick="App.navigate('spec-search')">Retry</button>
+                    </div>`;
+            }
         },
 
         navigate(route, params = {}) {
@@ -1278,6 +1372,9 @@ window.LMIcons = {
                     break;
                 case 'gantt-chart':
                     if (window.AdminGanttChart) AdminGanttChart.render(content, params);
+                    break;
+                case 'spec-search':
+                    this._launchSpecSearch(content);
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
