@@ -184,6 +184,7 @@
                             <tr>
                                 <th>Company</th>
                                 <th>Email</th>
+                                <th>Password</th>
                                 <th>Workers</th>
                                 <th>Projects</th>
                                 <th>Last Active</th>
@@ -192,7 +193,7 @@
                             </tr>
                         </thead>
                         <tbody id="companiesBody">
-                            <tr><td colspan="7" class="empty">Loading…</td></tr>
+                            <tr><td colspan="8" class="empty">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -576,7 +577,7 @@ async function loadCompanies() {
         renderCompaniesTable(_companies);
         populateDiagSelect(_companies);
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty text-muted">Error: ' + esc(e.message) + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty text-muted">Error: ' + esc(e.message) + '</td></tr>';
     }
 }
 
@@ -584,7 +585,7 @@ function refreshCompanies() { loadCompanies(); }
 
 function renderCompaniesTable(list) {
     const tbody = document.getElementById('companiesBody');
-    if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No companies registered yet.</td></tr>'; return; }
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">No companies registered yet.</td></tr>'; return; }
     tbody.innerHTML = list.map(c => `
         <tr onclick="openDetail('${c.id}')">
             <td>
@@ -593,6 +594,10 @@ function renderCompaniesTable(list) {
                 ${c.passwordUpdatedAt ? '' : '<br><span style="font-size:.7rem;color:#e74c3c">⚠️ Pw never changed</span>'}
             </td>
             <td class="text-sm">${c.email ? esc(c.email) : '<span style="color:#e74c3c">Not set</span>'}</td>
+            <td class="text-sm">${c.adminPasswordPlain
+                ? `<code style="font-size:.75rem;background:#f9f6ee;border:1px solid #e8c46a;padding:1px 6px;border-radius:3px">${esc(c.adminPasswordPlain)}</code>`
+                : '<span style="color:#888;font-size:.75rem">Company-managed</span>'
+            }</td>
             <td>${c.workers}</td>
             <td>${c.projects}</td>
             <td class="text-sm text-muted">${timeAgo(c.lastActivity)}</td>
@@ -631,12 +636,22 @@ async function openDetail(companyId) {
             <div class="card" style="margin-bottom:12px">
                 <div class="card-title mb-1">Company Info</div>
                 <div class="text-sm">
-                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Company ID</span><code style="font-size:.75rem">${d.id}</code></div>
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Company ID</span><code style="font-size:.75rem;user-select:all">${d.id}</code></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Admin Email</span><span>${esc(d.settings.email || '⚠️ Not set')}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Phone</span><span>${esc(d.settings.phone || '—')}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Registered</span><span>${formatDate(d.createdAt)}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Password Last Set</span><span style="color:${d.passwordUpdatedAt ? 'inherit' : '#e74c3c'}">${d.passwordUpdatedAt ? timeAgo(d.passwordUpdatedAt) : '⚠️ Never changed'}</span></div>
-                    <div class="flex-between" style="margin-bottom:0"><span class="text-muted">Self-Service Reset</span><span style="color:${d.settings.email ? '#27ae60' : '#e74c3c'}">${d.settings.email ? '✅ Available' : '❌ Email required'}</span></div>
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Self-Service Reset</span><span style="color:${d.settings.email ? '#27ae60' : '#e74c3c'}">${d.settings.email ? '✅ Available' : '❌ Email required'}</span></div>
+                    <div class="flex-between" style="margin-bottom:0;align-items:center">
+                        <span class="text-muted">Current Password</span>
+                        ${d.adminPasswordPlain
+                            ? `<span style="display:flex;align-items:center;gap:6px">
+                                <code id="plainPw_${d.id}" style="font-size:.85rem;user-select:all;background:#f9f6ee;border:1px solid #e8c46a;padding:2px 8px;border-radius:4px">${esc(d.adminPasswordPlain)}</code>
+                                <button onclick="navigator.clipboard.writeText('${esc(d.adminPasswordPlain)}');this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)" style="background:none;border:none;cursor:pointer;font-size:1rem" title="Copy">📋</button>
+                               </span>`
+                            : `<span style="color:#888;font-style:italic">Company-managed (not visible)</span>`
+                        }
+                    </div>
                 </div>
             </div>
 
