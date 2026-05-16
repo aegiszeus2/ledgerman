@@ -423,7 +423,7 @@ window.AdminSettings = {
             setTimeout(function() { self._startWizard(container); }, 300);
         }
 
-        // Render module toggles
+        // Render module toggles — loads from canonical backend source
         self._renderModules(container);
     },
 
@@ -462,71 +462,96 @@ window.AdminSettings = {
 
     _renderModules(container) {
         const self = this;
-        const settings = AppData.getSettings();
-        const savedModules = settings.modules || {};
         const el = container.querySelector('#modulesContainer');
         if (!el) return;
 
-        // Group by category
-        const groups = {};
-        self._MODULE_DEFS.forEach(function(mod) {
-            if (!groups[mod.category]) groups[mod.category] = [];
-            groups[mod.category].push(mod);
-        });
+        // Show loading state while fetching from canonical backend source
+        el.innerHTML = '<div style="color:var(--text2);font-size:.85rem;padding:8px 0">Loading module settings…</div>';
 
-        // Default enabled state: use saved value, fallback to built=true → false, built=false → false
-        function isEnabled(key) {
-            if (savedModules[key] !== undefined) return savedModules[key];
-            const def = self._MODULE_DEFS.find(function(m) { return m.key === key; });
-            return def ? false : false; // all default to off unless saved
-        }
+        // Fetch canonical module state from backend (companies.settings_json)
+        AppData.getCompanyModulesFromServer().then(function(data) {
+            const permitted = data.permitted || {};     // SuperAdmin's permission gate
+            const enabledModules = data.enabled || {};  // Company admin's current selections
 
-        let html = '';
-        Object.keys(groups).forEach(function(cat) {
-            html += '<div style="margin-bottom:20px">';
-            html += '<div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:10px">' + Utils.escapeHtml(cat) + '</div>';
-            groups[cat].forEach(function(mod) {
-                const enabled = isEnabled(mod.key);
-                const soon = !mod.built;
-                html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">';
-                // Toggle
-                html += '<label class="module-toggle" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">';
-                html += '<input type="checkbox" data-module-key="' + mod.key + '" ' + (enabled ? 'checked' : '') + (soon ? ' disabled' : '') + ' style="opacity:0;width:0;height:0">';
-                html += '<span style="position:absolute;cursor:' + (soon ? 'not-allowed' : 'pointer') + ';top:0;left:0;right:0;bottom:0;background:' + (enabled ? 'var(--primary)' : 'var(--border)') + ';border-radius:22px;transition:.2s" class="module-slider" data-key="' + mod.key + '"></span>';
-                html += '<span style="position:absolute;content:\'\';height:16px;width:16px;left:' + (enabled ? '21px' : '3px') + ';bottom:3px;background:white;border-radius:50%;transition:.2s" class="module-knob" data-key="' + mod.key + '"></span>';
-                html += '</label>';
-                // Text
-                html += '<div style="flex:1;min-width:0">';
-                html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-                html += '<span style="font-size:.875rem;font-weight:500' + (soon ? ';color:var(--text2)' : '') + '">' + Utils.escapeHtml(mod.name) + '</span>';
-                if (soon) html += '<span style="font-size:.7rem;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:1px 8px;color:var(--text2)">Coming Soon</span>';
-                html += '</div>';
-                html += '<div style="font-size:.78rem;color:var(--text2);margin-top:2px">' + Utils.escapeHtml(mod.desc) + '</div>';
-                html += '</div>';
+            // Group by category
+            const groups = {};
+            self._MODULE_DEFS.forEach(function(mod) {
+                if (!groups[mod.category]) groups[mod.category] = [];
+                groups[mod.category].push(mod);
+            });
+
+            // A module is enabled if the company has it on AND it's not denied by superadmin
+            function isEnabled(key) {
+                return !!enabledModules[key];
+            }
+
+            // A module is blocked when permitted_modules is configured and explicitly denies it
+            function isBlocked(key) {
+                if (!Object.keys(permitted).length) return false; // not configured — open
+                return permitted[key] === false;
+            }
+
+            let html = '';
+            Object.keys(groups).forEach(function(cat) {
+                html += '<div style="margin-bottom:20px">';
+                html += '<div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:10px">' + Utils.escapeHtml(cat) + '</div>';
+                groups[cat].forEach(function(mod) {
+                    const enabled = isEnabled(mod.key);
+                    const blocked = isBlocked(mod.key);
+                    const soon    = !mod.built;
+                    const locked  = soon || blocked; // disabled toggle for coming-soon OR admin-blocked
+                    html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">';
+                    // Toggle
+                    html += '<label class="module-toggle" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">';
+                    html += '<input type="checkbox" data-module-key="' + mod.key + '" ' + (enabled ? 'checked' : '') + (locked ? ' disabled' : '') + ' style="opacity:0;width:0;height:0">';
+                    html += '<span style="position:absolute;cursor:' + (locked ? 'not-allowed' : 'pointer') + ';top:0;left:0;right:0;bottom:0;background:' + (enabled ? 'var(--primary)' : 'var(--border)') + ';border-radius:22px;transition:.2s" class="module-slider" data-key="' + mod.key + '"></span>';
+                    html += '<span style="position:absolute;content:\'\';height:16px;width:16px;left:' + (enabled ? '21px' : '3px') + ';bottom:3px;background:white;border-radius:50%;transition:.2s" class="module-knob" data-key="' + mod.key + '"></span>';
+                    html += '</label>';
+                    // Text
+                    html += '<div style="flex:1;min-width:0">';
+                    html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+                    html += '<span style="font-size:.875rem;font-weight:500' + ((soon || blocked) ? ';color:var(--text2)' : '') + '">' + Utils.escapeHtml(mod.name) + '</span>';
+                    if (blocked) html += '<span style="font-size:.7rem;background:rgba(233,69,96,.1);border:1px solid var(--accent);border-radius:20px;padding:1px 8px;color:var(--accent)">Not available</span>';
+                    else if (soon) html += '<span style="font-size:.7rem;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:1px 8px;color:var(--text2)">Coming Soon</span>';
+                    html += '</div>';
+                    html += '<div style="font-size:.78rem;color:var(--text2);margin-top:2px">' + Utils.escapeHtml(mod.desc) + '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                });
                 html += '</div>';
             });
-            html += '</div>';
-        });
 
-        el.innerHTML = html;
+            el.innerHTML = html;
 
-        // Toggle interaction
-        el.querySelectorAll('input[data-module-key]').forEach(function(checkbox) {
-            checkbox.addEventListener('change', function() {
-                const key = this.getAttribute('data-module-key');
-                const val = this.checked;
-                // Update slider + knob visuals
-                const slider = el.querySelector('.module-slider[data-key="' + key + '"]');
-                const knob   = el.querySelector('.module-knob[data-key="' + key + '"]');
-                if (slider) slider.style.background = val ? 'var(--primary)' : 'var(--border)';
-                if (knob)   knob.style.left = val ? '21px' : '3px';
-                // Persist
-                const current = AppData.getSettings();
-                const modules = Object.assign({}, current.modules || {});
-                modules[key] = val;
-                AppData.saveSettings(Object.assign({}, current, { modules: modules }));
-                Utils.showToast((val ? 'Enabled' : 'Disabled') + ': ' + key.replace(/_/g, ' '));
+            // Toggle interaction — saves to canonical backend (companies.settings_json)
+            el.querySelectorAll('input[data-module-key]').forEach(function(checkbox) {
+                checkbox.addEventListener('change', async function() {
+                    const key = this.getAttribute('data-module-key');
+                    const val = this.checked;
+                    // Optimistic visual update
+                    const slider = el.querySelector('.module-slider[data-key="' + key + '"]');
+                    const knob   = el.querySelector('.module-knob[data-key="' + key + '"]');
+                    if (slider) slider.style.background = val ? 'var(--primary)' : 'var(--border)';
+                    if (knob)   knob.style.left = val ? '21px' : '3px';
+                    // Persist to canonical source (companies.settings_json.modules)
+                    try {
+                        const latest = await AppData.getCompanyModulesFromServer();
+                        const modules = Object.assign({}, latest.enabled || {});
+                        modules[key] = val;
+                        await AppData.saveCompanyModulesAsync(modules);
+                        Utils.showToast((val ? 'Enabled' : 'Disabled') + ': ' + key.replace(/_/g, ' '));
+                    } catch (err) {
+                        // Revert visual on failure
+                        if (slider) slider.style.background = val ? 'var(--border)' : 'var(--primary)';
+                        if (knob)   knob.style.left = val ? '3px' : '21px';
+                        this.checked = !val;
+                        Utils.showToast(err.message || 'Failed to save module setting', 'error');
+                    }
+                });
             });
+
+        }).catch(function(err) {
+            el.innerHTML = '<div style="color:var(--accent);font-size:.85rem;padding:8px 0">Could not load module settings: ' + Utils.escapeHtml(err.message) + '</div>';
         });
     },
 

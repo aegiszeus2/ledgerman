@@ -30,7 +30,8 @@ window.LMIcons = {
         currentProjectId: null, // for project detail views
         _loginAttempts: 0,
         _loginLockoutUntil: 0,
-        _modules: {},          // populated by fetchModules() — platform-level module flags
+        _modules: {},          // populated by fetchModules() — platform-level module flags (spec search, AI)
+        _featureModules: {},   // populated by fetchModules() — company feature toggles (nav modules)
         _specSearchUrl: '',    // deprecated — kept for backwards compat, no longer used
 
         init() {
@@ -1012,7 +1013,11 @@ window.LMIcons = {
         // ============ ADMIN PANEL ============
 
         _buildNavHtml() {
-            const m = (AppData.getSettings().modules) || {};
+            // Use canonical module state from companies.settings_json (synced with LittleShield Admin).
+            // Falls back to legacy settings.data_json.modules when backend hasn't populated _featureModules yet.
+            const canonical = this._featureModules;
+            const legacy = (AppData.getSettings().modules) || {};
+            const m = Object.keys(canonical).length ? canonical : legacy;
             const on = (key, def) => (m[key] !== undefined ? m[key] : def);
             const ic = (key) => `<span class="nav-icon">${LMIcons[key] || ''}</span>`;
             const item = (route, iconKey, label, tooltip, extra) =>
@@ -1067,17 +1072,32 @@ window.LMIcons = {
         },
 
         async fetchModules() {
-            // Fetch platform-level module flags from /api/company/modules
-            // (separate from settings.modules which is the local feature-flag set)
+            // Fetch platform-level module flags (/api/company/modules — spec search, AI)
+            // AND canonical feature module state (/api/company/settings/modules — nav toggles).
+            // Both sources live in companies.settings_json — single canonical DB record.
+            const jwt = AppData.getJwt();
+            if (!jwt) return;
+            const headers = { 'Authorization': 'Bearer ' + jwt };
+
+            // Platform-level flags (spec search, AI assistant)
             try {
-                const res = await fetch(AppData.API_BASE + '/api/company/modules', {
-                    headers: { 'Authorization': 'Bearer ' + AppData.getJwt() }
-                });
-                if (!res.ok) return;
-                const data = await res.json();
-                this._modules = data;
+                const res = await fetch(AppData.API_BASE + '/api/company/modules', { headers });
+                if (res.ok) {
+                    this._modules = await res.json();
+                }
             } catch (e) {
-                console.warn('[Ledgerman] fetchModules failed:', e.message);
+                console.warn('[Ledgerman] fetchModules (platform) failed:', e.message);
+            }
+
+            // Feature module state (nav toggles — canonical: companies.settings_json.modules)
+            try {
+                const res2 = await fetch(AppData.API_BASE + '/api/company/settings/modules', { headers });
+                if (res2.ok) {
+                    const data2 = await res2.json();
+                    this._featureModules = data2.enabled || {};
+                }
+            } catch (e) {
+                console.warn('[Ledgerman] fetchModules (features) failed:', e.message);
             }
         },
 

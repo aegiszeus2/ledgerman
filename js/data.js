@@ -847,6 +847,34 @@ async function changeAdminPassword(currentPassword, newPassword) {
     return resp;
 }
 
+// ─── Feature Modules (canonical source: companies.settings_json via backend) ──
+// LittleShield Admin and company admin portal both read/write from the same
+// canonical source. SuperAdmin controls permitted_modules; company admin controls
+// the enabled (modules) state within what's permitted.
+
+async function getCompanyModulesFromServer() {
+    if (!isApiMode() || !getJwt()) return { permitted: {}, enabled: {} };
+    try {
+        const resp = await _apiFetch('/api/company/settings/modules');
+        if (resp && !resp.error) return resp;
+    } catch (e) {
+        console.warn('[API] getCompanyModulesFromServer:', e.message);
+    }
+    return { permitted: {}, enabled: {} };
+}
+
+async function saveCompanyModulesAsync(modules) {
+    if (!isApiMode() || !getJwt()) {
+        throw new Error('Must be logged in to save module settings');
+    }
+    const resp = await _apiFetch('/api/company/settings/modules', {
+        method: 'PUT',
+        body: JSON.stringify({ modules })
+    });
+    if (resp && resp.error) throw new Error(resp.error);
+    return resp;
+}
+
 // ─── First Run / Setup ─────────────────────────────────────────────────────
 function isFirstRun() {
     // API mode: first run if no companyId stored on this device
@@ -1197,6 +1225,8 @@ window.AppData = {
     editSubmissionAsync,
     // Settings
     getSettings, saveSettings, getCompanyName,
+    // Feature modules (canonical source: companies.settings_json via backend)
+    getCompanyModulesFromServer, saveCompanyModulesAsync,
     // Workers
     getWorkers, getWorker, saveWorker, deleteWorker, getWorkerByPin,
     // Clients
