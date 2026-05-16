@@ -535,15 +535,15 @@ window.LMIcons = {
         // ============ PASSWORD RESET (ADMIN) ============
 
         _showPasswordReset() {
-            const settings = AppData.getSettings();
-            const adminEmail = settings.email;
+            // Use server-backed reset flow (SMTP via LittleShield mail dispatcher).
+            // EmailJS is no longer used — EmailService.isConfigured() check removed.
+            const companyId = AppData.getCompanyId();
+            const companyNameInput = document.getElementById('adminCompanyName');
+            const companyName = companyNameInput ? companyNameInput.value.trim() : '';
 
-            if (!EmailService.isConfigured()) {
-                Utils.showToast('Email service not configured. Contact your administrator.', 'error');
-                return;
-            }
-            if (!adminEmail) {
-                Utils.showToast('No company email set in Settings. Cannot send reset code.', 'error');
+            const resetPayload = companyId ? { companyId } : (companyName ? { companyName } : null);
+            if (!resetPayload) {
+                Utils.showToast('Enter your company name first, then click Forgot Password.', 'error');
                 return;
             }
 
@@ -553,9 +553,8 @@ window.LMIcons = {
                     <div class="login-card">
                         <div style="font-size:2rem;margin-bottom:8px">🔑</div>
                         <h2>Reset Admin Password</h2>
-                        <p class="text-muted">We'll send a verification code to the company email on file.</p>
+                        <p class="text-muted">We'll send a 6-digit code to the company email on file.</p>
                         <div id="resetStep1">
-                            <p style="font-size:.9rem;margin-bottom:16px">Code will be sent to: <strong>${Utils.escapeHtml(adminEmail)}</strong></p>
                             <button class="btn btn-primary btn-block" id="sendResetCode">Send Reset Code</button>
                             <button class="btn btn-secondary btn-block mt-1" id="backToLogin">Back to Login</button>
                         </div>
@@ -564,20 +563,21 @@ window.LMIcons = {
                                 <div class="form-group" style="margin-bottom:12px">
                                     <label>Verification Code</label>
                                     <input type="text" class="form-control" id="resetCodeInput"
-                                        placeholder="000 000" maxlength="7" inputmode="numeric"
+                                        placeholder="000000" maxlength="6" inputmode="numeric"
+                                        autocomplete="one-time-code"
                                         style="letter-spacing:6px;text-align:center;font-size:1.4rem;padding:14px">
                                 </div>
                                 <div class="form-group" style="margin-bottom:12px">
                                     <label>New Password</label>
-                                    <div style="position:relative"><input type="password" class="form-control" id="resetNewPw" required minlength="12" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="resetNewPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
-                                    <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Min 12 chars, mixed case, number, special character</p>
+                                    <input type="password" class="form-control" id="resetNewPw" required minlength="8" autocomplete="new-password">
+                                    <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Minimum 8 characters</p>
                                 </div>
                                 <div class="form-group" style="margin-bottom:12px">
                                     <label>Confirm New Password</label>
-                                    <div style="position:relative"><input type="password" class="form-control" id="resetConfirmPw" required minlength="12" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="resetConfirmPw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
+                                    <input type="password" class="form-control" id="resetConfirmPw" required minlength="8" autocomplete="new-password">
                                 </div>
                                 <div class="form-error" id="resetError" style="display:none"></div>
-                                <button type="submit" class="btn btn-primary btn-block">Reset Password</button>
+                                <button type="submit" class="btn btn-primary btn-block" id="confirmResetBtn">Reset Password</button>
                                 <button type="button" class="btn btn-ghost btn-block mt-1" id="resendResetCode">Resend Code</button>
                             </form>
                         </div>
@@ -587,69 +587,92 @@ window.LMIcons = {
 
             document.getElementById('backToLogin').onclick = () => this.showAdminLogin();
 
-            document.getElementById('sendResetCode').onclick = async () => {
-                const btn = document.getElementById('sendResetCode');
+            // resolvedCompanyId filled in after first successful request-reset (backend may return it)
+            let resolvedCompanyId = resetPayload.companyId || '';
+
+            const doRequestReset = async (btn, btnLabel) => {
                 btn.disabled = true; btn.textContent = 'Sending…';
                 try {
-                    await EmailService.sendPasswordReset(adminEmail, 'Admin');
+                    const res = await fetch(AppData.API_BASE + '/api/auth/admin/request-reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(resetPayload)
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || data.error) {
+                        Utils.showToast(data.error || 'Failed to send reset code. Try again.', 'error');
+                        btn.disabled = false; btn.textContent = btnLabel;
+                        return false;
+                    }
+                    if (data.companyId) resolvedCompanyId = data.companyId;
+                    return true;
+                } catch (err) {
+                    Utils.showToast('Network error. Check your connection and try again.', 'error');
+                    btn.disabled = false; btn.textContent = btnLabel;
+                    return false;
+                }
+            };
+
+            document.getElementById('sendResetCode').onclick = async () => {
+                const btn = document.getElementById('sendResetCode');
+                const ok = await doRequestReset(btn, 'Send Reset Code');
+                if (ok) {
                     document.getElementById('resetStep1').style.display = 'none';
                     document.getElementById('resetStep2').style.display = 'block';
                     document.getElementById('resetCodeInput').focus();
-                    Utils.showToast('Reset code sent to ' + adminEmail);
-                } catch (err) {
-                    btn.disabled = false; btn.textContent = 'Send Reset Code';
-                    Utils.showToast(err.message, 'error');
+                    Utils.showToast('Reset code sent to the company email on file.');
                 }
             };
 
             const resendBtn = document.getElementById('resendResetCode');
             if (resendBtn) {
                 resendBtn.onclick = async () => {
-                    resendBtn.disabled = true; resendBtn.textContent = 'Sending…';
-                    try {
-                        await EmailService.sendPasswordReset(adminEmail, 'Admin');
-                        Utils.showToast('New code sent!');
-                    } catch (err) {
-                        Utils.showToast(err.message, 'error');
-                    }
-                    resendBtn.disabled = false; resendBtn.textContent = 'Resend Code';
+                    await doRequestReset(resendBtn, 'Resend Code');
+                    Utils.showToast('New code sent!');
                 };
             }
 
-            document.getElementById('resetCodeForm').onsubmit = (e) => {
+            document.getElementById('resetCodeForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const code = (document.getElementById('resetCodeInput').value || '').replace(/\s/g, '');
                 const newPw = document.getElementById('resetNewPw').value;
                 const confirmPw = document.getElementById('resetConfirmPw').value;
                 const errEl = document.getElementById('resetError');
+                const submitBtn = document.getElementById('confirmResetBtn');
                 errEl.style.display = 'none';
 
-                // Verify code
-                const result = EmailService.verifyCode(adminEmail, code);
-                if (!result.valid) {
-                    errEl.textContent = result.error;
-                    errEl.style.display = 'block';
-                    return;
-                }
-
-                // Validate password strength
-                const pwCheck = Utils.validatePassword(newPw);
-                if (!pwCheck.valid) {
-                    errEl.textContent = 'Password requirements: ' + pwCheck.errors.join(', ');
-                    errEl.style.display = 'block';
-                    return;
-                }
                 if (newPw !== confirmPw) {
                     errEl.textContent = 'Passwords do not match.';
                     errEl.style.display = 'block';
                     return;
                 }
+                if (newPw.length < 8) {
+                    errEl.textContent = 'Password must be at least 8 characters.';
+                    errEl.style.display = 'block';
+                    return;
+                }
 
-                // Set new password
-                AppData.setAdminPassword(newPw);
-                AppData.addAuditLog('System', 'Password Reset', 'Admin password reset via email');
-                Utils.showToast('Password reset successfully! Please log in.');
-                this.showAdminLogin();
+                submitBtn.disabled = true; submitBtn.textContent = 'Resetting…';
+                try {
+                    const res = await fetch(AppData.API_BASE + '/api/auth/admin/confirm-reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ companyId: resolvedCompanyId, code, newPassword: newPw })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || data.error) {
+                        errEl.textContent = data.error || 'Reset failed. Try requesting a new code.';
+                        errEl.style.display = 'block';
+                        submitBtn.disabled = false; submitBtn.textContent = 'Reset Password';
+                        return;
+                    }
+                    Utils.showToast('Password reset successfully! Please log in.');
+                    this.showAdminLogin();
+                } catch (err) {
+                    errEl.textContent = 'Network error. Try again.';
+                    errEl.style.display = 'block';
+                    submitBtn.disabled = false; submitBtn.textContent = 'Reset Password';
+                }
             };
         },
 
