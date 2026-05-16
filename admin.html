@@ -757,8 +757,7 @@ async function updateCompanyPassword(id) {
         });
         toast('Password updated.', 'success');
         pwdField.value = '';
-        pwdField.type = 'password';
-        document.querySelector(`[data-toggle="${fieldId}"]`).textContent = 'Show';
+        await openDetail(id);
     } catch(e) {
         toast('Password update failed: ' + e.message, 'error');
     }
