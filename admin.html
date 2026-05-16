@@ -632,13 +632,6 @@ async function openDetail(companyId) {
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Email</span><span>${esc(d.settings.email || '—')}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Phone</span><span>${esc(d.settings.phone || '—')}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Registered</span><span>${formatDate(d.createdAt)}</span></div>
-                    <div class="flex-between" style="margin-bottom:4px;align-items:flex-start">
-                        <span class="text-muted">Admin Password</span>
-                        <div class="password-field-wrap" style="gap:4px;width:auto;margin-left:auto">
-                            <input type="password" id="companyPassword_${d.id}" placeholder="••••••••" maxlength="100" style="flex:1;max-width:120px;padding-right:40px" autocomplete="off">
-                            <button type="button" class="password-toggle company-pwd-toggle" data-toggle="companyPassword_${d.id}" data-company="${d.id}" style="z-index:10;pointer-events:all;position:absolute;right:8px">Show</button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -648,7 +641,7 @@ async function openDetail(companyId) {
                     <div style="flex:1">
                         <div class="text-sm text-muted" style="margin-bottom:6px">Update company admin password</div>
                         <div class="password-field-wrap">
-                            <input type="password" id="companyPassword_${d.id}" placeholder="New password" style="padding-right:40px">
+                            <input type="password" id="companyPassword_${d.id}" placeholder="New password" style="padding-right:40px" autocomplete="new-password">
                             <button type="button" class="password-toggle" data-toggle="companyPassword_${d.id}">Show</button>
                         </div>
                     </div>
@@ -708,54 +701,7 @@ function closeDetail() {
     document.getElementById('detailBackdrop').classList.remove('active');
 }
 
-// Handle company password field toggle and save
-document.addEventListener('click', async function(e) {
-    if (e.target.classList.contains('company-pwd-toggle')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const toggle = e.target;
-        const inputId = toggle.dataset.toggle;
-        const input = document.getElementById(inputId);
-        if (!input) return;
-        
-        if (input.type === 'password') {
-            input.type = 'text';
-            toggle.textContent = 'Hide';
-        } else {
-            input.type = 'password';
-            toggle.textContent = 'Show';
-        }
-    }
-});
-
-// Save password when user presses Enter or loses focus
-document.addEventListener('blur', async function(e) {
-    if (e.target.id && e.target.id.startsWith('companyPassword_')) {
-        const companyId = e.target.id.replace('companyPassword_', '');
-        const newPassword = e.target.value.trim();
-        
-        if (!newPassword) {
-            e.target.value = '';
-            return;
-        }
-        
-        try {
-            const result = await apiFetch('/api/superadmin/companies/' + companyId + '/reset-password', {
-                method: 'POST',
-                body: JSON.stringify({ password: newPassword })
-            });
-            if (result.success) {
-                toast('Password updated', 'success');
-                e.target.value = '';
-                e.target.type = 'password';
-                e.target.nextElementSibling.textContent = 'Show';
-            }
-        } catch (err) {
-            toast('Failed to update password: ' + err.message, 'error');
-            e.target.value = '';
-        }
-    }
-}, true);
+// (company-pwd-toggle and blur-autosave handlers removed — use the Update button)
 
 async function deleteCompany(id, name) {
     if (!confirm(`DELETE "${name}" and ALL its data?\n\nThis cannot be undone.`)) return;
