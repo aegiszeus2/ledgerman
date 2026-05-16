@@ -72,15 +72,23 @@ function isTokenExpired(token) {
 
 /**
  * clearAuthState()
- * Removes all session/persistent auth keys so the login form is shown clean.
- * Does NOT clear data-cache keys (ledgeman_workers, ledgeman_projects, etc.)
- * or offline settings — only the auth identifiers.
+ * Removes all session/persistent auth keys and the entire entity cache.
+ * SECURITY: entity localStorage keys are cleared on every company switch to prevent
+ * the orphan recovery mechanism from injecting a previous company's data into the
+ * next company that logs in on the same browser (tenant isolation fix 2026-05-16).
  */
 function clearAuthState() {
     try {
         sessionStorage.removeItem('ledgeman_jwt');
         sessionStorage.removeItem('ledgeman_companyId');
         localStorage.removeItem('ledgeman_persistent_login');
+        // SECURITY FIX: reset in-memory cache and wipe all entity localStorage keys
+        // to prevent cross-company data injection via orphan recovery on next login.
+        _cache = null;
+        _SYNC_ENTITY_KEYS.forEach(function(k) {
+            try { localStorage.removeItem('ledgeman_' + k); } catch(e) {}
+        });
+        try { localStorage.removeItem('ledgeman_settings'); } catch(e) {}
     } catch (e) {
         console.warn('[Ledgerman] clearAuthState failed:', e.message);
     }
@@ -314,7 +322,12 @@ async function syncFromServer() {
         // ── Orphan recovery ──────────────────────────────────────────────────
         // If an item was saved locally but the server confirms it's missing (async race),
         // add it back to cache immediately and re-push to backend.
+        // SECURITY: items are only recovered if they belong to the current company
+        // (checked via companyId/company_id field in the item). Items from a previous
+        // company session are silently discarded — they should not exist in localStorage
+        // after clearAuthState() runs on logout, but this guard provides defense-in-depth.
         if (isApiMode() && getJwt()) {
+            var _currentCompanyId = getCompanyId();
             var _orphanTypes = ['projects','tasks','clients','subtasks','expenses',
                 'invoices','payments','vendors','estimates','daily_reports','punch_items',
                 'equipment','equipmentLogs','budget_versions','budget_items'];
@@ -322,6 +335,13 @@ async function syncFromServer() {
                 var serverIds = new Set((_cache[key] || []).map(function(i) { return i.id; }));
                 (_preSyncLocal[key] || []).forEach(function(localItem) {
                     if (localItem && localItem.id && !serverIds.has(localItem.id)) {
+                        // SECURITY: reject cross-company items — if item has a companyId field
+                        // that doesn't match the current session, it belongs to another tenant.
+                        var itemCompanyId = localItem.companyId || localItem.company_id || '';
+                        if (itemCompanyId && itemCompanyId !== _currentCompanyId) {
+                            console.warn('[Ledgerman] Orphan recovery BLOCKED — cross-company item rejected:', key, localItem.id, 'belongs to', itemCompanyId);
+                            return;
+                        }
                         console.log('[Ledgerman] Recovering orphaned ' + key + ' item:', localItem.id);
                         if (_cache[key]) { _cache[key].push(localItem); setData(key, _cache[key]); }
                         _apiFetch('/api/' + key, { method: 'POST', body: JSON.stringify(localItem) })
