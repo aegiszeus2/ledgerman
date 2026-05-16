@@ -183,6 +183,7 @@
                         <thead>
                             <tr>
                                 <th>Company</th>
+                                <th>Email</th>
                                 <th>Workers</th>
                                 <th>Projects</th>
                                 <th>Last Active</th>
@@ -191,7 +192,7 @@
                             </tr>
                         </thead>
                         <tbody id="companiesBody">
-                            <tr><td colspan="6" class="empty">Loading…</td></tr>
+                            <tr><td colspan="7" class="empty">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -569,13 +570,13 @@ function renderRecentCompanies(list) {
 // ── Companies ────────────────────────────────────────────────
 async function loadCompanies() {
     const tbody = document.getElementById('companiesBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
     try {
         _companies = await apiFetch('/api/superadmin/companies');
         renderCompaniesTable(_companies);
         populateDiagSelect(_companies);
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty text-muted">Error: ' + esc(e.message) + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty text-muted">Error: ' + esc(e.message) + '</td></tr>';
     }
 }
 
@@ -583,13 +584,15 @@ function refreshCompanies() { loadCompanies(); }
 
 function renderCompaniesTable(list) {
     const tbody = document.getElementById('companiesBody');
-    if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No companies registered yet.</td></tr>'; return; }
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No companies registered yet.</td></tr>'; return; }
     tbody.innerHTML = list.map(c => `
         <tr onclick="openDetail('${c.id}')">
             <td>
                 <strong>${esc(c.name)}</strong>
                 <br><span class="text-sm text-muted" style="font-family:monospace">${c.id}</span>
+                ${c.passwordUpdatedAt ? '' : '<br><span style="font-size:.7rem;color:#e74c3c">⚠️ Pw never changed</span>'}
             </td>
+            <td class="text-sm">${c.email ? esc(c.email) : '<span style="color:#e74c3c">Not set</span>'}</td>
             <td>${c.workers}</td>
             <td>${c.projects}</td>
             <td class="text-sm text-muted">${timeAgo(c.lastActivity)}</td>
@@ -629,9 +632,11 @@ async function openDetail(companyId) {
                 <div class="card-title mb-1">Company Info</div>
                 <div class="text-sm">
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Company ID</span><code style="font-size:.75rem">${d.id}</code></div>
-                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Email</span><span>${esc(d.settings.email || '—')}</span></div>
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Admin Email</span><span>${esc(d.settings.email || '⚠️ Not set')}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Phone</span><span>${esc(d.settings.phone || '—')}</span></div>
                     <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Registered</span><span>${formatDate(d.createdAt)}</span></div>
+                    <div class="flex-between" style="margin-bottom:4px"><span class="text-muted">Password Last Set</span><span style="color:${d.passwordUpdatedAt ? 'inherit' : '#e74c3c'}">${d.passwordUpdatedAt ? timeAgo(d.passwordUpdatedAt) : '⚠️ Never changed'}</span></div>
+                    <div class="flex-between" style="margin-bottom:0"><span class="text-muted">Self-Service Reset</span><span style="color:${d.settings.email ? '#27ae60' : '#e74c3c'}">${d.settings.email ? '✅ Available' : '❌ Email required'}</span></div>
                 </div>
             </div>
 
