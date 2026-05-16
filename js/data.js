@@ -71,6 +71,36 @@ function isTokenExpired(token) {
 }
 
 /**
+ * clearEntityCache()
+ * Wipes all company entity data from localStorage and resets the in-memory cache.
+ *
+ * SECURITY: Must be called on every logout and session timeout.
+ * Without this, entity data (projects, equipment, etc.) from Company A
+ * lingers in localStorage when Company B logs in on the same browser.
+ * The orphan-recovery logic in syncFromServer() would then detect Company A's
+ * items as "missing from the server" and POST them into Company B's account —
+ * causing confirmed cross-company data contamination (Belfort → Cyprus Mechanical).
+ */
+function clearEntityCache() {
+    try {
+        var entityKeys = [
+            'workers','projects','tasks','clients','subtasks','expenses','submissions',
+            'invoices','payments','vendors','invites','estimates','auditLog','daily_reports',
+            'punch_items','equipment','equipmentLogs','notifications','budget_versions','budget_items',
+            'settings'
+        ];
+        entityKeys.forEach(function(k) {
+            localStorage.removeItem('ledgeman_' + k);
+        });
+        // Reset in-memory cache — no stale tenant data should survive after logout
+        _cache = null;
+        console.log('[Ledgerman] Entity cache cleared (cross-company contamination guard)');
+    } catch (e) {
+        console.warn('[Ledgerman] clearEntityCache failed:', e.message);
+    }
+}
+
+/**
  * clearAuthState()
  * Removes all session/persistent auth keys and the entire entity cache.
  * SECURITY: entity localStorage keys are cleared on every company switch to prevent
@@ -82,13 +112,8 @@ function clearAuthState() {
         sessionStorage.removeItem('ledgeman_jwt');
         sessionStorage.removeItem('ledgeman_companyId');
         localStorage.removeItem('ledgeman_persistent_login');
-        // SECURITY FIX: reset in-memory cache and wipe all entity localStorage keys
-        // to prevent cross-company data injection via orphan recovery on next login.
-        _cache = null;
-        _SYNC_ENTITY_KEYS.forEach(function(k) {
-            try { localStorage.removeItem('ledgeman_' + k); } catch(e) {}
-        });
-        try { localStorage.removeItem('ledgeman_settings'); } catch(e) {}
+        // Also clear entity data — prevents cross-company contamination on next login
+        clearEntityCache();
     } catch (e) {
         console.warn('[Ledgerman] clearAuthState failed:', e.message);
     }
@@ -283,6 +308,11 @@ var _SYNC_ENTITY_KEYS = [
 ];
 
 async function syncFromServer() {
+    // Capture the company ID at the START of sync — used to guard orphan recovery below.
+    // If the company changes between pre-sync capture and recovery (i.e. different company
+    // logs in on the same browser), we must not push stale items into the new company.
+    var _presyncCompanyId = getCompanyId();
+
     // Capture pre-sync localStorage for orphan recovery (items saved locally before refresh
     // but async POST hadn't completed — rescues them after server says they're missing)
     var _preSyncLocal = {};
@@ -322,12 +352,18 @@ async function syncFromServer() {
         // ── Orphan recovery ──────────────────────────────────────────────────
         // If an item was saved locally but the server confirms it's missing (async race),
         // add it back to cache immediately and re-push to backend.
-        // SECURITY: items are only recovered if they belong to the current company
-        // (checked via companyId/company_id field in the item). Items from a previous
-        // company session are silently discarded — they should not exist in localStorage
-        // after clearAuthState() runs on logout, but this guard provides defense-in-depth.
-        if (isApiMode() && getJwt()) {
-            var _currentCompanyId = getCompanyId();
+        //
+        // TWO-LAYER GUARD against cross-company contamination:
+        // 1. _presyncCompanyId check: skip recovery entirely if a different company logged
+        //    in between pre-sync capture and now (e.g. older client build that didn't clear cache)
+        // 2. Per-item companyId check: reject any individual item whose companyId field
+        //    doesn't match the current session (defense-in-depth for items with embedded IDs)
+        var _currentCompanyId = getCompanyId();
+        var _safeToRecover = isApiMode() && getJwt() &&
+                             _presyncCompanyId && _currentCompanyId &&
+                             _presyncCompanyId === _currentCompanyId;
+
+        if (_safeToRecover) {
             var _orphanTypes = ['projects','tasks','clients','subtasks','expenses',
                 'invoices','payments','vendors','estimates','daily_reports','punch_items',
                 'equipment','equipmentLogs','budget_versions','budget_items'];
@@ -351,6 +387,10 @@ async function syncFromServer() {
                     }
                 });
             });
+        } else if (_presyncCompanyId !== _currentCompanyId) {
+            console.warn('[Ledgerman] Orphan recovery skipped — company changed during sync.',
+                'Pre-sync:', _presyncCompanyId, 'Current:', _currentCompanyId,
+                '. This prevents cross-tenant data contamination.');
         }
 
         return _cache;
@@ -1142,7 +1182,7 @@ window.AppData = {
     API_BASE: API_BASE,
     // Auth / session
     getJwt, setJwt, getCompanyId, setCompanyId, isApiMode,
-    isTokenExpired, clearAuthState,
+    isTokenExpired, clearAuthState, clearEntityCache,
     getPersistentLogin, savePersistentLogin, clearPersistentLogin,
     apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin, apiVerify2FA,
     apiCreateInvite, apiGetInvite, apiUseInvite,

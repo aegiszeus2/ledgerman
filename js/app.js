@@ -1586,8 +1586,10 @@ window.LMIcons = {
             this.currentUser = null;
             this.currentView = null;
             this.currentProjectId = null;
-            AppData.setJwt(''); // clear JWT
-            AppData.clearPersistentLogin(); // explicit logout — clear "keep me signed in" too
+            // clearAuthState: clears JWT, companyId (sessionStorage), persistent login,
+            // AND all entity caches (localStorage) — prevents cross-company data contamination
+            // if a different tenant logs in on the same browser after this logout.
+            AppData.clearAuthState();
             Utils.stopSessionTimer();
             const app = document.getElementById('app');
             app.className = '';
@@ -1595,8 +1597,8 @@ window.LMIcons = {
         },
 
         // Called by the inactivity session timer — different from explicit logout.
-        // Clears the active session but preserves "Keep me signed in" in localStorage
-        // so the user is auto-restored on the next page load / browser open.
+        // Clears the active session AND entity cache, but preserves "Keep me signed in"
+        // so the user is auto-restored (with a fresh server sync) on next page load.
         _sessionTimeout() {
             if (this.currentUser) {
                 AppData.addAuditLog(this.currentUser.name, 'Session Timeout', '');
@@ -1604,7 +1606,9 @@ window.LMIcons = {
             this.currentUser = null;
             this.currentView = null;
             this.currentProjectId = null;
-            AppData.setJwt(''); // clear active JWT only
+            AppData.setJwt('');           // clear active JWT
+            AppData.clearEntityCache();   // clear entity data — prevents contamination if
+                                          // a different tenant logs in before page reload
             // Do NOT call AppData.clearPersistentLogin() — keep "Keep me signed in" intact
             Utils.stopSessionTimer();
             const app = document.getElementById('app');
