@@ -1,0 +1,14 @@
+{
+  "name": "ledgerman-browser-tests",
+  "version": "1.0.0",
+  "description": "Playwright browser tests for Ledgerman",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:mobile": "npx playwright test mobile-regression.spec.js --project=mobile-375 --project=mobile-390 --project=mobile-414",
+    "test:all": "npx playwright test",
+    "test:report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}
