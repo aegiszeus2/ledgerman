@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1a2744">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -33,11 +33,11 @@
       color: var(--text);
       font-size: 17px;
       -webkit-tap-highlight-color: transparent;
-      overflow: hidden;
+      overflow-x: hidden;
     }
 
     /* ── Screens ────────────────────────────────────── */
-    #app { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    #app { width: 100%; height: 100%; position: relative; overflow-x: hidden; }
     .screen {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
@@ -261,7 +261,7 @@
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      min-height: 40px;
+      min-height: 44px;
       display: flex; align-items: center;
       transition: background 0.1s, color 0.1s;
     }

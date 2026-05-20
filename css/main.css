@@ -601,9 +601,9 @@ input:-webkit-autofill:active {
   background-color: var(--bg-surface-hover);
 }
 
-.table td:last-child {
-  white-space: nowrap;
-}
+/* Last-column nowrap removed — was forcing horizontal scroll on tables
+   with text content in the final column. Action-button columns are
+   handled by .col-actions { white-space: nowrap } where needed. */
 
 /* --- Modals (dark — matches shell) --- */
 .modal-overlay {
@@ -669,6 +669,8 @@ input:-webkit-autofill:active {
 .modal-body {
   padding: 18px 22px;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   flex: 1;
 }
 
@@ -1444,11 +1446,15 @@ input:-webkit-autofill:active {
 }
 
 @media (max-width: 768px) {
-  /* Touch-friendly tap targets: minimum 44px height for buttons and inputs */
+  /* Touch-friendly tap targets: minimum 44px height for ALL button variants */
   .btn,
   .btn-primary,
   .btn-secondary,
   .btn-danger,
+  .btn-sm,
+  .btn-icon,
+  .btn-quiet,
+  .btn-ghost,
   button {
     min-height: 44px;
   }
@@ -1473,11 +1479,8 @@ input:-webkit-autofill:active {
     gap: var(--space-3, 12px);
   }
 
-  /* Ensure tables scroll horizontally instead of overflowing */
-  .table,
-  table {
-    min-width: 480px;
-  }
+  /* Tables: no forced min-width — let content determine width.
+     Horizontal scroll is handled by .table-responsive wrappers. */
 
   /* Wrap any bare table in a scrollable container */
   .card-body > table,
@@ -1496,9 +1499,16 @@ input:-webkit-autofill:active {
     box-sizing: border-box;
   }
 
-  /* Ensure modals don't overflow */
+  /* Ensure modals don't overflow — reduce overlay padding for small phones */
   .modal {
     padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Give modals full usable width on small phones (was 40px each side) */
+  .modal-overlay {
+    padding: 12px;
   }
 }
 

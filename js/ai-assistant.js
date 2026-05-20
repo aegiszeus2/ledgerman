@@ -501,7 +501,7 @@ window.AIAssistant = (function () {
         panel.style.cssText = [
             'position:fixed', 'bottom:148px', 'right:24px', 'z-index:8999',
             'width:380px', 'max-width:calc(100vw - 32px)',
-            'height:520px', 'max-height:calc(100vh - 160px)',
+            'height:520px', 'max-height:calc(100dvh - 160px)',
             'display:none', 'flex-direction:column',
             'background:var(--surface,#fff)', 'border-radius:16px',
             'box-shadow:0 8px 40px rgba(0,0,0,.2)', 'border:1px solid var(--border,#dde4e0)',
@@ -870,7 +870,7 @@ window.WorkerAIAssistant = (function () {
         panel.style.cssText = [
             'position:fixed', 'bottom:80px', 'right:24px', 'z-index:8999',
             'width:320px', 'max-width:calc(100vw - 32px)',
-            'height:460px', 'max-height:calc(100vh - 100px)',
+            'height:460px', 'max-height:calc(100dvh - 100px)',
             'display:none', 'flex-direction:column',
             'background:var(--surface,#fff)', 'border-radius:16px',
             'box-shadow:0 8px 40px rgba(0,0,0,.2)', 'border:1px solid var(--border,#dde4e0)',

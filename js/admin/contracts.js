@@ -336,8 +336,8 @@ window.AdminContracts = {
             '</div>' +
             '</div>' +
 
-            '<div class="card" style="overflow-x:auto;margin-bottom:16px">' +
-            '<table style="min-width:900px">' +
+            '<div class="card" style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:16px">' +
+            '<table style="min-width:600px">' +
             '<thead><tr style="font-size:.78rem">' +
             '<th style="min-width:40px">#</th>' +
             '<th style="min-width:200px">Description</th>' +
@@ -556,11 +556,11 @@ window.AdminContracts = {
             '<option value="time_and_material"' + (contract && contract.contractType === 'time_and_material' ? ' selected' : '') + '>Time &amp; Material</option>' +
             '<option value="mixed"' + (contract && contract.contractType === 'mixed' ? ' selected' : '') + '>Mixed</option>' +
             '</select></div>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">' +
             '<div class="form-group"><label>Original Value ($)</label><input type="number" id="cValue" value="' + (contract ? contract.originalValue || 0 : 0) + '" min="0" step="0.01"></div>' +
             '<div class="form-group"><label>Approved Changes ($)</label><input type="number" id="cChanges" value="' + (contract ? (contract.approvedChanges || 0) : 0) + '" step="0.01"></div>' +
             '</div>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">' +
             '<div class="form-group"><label>Holdback %</label><input type="number" id="cHoldback" value="' + (contract ? contract.holdbackPct || 10 : 10) + '" min="0" max="100" step="0.01"></div>' +
             '<div class="form-group"><label>Contract Date</label><input type="date" id="cDate" value="' + (contract ? (contract.contractDate || '') : '') + '"></div>' +
             '</div>' +
@@ -635,7 +635,7 @@ window.AdminContracts = {
             '<option value="unit_price_quantity"' + (item && item.billingMethod === 'unit_price_quantity' ? ' selected' : '') + '>Unit Price (Qty × Rate)</option>' +
             '<option value="time_and_material"' + (item && item.billingMethod === 'time_and_material' ? ' selected' : '') + '>Time &amp; Material</option>' +
             '</select></div>' +
-            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">' +
             '<div class="form-group"><label>UOM</label><input type="text" id="iUom" value="' + esc(item ? (item.uom || 'LS') : 'LS') + '" placeholder="LS, m2, hr..."></div>' +
             '<div class="form-group"><label>Contract Qty</label><input type="number" id="iQty" value="' + (item ? (item.contractQuantity || '') : '') + '" min="0" step="any" placeholder="optional"></div>' +
             '<div class="form-group"><label>Unit Rate ($)</label><input type="number" id="iRate" value="' + (item ? (item.unitRate || '') : '') + '" min="0" step="0.01" placeholder="optional"></div>' +

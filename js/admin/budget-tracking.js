@@ -720,7 +720,7 @@ window.AdminBudgetTracking = {
                     </div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:12px">
                     <div>
                         <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Quantity <span style="color:#e74c3c">*</span></label>
                         <input id="fi_qty" type="number" min="0" step="any" value="${item.quantity !== undefined ? item.quantity : 1}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">

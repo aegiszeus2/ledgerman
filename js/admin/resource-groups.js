@@ -57,9 +57,9 @@ window.ResourceGroups = (function () {
 
     function _renderPanel() {
         _container.innerHTML = `
-            <div style="display:flex;height:100%;min-height:400px">
+            <div style="display:flex;flex-wrap:wrap;min-height:400px;gap:0">
                 <!-- Sidebar list -->
-                <div style="width:220px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:8px">
+                <div style="flex:0 0 auto;width:min(220px,100%);border-right:1px solid var(--border);border-bottom:1px solid var(--border);overflow-y:auto;padding:8px">
                     <button class="btn-primary btn-sm" id="addGroupBtn" style="width:100%;margin-bottom:8px">+ New Crew</button>
                     ${_groups.length === 0
                         ? '<p class="text-muted" style="font-size:0.85rem;padding:4px">No crews yet.</p>'

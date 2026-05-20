@@ -310,7 +310,7 @@
 /* --- Dashboard Stats --- */
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-6);
 }
@@ -642,6 +642,7 @@
 .detail-panel-body {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: var(--space-5);
 }
 
@@ -735,10 +736,7 @@
   .admin-header .sidebar-toggle {
     display: flex;
   }
-
-  .dashboard-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  /* dashboard-stats uses auto-fit minmax — collapses naturally; no override needed */
 }
 
 /* Small devices: sidebar becomes overlay */
@@ -809,10 +807,7 @@
     display: none;
   }
 
-  .dashboard-stats {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-2);
-  }
+  /* dashboard-stats uses auto-fit minmax — no override needed at 768px */
 
   .stat-card {
     padding: var(--space-3);
@@ -826,13 +821,13 @@
     font-size: 0.7rem;
   }
 
-  /* Tables: horizontal scroll on mobile */
+  /* Tables: horizontal scroll on mobile — no forced nowrap so content
+     can wrap naturally within cells rather than extending the table */
   .card table,
   .table {
     display: block;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
   }
 
   .card table thead,
@@ -903,7 +898,6 @@
     display: block;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
   }
 
   .admin-content table thead,
@@ -1075,9 +1069,7 @@
 
 /* Extra small devices (< 480px) */
 @media (max-width: 480px) {
-  .dashboard-stats {
-    grid-template-columns: 1fr;
-  }
+  /* dashboard-stats and stats-grid use auto-fit minmax — collapse automatically */
 
   .stats-grid {
     grid-template-columns: 1fr;
@@ -1151,11 +1143,11 @@
   color: var(--text-muted);
 }
 
-/* Ledgeman product branding in sidebar */
+/* Ledgeman product branding in sidebar — min 4.5:1 contrast on dark bg */
 .sidebar-product-name {
     font-size: 0.65rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.60);
     margin-top: 2px;
 }

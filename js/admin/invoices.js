@@ -1232,7 +1232,8 @@ window.AdminInvoices = {
                     '<div class="form-group" style="margin-bottom:16px"><label>Notes</label><textarea name="notes" rows="2">' + esc(inv.notes || '') + '</textarea></div>' +
 
                     '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:12px">Line Items</h4>' +
-                    '<table style="width:100%;border-collapse:collapse;margin-bottom:8px">' +
+                    '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px">' +
+                    '<table style="width:100%;min-width:360px;border-collapse:collapse">' +
                         '<thead><tr style="background:#f3f4f6">' +
                             '<th style="padding:7px 6px;text-align:left;font-size:.82rem;font-weight:600">Description</th>' +
                             '<th style="padding:7px 6px;text-align:left;font-size:.82rem;font-weight:600;width:115px">Category</th>' +
@@ -1241,6 +1242,7 @@ window.AdminInvoices = {
                         '</tr></thead>' +
                         '<tbody id="editLineItemsBody"></tbody>' +
                     '</table>' +
+                    '</div>' +
                     '<button type="button" id="addCustomItem" style="background:var(--bg-surface);border:1px dashed var(--border-color);padding:6px 14px;border-radius:4px;cursor:pointer;font-size:.85rem;color:var(--text-secondary);margin-bottom:20px">+ Add Custom Line Item</button>' +
 
                     '<h4 style="color:#1a3a5c;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin-bottom:10px">Add from Project Expenses</h4>' +
