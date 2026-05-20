@@ -1,0 +1,45 @@
+name: Mobile Regression Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  mobile-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: |
+          cd browser-tests
+          npm install
+
+      - name: Install Playwright Chromium
+        run: |
+          cd browser-tests
+          npx playwright install chromium --with-deps
+
+      - name: Run mobile regression tests
+        run: |
+          cd browser-tests
+          npm run test:mobile
+
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-artifacts
+          path: |
+            browser-tests/mobile-screenshots/
+            browser-tests/MOBILE_REGRESSION_REPORT.md
+            browser-tests/playwright-report/
