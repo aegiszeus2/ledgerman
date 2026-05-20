@@ -409,12 +409,28 @@ window.AdminSpecSearch = (function () {
                     ${result.citations && result.citations.length ? `
                     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-color)">
                         <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
-                        ${result.citations.map(c => `
-                        <div style="background:var(--bg-surface,#1c2746);border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:0.82rem">
-                            <div style="font-weight:600">${esc(c.document_name || '')}</div>
-                            ${c.section_number ? `<div style="color:var(--text-muted)">§ ${esc(c.section_number)}${c.page_number ? ' · p.' + c.page_number : ''}</div>` : ''}
-                            ${c.quoted_text ? `<div style="margin-top:4px;color:var(--text-secondary,#555);font-style:italic">"${esc(c.quoted_text.slice(0, 200))}${c.quoted_text.length > 200 ? '…' : ''}"</div>` : ''}
-                        </div>`).join('')}
+                        ${result.citations.map((c, i) => {
+                            const refLine = [
+                                c.section_number ? `§ ${esc(c.section_number)}` : '',
+                                c.section_title  ? esc(c.section_title) : '',
+                                c.page_number    ? `p. ${c.page_number}` : '',
+                                (!c.section_number && c.chunk_index != null) ? `Chunk ${c.chunk_index}` : '',
+                            ].filter(Boolean).join(' · ');
+                            const metaLine = [
+                                c.document_type ? esc(c.document_type) : '',
+                                c.revision      ? `Rev. ${esc(c.revision)}` : '',
+                            ].filter(Boolean).join(' · ');
+                            return `
+                        <div style="background:var(--bg-surface,#1c2746);border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:0.82rem;border-left:3px solid var(--border-color-strong,#34467a)">
+                            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">
+                                <div style="font-weight:600;color:var(--text-primary)">${esc(c.document_name || 'Unknown document')}</div>
+                                <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0">Source ${i + 1}</div>
+                            </div>
+                            ${refLine ? `<div style="color:var(--text-muted);margin-bottom:3px">${refLine}</div>` : ''}
+                            ${metaLine ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">${metaLine}</div>` : ''}
+                            ${c.quoted_text ? `<div style="margin-top:6px;color:var(--text-secondary,#b9c4dc);font-style:italic;border-top:1px solid var(--border-color-soft,#1a2340);padding-top:6px">"${esc(c.quoted_text.slice(0, 300))}${c.quoted_text.length > 300 ? '…' : ''}"</div>` : ''}
+                        </div>`;
+                        }).join('')}
                     </div>` : ''}
                 </div>`;
 
