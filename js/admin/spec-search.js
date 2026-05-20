@@ -393,24 +393,24 @@ window.AdminSpecSearch = (function () {
                            : result.confidence_level === 'medium' ? '#f59e0b' : '#94a3b8';
 
             answerArea.innerHTML = `
-                <div style="background:var(--bg-surface,#f8fafc);border:1px solid var(--border-color);border-radius:8px;padding:16px;margin-bottom:12px">
+                <div style="background:var(--bg-surface,#1c2746);border:1px solid var(--border-color);border-radius:8px;padding:16px;margin-bottom:12px">
                     <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:8px">
                         <span>Your question</span>
                     </div>
                     <div style="font-weight:500">${esc(question)}</div>
                 </div>
-                <div style="background:#fff;border:1px solid var(--border-color);border-radius:8px;padding:16px">
+                <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:16px">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
                         <span style="font-size:0.75rem;font-weight:600;color:${confColor};background:${confColor}22;padding:2px 8px;border-radius:999px;text-transform:uppercase">
                             ${esc(result.confidence_level || 'unknown')} confidence
                         </span>
                     </div>
-                    <div style="line-height:1.6;white-space:pre-wrap">${esc(result.answer)}</div>
+                    <div style="line-height:1.6;white-space:pre-wrap;color:var(--text-primary)">${esc(result.answer)}</div>
                     ${result.citations && result.citations.length ? `
                     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-color)">
                         <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
                         ${result.citations.map(c => `
-                        <div style="background:var(--bg-surface,#f8fafc);border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:0.82rem">
+                        <div style="background:var(--bg-surface,#1c2746);border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:0.82rem">
                             <div style="font-weight:600">${esc(c.document_name || '')}</div>
                             ${c.section_number ? `<div style="color:var(--text-muted)">§ ${esc(c.section_number)}${c.page_number ? ' · p.' + c.page_number : ''}</div>` : ''}
                             ${c.quoted_text ? `<div style="margin-top:4px;color:var(--text-secondary,#555);font-style:italic">"${esc(c.quoted_text.slice(0, 200))}${c.quoted_text.length > 200 ? '…' : ''}"</div>` : ''}

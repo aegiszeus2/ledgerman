@@ -162,7 +162,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #94a3b8;
+  color: #475569;
 }
 
 .invoice-print-container .invoice-number-value {
@@ -188,7 +188,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: #475569;
   margin-bottom: 6px;
 }
 
@@ -226,7 +226,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #94a3b8;
+  color: #475569;
 }
 
 .invoice-print-container .meta-value {
@@ -350,7 +350,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #94a3b8;
+  color: #475569;
   margin-bottom: 6px;
 }
 
@@ -398,7 +398,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #94a3b8;
+  color: #475569;
 }
 
 .invoice-print-container .payment-item-value {
@@ -408,7 +408,7 @@
 
 .invoice-print-container .compliance-notes {
   font-size: 7.5pt;
-  color: #94a3b8;
+  color: #475569;
   line-height: 1.6;
   border-top: 1px solid #e2e8f0;
   padding-top: 12px;
