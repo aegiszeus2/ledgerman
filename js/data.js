@@ -266,6 +266,20 @@ async function apiLoginWorkerByNameAndPin(companyName, workerName, pin, persiste
     if (data.worker && data.worker.company_id) setCompanyId(data.worker.company_id);
     return data; // { token, worker } OR { twoFARequired: true, workerId, workerName }
 }
+/**
+ * workerUpdateMyEmail(email)
+ * Allows a logged-in worker to save their own email address.
+ * Uses PATCH /api/workers/me/email which accepts worker JWTs (not admin-only).
+ * This is the correct endpoint to call from the Worker Portal email prompt — the
+ * general PUT /api/workers/<id> endpoint requires admin role and will 403 for workers.
+ */
+async function workerUpdateMyEmail(email) {
+    return _apiFetch('/api/workers/me/email', {
+        method: 'PATCH',
+        body: JSON.stringify({ email: email })
+    });
+}
+
 async function apiVerify2FA(workerId, totpCode) {
     const companyId = getCompanyId();
     const data = await _apiFetch('/api/auth/worker/verify2fa', {
@@ -1213,6 +1227,7 @@ window.AppData = {
     isTokenExpired, clearAuthState, clearEntityCache,
     getPersistentLogin, savePersistentLogin, clearPersistentLogin,
     apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin, apiVerify2FA,
+    workerUpdateMyEmail,
     apiCreateInvite, apiGetInvite, apiUseInvite,
     syncFromServer, isCacheLoaded,
     // Photos (IndexedDB)
