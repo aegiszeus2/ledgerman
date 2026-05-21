@@ -265,6 +265,55 @@ window.WorkerTimeEntry = {
             );
         }
 
+        // ── Draft persistence helpers ────────────────────────────────────
+        // Draft key scoped per worker + project to prevent cross-contamination.
+        // File blobs cannot be serialized; only metadata (name) is preserved.
+        // Workers are informed they need to re-attach receipt files.
+        var draftKey = 'timeentry_draft_' + worker.id + '_' + projectId;
+        var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+        var draftDirty = false;
+        var draftSaveTimer = null;
+
+        function saveDraft() {
+            try {
+                var f = document.getElementById('timeEntryForm');
+                if (!f) return;
+                var draft = {
+                    date:              (f.querySelector('#teDate')         || {}).value || '',
+                    startTime:         (f.querySelector('#teStartTime')    || {}).value || '',
+                    endTime:           (f.querySelector('#teEndTime')      || {}).value || '',
+                    description:       (f.querySelector('#teDescription')  || {}).value || '',
+                    subtaskId:         (f.querySelector('#teSubtask')      || {}).value || '',
+                    units:             (f.querySelector('#teUnits')        || {}).value || '',
+                    impactCodeId:      (f.querySelector('#teImpactCode')   || {}).value || '',
+                    impactHours:       (f.querySelector('#teImpactHours')  || {}).value || '',
+                    impactBillable:    (f.querySelector('#teImpactBillable')|| {}).value || '',
+                    impactDescription: (f.querySelector('#teImpactDesc')   || {}).value || '',
+                    equipmentNote:     (f.querySelector('#teEquipmentNote')|| {}).value || '',
+                    // Serialize expense metadata only (no file blobs)
+                    expenses:  selectedExpenses.map(function(e) {
+                        return { description: e.description, amount: e.amount, fileName: e.file ? e.file.name : null };
+                    }),
+                    equipment:  selectedEquipment.map(function(e) {
+                        return { equipmentId: e.equipmentId, equipmentName: e.equipmentName, hours: e.hours };
+                    }),
+                    draftSavedAt: new Date().toISOString()
+                };
+                AppData.setData(draftKey, draft);
+                draftDirty = false;
+            } catch(err) { /* silent — draft save is best-effort */ }
+        }
+
+        function clearDraft() {
+            try { AppData.setData(draftKey, null); } catch(e) {}
+        }
+
+        function scheduleDraftSave() {
+            draftDirty = true;
+            clearTimeout(draftSaveTimer);
+            draftSaveTimer = setTimeout(saveDraft, 600);
+        }
+
         // ── Complete-entry form (shared by both modes after clock-out) ───
         function renderCompleteForm(defaultDate, defaultStart, defaultEnd) {
             // CRITICAL: Clear contentArea completely and atomically
@@ -273,6 +322,36 @@ window.WorkerTimeEntry = {
             var selectedExpenses = []; // Reset expense list for this form
             var selectedEquipment = []; // Reset equipment list for this form
             var impactCodes = []; // Loaded async below
+
+            // ── Draft restore ────────────────────────────────────────────
+            var existingDraft = AppData.getData(draftKey);
+            var restoredFromDraft = false;
+            var draftHadFiles = false;
+            if (existingDraft && existingDraft.draftSavedAt) {
+                var age = Date.now() - new Date(existingDraft.draftSavedAt).getTime();
+                if (age < DRAFT_MAX_AGE_MS) {
+                    // Use draft values as defaults (overrides clock-out prefill only when
+                    // the draft has actual content — avoids empty draft clobbering clock data)
+                    if (existingDraft.date)      defaultDate  = existingDraft.date;
+                    if (existingDraft.startTime) defaultStart = existingDraft.startTime;
+                    if (existingDraft.endTime)   defaultEnd   = existingDraft.endTime;
+                    // Restore in-memory expense/equipment lists (without file blobs)
+                    if (existingDraft.expenses && existingDraft.expenses.length > 0) {
+                        existingDraft.expenses.forEach(function(e) {
+                            selectedExpenses.push({ description: e.description, amount: e.amount, file: null });
+                            if (e.fileName) draftHadFiles = true;
+                        });
+                    }
+                    if (existingDraft.equipment && existingDraft.equipment.length > 0) {
+                        existingDraft.equipment.forEach(function(e) {
+                            selectedEquipment.push({ equipmentId: e.equipmentId, equipmentName: e.equipmentName, hours: e.hours });
+                        });
+                    }
+                    restoredFromDraft = true;
+                } else {
+                    clearDraft(); // Stale draft — discard
+                }
+            }
 
             var form = document.createElement('form');
             form.className = 'time-entry-form';
@@ -363,7 +442,7 @@ window.WorkerTimeEntry = {
                     '</div>' +
                 '</div>';
 
-            // Expenses (SINGLE input section)
+            // Expenses — multi-file support, persistent attachment status
             formHTML +=
                 '<div class="form-group">' +
                     '<label class="form-label">Expenses <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
@@ -371,31 +450,42 @@ window.WorkerTimeEntry = {
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
                         '<input class="form-control" type="text" id="teExpenseDesc" placeholder="Expense description (e.g. Gas, Tools)" style="flex:1;min-width:150px">' +
                         '<input class="form-control" type="number" id="teExpenseAmount" placeholder="$0.00" step="0.01" min="0" style="width:100px">' +
-                        '<button type="button" class="btn btn-secondary" id="teExpenseFileBtn" style="padding:10px 16px;white-space:nowrap" aria-label="Attach file to expense">📎 Attach</button>' +
+                        '<button type="button" class="btn btn-secondary" id="teExpenseFileBtn" style="padding:10px 16px;white-space:nowrap" aria-label="Attach receipt or document">📎 Attach</button>' +
                         '<button type="button" class="btn btn-secondary" id="addExpenseBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
                     '</div>' +
-                    '<input type="file" id="teExpenseInput" style="display:none">' +
+                    '<div id="teExpenseFileStatus" style="display:none;font-size:.82rem;font-weight:600;color:var(--success);padding:5px 6px;margin-top:4px;background:rgba(46,204,113,.08);border-radius:5px;border:1px solid rgba(46,204,113,.25)"></div>' +
+                    '<input type="file" id="teExpenseInput" accept="image/*,.pdf,.doc,.docx,.heic,.heif" multiple style="display:none">' +
                 '</div>';
 
-            // Equipment (optional — only shown when equipment exists)
+            // Equipment — always render; workers select from admin-created list only.
+            // If equipment not in list, worker can leave a note (stored on submission, not as equipment record).
             var activeEquipment = (AppData.getEquipment ? AppData.getEquipment() : []).filter(function(eq) { return eq.status === 'Active'; });
+            var eqSelectHtml = '';
             if (activeEquipment.length > 0) {
                 var eqOptions = '<option value="">— Select equipment —</option>' +
                     activeEquipment.map(function(eq) {
                         return '<option value="' + esc(eq.id) + '" data-name="' + esc(eq.name) + '">' +
                             esc(eq.name) + (eq.type ? ' (' + esc(eq.type) + ')' : '') + '</option>';
                     }).join('');
-                formHTML +=
-                    '<div class="form-group">' +
-                        '<label class="form-label">Equipment Used <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
-                        '<div id="equipmentEntryList" style="margin-bottom:12px"></div>' +
-                        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-                            '<select class="form-control" id="teEquipmentSelect" style="flex:1;min-width:160px">' + eqOptions + '</select>' +
-                            '<input class="form-control" type="number" id="teEquipmentHours" placeholder="Hours" step="0.25" min="0.25" style="width:90px">' +
-                            '<button type="button" class="btn btn-secondary" id="addEquipmentEntryBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
-                        '</div>' +
+                eqSelectHtml =
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+                        '<select class="form-control" id="teEquipmentSelect" style="flex:1;min-width:160px">' + eqOptions + '</select>' +
+                        '<input class="form-control" type="number" id="teEquipmentHours" placeholder="Hours" step="0.25" min="0.25" style="width:90px">' +
+                        '<button type="button" class="btn btn-secondary" id="addEquipmentEntryBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
                     '</div>';
+            } else {
+                eqSelectHtml = '<p style="color:var(--text2);font-size:.85rem;margin:0 0 8px">No equipment has been set up by your company yet. Use the note below to flag it for your admin.</p>';
             }
+            formHTML +=
+                '<div class="form-group">' +
+                    '<label class="form-label">Equipment Used <span style="font-weight:400;color:var(--text2)">(optional)</span></label>' +
+                    '<div id="equipmentEntryList" style="margin-bottom:8px"></div>' +
+                    eqSelectHtml +
+                    '<div style="margin-top:6px">' +
+                        '<label class="form-label" style="font-size:.8rem;color:var(--text2);margin-bottom:3px">Equipment not in list? Note for admin:</label>' +
+                        '<input class="form-control" type="text" id="teEquipmentNote" placeholder="e.g. Used excavator — not listed yet" style="font-size:.9rem">' +
+                    '</div>' +
+                '</div>';
 
             // Photos — single input, no capture="environment" (causes iPhone black screen)
             // accept="image/*" without capture shows iOS native sheet: Take Photo / Photo Library / Files
@@ -417,6 +507,51 @@ window.WorkerTimeEntry = {
             form.innerHTML = formHTML;
             contentArea.innerHTML = ''; // Double-clear before appending
             contentArea.appendChild(form);
+
+            // ── Draft restore banner ─────────────────────────────────────
+            if (restoredFromDraft) {
+                var banner = document.createElement('div');
+                banner.id = 'teDraftBanner';
+                banner.style.cssText = 'background:rgba(52,152,219,.1);border:1px solid rgba(52,152,219,.35);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;display:flex;justify-content:space-between;align-items:flex-start;gap:12px';
+                var savedTime = existingDraft.draftSavedAt ? new Date(existingDraft.draftSavedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+                var bannerMsg = '📋 Draft restored from ' + savedTime + '.';
+                if (draftHadFiles) bannerMsg += ' Re-attach receipt files — files cannot be saved in drafts.';
+                banner.innerHTML =
+                    '<span>' + bannerMsg + '</span>' +
+                    '<button type="button" id="teDraftDiscard" style="background:none;border:none;color:var(--accent);font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;padding:0">Discard draft</button>';
+                form.insertBefore(banner, form.firstChild);
+                // Restore text field values from draft
+                var dv = existingDraft;
+                if (dv.description  && form.querySelector('#teDescription'))   form.querySelector('#teDescription').value   = dv.description;
+                if (dv.subtaskId    && form.querySelector('#teSubtask'))        form.querySelector('#teSubtask').value        = dv.subtaskId;
+                if (dv.units        && form.querySelector('#teUnits'))          form.querySelector('#teUnits').value          = dv.units;
+                if (dv.equipmentNote && form.querySelector('#teEquipmentNote')) form.querySelector('#teEquipmentNote').value  = dv.equipmentNote;
+                if (dv.impactCodeId) {
+                    var icSel = form.querySelector('#teImpactCode');
+                    if (icSel) {
+                        // Impact codes loaded async — store for deferred restore
+                        form.dataset.restoreImpactCode    = dv.impactCodeId;
+                        form.dataset.restoreImpactHours   = dv.impactHours   || '';
+                        form.dataset.restoreImpactBillable= dv.impactBillable|| '';
+                        form.dataset.restoreImpactDesc    = dv.impactDescription || '';
+                    }
+                }
+                banner.querySelector('#teDraftDiscard').onclick = function() {
+                    clearDraft();
+                    selectedExpenses  = [];
+                    selectedEquipment = [];
+                    banner.remove();
+                    renderExpenseList();
+                    renderEquipmentList();
+                    // Reset text fields
+                    ['#teDescription','#teSubtask','#teUnits','#teEquipmentNote',
+                     '#teImpactCode','#teImpactHours','#teImpactDesc'].forEach(function(id) {
+                        var el = form.querySelector(id);
+                        if (el) el.value = '';
+                    });
+                    Utils.showToast('Draft discarded', 'info');
+                };
+            }
 
             // ── Wire events ──────────────────────────────────────────────
 
@@ -443,8 +578,44 @@ window.WorkerTimeEntry = {
                         opt.dataset.billable = ic.defaultBillableStatus || 'Non-Billable';
                         sel.appendChild(opt);
                     });
+                    // Restore impact code from draft (deferred until options are loaded)
+                    var ri = form.dataset.restoreImpactCode;
+                    if (ri) {
+                        sel.value = ri;
+                        if (sel.value === ri) { // option exists
+                            sel.dispatchEvent(new Event('change')); // show detail section
+                            setTimeout(function() {
+                                var hEl = form.querySelector('#teImpactHours');
+                                var bEl = form.querySelector('#teImpactBillable');
+                                var dEl = form.querySelector('#teImpactDesc');
+                                if (hEl && form.dataset.restoreImpactHours)    hEl.value = form.dataset.restoreImpactHours;
+                                if (dEl && form.dataset.restoreImpactDesc)     dEl.value = form.dataset.restoreImpactDesc;
+                                if (bEl && form.dataset.restoreImpactBillable) {
+                                    bEl.value = form.dataset.restoreImpactBillable;
+                                    bEl.dispatchEvent(new Event('change'));
+                                }
+                            }, 0);
+                        }
+                    }
                 } catch (e2) { /* silent — impact code is optional */ }
             })();
+
+            // ── Draft auto-save: wire blur on key fields ─────────────────
+            ['#teDate','#teStartTime','#teEndTime','#teDescription','#teSubtask',
+             '#teUnits','#teImpactCode','#teImpactHours','#teImpactBillable','#teImpactDesc','#teEquipmentNote']
+            .forEach(function(id) {
+                var el = form.querySelector(id);
+                if (el) el.addEventListener('change', scheduleDraftSave);
+            });
+            // Text area saves on input (debounced)
+            var descEl = form.querySelector('#teDescription');
+            if (descEl) descEl.addEventListener('input', scheduleDraftSave);
+
+            // ── Render lists from restored draft data ────────────────────
+            if (restoredFromDraft) {
+                renderExpenseList();
+                renderEquipmentList();
+            }
 
             // Impact code toggle
             form.querySelector('#teImpactCode').addEventListener('change', function() {
@@ -521,8 +692,23 @@ window.WorkerTimeEntry = {
             }
             if (subtaskSelect) { subtaskSelect.addEventListener('change', updateUnits); updateUnits(); }
 
-            // Expenses — with file attachment support
-            var currentExpenseFile = null; // Track current file being attached
+            // Expenses — multi-file support with persistent status indicator
+            var pendingExpenseFiles = []; // Files queued for the next Add action
+
+            function updateExpenseFileStatus() {
+                var statusEl = form.querySelector('#teExpenseFileStatus');
+                if (!statusEl) return;
+                if (pendingExpenseFiles.length === 0) {
+                    statusEl.style.display = 'none';
+                    statusEl.textContent = '';
+                } else if (pendingExpenseFiles.length === 1) {
+                    statusEl.textContent = '📎 ' + pendingExpenseFiles[0].name + ' — ready to attach (click Add)';
+                    statusEl.style.display = 'block';
+                } else {
+                    statusEl.textContent = '📎 ' + pendingExpenseFiles.length + ' files selected — one expense line will be created per file when you click Add';
+                    statusEl.style.display = 'block';
+                }
+            }
 
             form.querySelector('#teExpenseFileBtn').addEventListener('click', function(e) {
                 e.preventDefault();
@@ -531,24 +717,47 @@ window.WorkerTimeEntry = {
 
             form.querySelector('#teExpenseInput').addEventListener('change', function() {
                 if (this.files.length > 0) {
-                    currentExpenseFile = this.files[0];
-                    Utils.showToast('📎 ' + currentExpenseFile.name + ' attached', 'success');
+                    pendingExpenseFiles = Array.from(this.files);
+                    updateExpenseFileStatus();
+                    if (pendingExpenseFiles.length === 1) {
+                        Utils.showToast('📎 ' + pendingExpenseFiles[0].name + ' ready — click Add to attach', 'success');
+                    } else {
+                        Utils.showToast('📎 ' + pendingExpenseFiles.length + ' files selected — click Add to attach', 'success');
+                    }
                 }
-                this.value = '';
+                this.value = ''; // Reset so same file can be re-selected
             });
 
             form.querySelector('#addExpenseBtn').addEventListener('click', function() {
                 var desc = form.querySelector('#teExpenseDesc').value.trim();
-                var amt = parseFloat(form.querySelector('#teExpenseAmount').value);
+                var amt  = parseFloat(form.querySelector('#teExpenseAmount').value);
                 if (!desc || isNaN(amt) || amt <= 0) {
                     Utils.showToast('Enter expense description and valid amount', 'error');
                     return;
                 }
-                selectedExpenses.push({ description: desc, amount: amt, file: currentExpenseFile });
-                form.querySelector('#teExpenseDesc').value = '';
+                if (pendingExpenseFiles.length > 1) {
+                    // Multi-file: auto-create one expense line per file
+                    pendingExpenseFiles.forEach(function(file, i) {
+                        selectedExpenses.push({
+                            description: desc + ' (' + (i + 1) + ')',
+                            amount: amt,
+                            file: file
+                        });
+                    });
+                    Utils.showToast(pendingExpenseFiles.length + ' expense lines added', 'success');
+                } else {
+                    selectedExpenses.push({
+                        description: desc,
+                        amount: amt,
+                        file: pendingExpenseFiles.length === 1 ? pendingExpenseFiles[0] : null
+                    });
+                }
+                form.querySelector('#teExpenseDesc').value  = '';
                 form.querySelector('#teExpenseAmount').value = '';
-                currentExpenseFile = null;
+                pendingExpenseFiles = [];
+                updateExpenseFileStatus();
                 renderExpenseList();
+                saveDraft();
             });
 
             function renderExpenseList() {
@@ -574,6 +783,7 @@ window.WorkerTimeEntry = {
                         e.preventDefault();
                         selectedExpenses.splice(parseInt(this.dataset.idx), 1);
                         renderExpenseList();
+                        saveDraft();
                     });
                     list.appendChild(item);
                 });
@@ -585,45 +795,53 @@ window.WorkerTimeEntry = {
                 }
             }
 
-            // Equipment entry handlers
-            if (form.querySelector('#addEquipmentEntryBtn')) {
-                function renderEquipmentList() {
-                    var list = form.querySelector('#equipmentEntryList');
-                    if (!list) return;
-                    list.innerHTML = '';
-                    selectedEquipment.forEach(function(entry, idx) {
-                        var div = document.createElement('div');
-                        div.style.cssText = 'padding:8px;background:rgba(52,152,219,.08);border:1px solid rgba(52,152,219,.2);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center';
-                        div.innerHTML =
-                            '<div>' +
-                                '<strong>' + esc(entry.equipmentName) + '</strong>' +
-                                '<span style="color:var(--text2);font-size:.85rem;margin-left:8px">' + entry.hours + ' hr</span>' +
-                            '</div>' +
-                            '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
-                        div.querySelector('button').addEventListener('click', function() {
-                            selectedEquipment.splice(parseInt(this.dataset.idx), 1);
-                            renderEquipmentList();
-                        });
-                        list.appendChild(div);
+            // Equipment entry handlers — always wired (section always rendered)
+            function renderEquipmentList() {
+                var list = form.querySelector('#equipmentEntryList');
+                if (!list) return;
+                list.innerHTML = '';
+                selectedEquipment.forEach(function(entry, idx) {
+                    var div = document.createElement('div');
+                    div.style.cssText = 'padding:8px;background:rgba(52,152,219,.08);border:1px solid rgba(52,152,219,.2);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center';
+                    div.innerHTML =
+                        '<div>' +
+                            '<strong>' + esc(entry.equipmentName) + '</strong>' +
+                            '<span style="color:var(--text2);font-size:.85rem;margin-left:8px">' + entry.hours + ' hr</span>' +
+                        '</div>' +
+                        '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>';
+                    div.querySelector('button').addEventListener('click', function() {
+                        selectedEquipment.splice(parseInt(this.dataset.idx), 1);
+                        renderEquipmentList();
+                        saveDraft();
                     });
-                }
+                    list.appendChild(div);
+                });
+            }
 
-                form.querySelector('#addEquipmentEntryBtn').addEventListener('click', function() {
+            var addEqBtn = form.querySelector('#addEquipmentEntryBtn');
+            if (addEqBtn) {
+                addEqBtn.addEventListener('click', function() {
                     var sel = form.querySelector('#teEquipmentSelect');
                     var hrs = parseFloat(form.querySelector('#teEquipmentHours').value);
                     if (!sel.value) { Utils.showToast('Select equipment first', 'error'); return; }
-                    if (isNaN(hrs) || hrs < 0) { Utils.showToast('Equipment hours must be 0 or greater.', 'error'); return; }
-                    if (hrs === 0) { Utils.showToast('Enter valid hours greater than 0 (e.g. 0.5, 2)', 'error'); return; }
+                    if (isNaN(hrs) || hrs <= 0) { Utils.showToast('Enter valid hours greater than 0 (e.g. 0.5, 2)', 'error'); return; }
                     var opt = sel.options[sel.selectedIndex];
                     selectedEquipment.push({
-                        equipmentId:    sel.value,
-                        equipmentName:  opt.dataset.name || opt.textContent,
-                        hours:          hrs
+                        equipmentId:   sel.value,
+                        equipmentName: opt.dataset.name || opt.textContent,
+                        hours:         hrs
                     });
                     sel.value = '';
                     form.querySelector('#teEquipmentHours').value = '';
                     renderEquipmentList();
+                    saveDraft();
                 });
+            }
+
+            // Equipment note — save draft on change
+            var eqNoteInput = form.querySelector('#teEquipmentNote');
+            if (eqNoteInput) {
+                eqNoteInput.addEventListener('input', function() { draftDirty = true; });
             }
 
             // Photos — single input triggers iOS native sheet (Take Photo / Photo Library / Files)
@@ -808,6 +1026,8 @@ window.WorkerTimeEntry = {
                         impactHours:          impactCodeId ? impactHours : null,
                         impactBillableStatus: impactCodeId ? impactBillable : null,
                         impactDescription:    impactCodeId ? impactDescription : null,
+                        // Equipment note — admin-facing only; no equipment record created
+                        equipmentNote:        (form.querySelector('#teEquipmentNote') || {}).value ? form.querySelector('#teEquipmentNote').value.trim() : '',
                     };
 
                     AppData.saveSubmission(submission);
@@ -888,6 +1108,7 @@ window.WorkerTimeEntry = {
                     }
 
                     if (isWizardMode) AppData.setData('worker_wizard_done_' + worker.id, true);
+                    clearDraft(); // Clear draft on successful submit
                     showSuccess();
 
                 } catch (err) {
@@ -908,6 +1129,25 @@ window.WorkerTimeEntry = {
             }
         }
         renderContent();
+
+        // ── Draft save on app-switch / tab-hide (mobile critical) ────────
+        // These fire when the worker switches apps, locks screen, or gets a call.
+        // Only save if the form is currently rendered (mode has progressed to complete-entry).
+        function _onPageHide() {
+            if (document.getElementById('timeEntryForm')) saveDraft();
+        }
+        document.addEventListener('visibilitychange', _onPageHide);
+        window.addEventListener('pagehide', _onPageHide);
+
+        // Cleanup listeners when this module's container is replaced
+        var _mutationObs = new MutationObserver(function() {
+            if (!container.contains(document.getElementById('timeEntryForm'))) {
+                document.removeEventListener('visibilitychange', _onPageHide);
+                window.removeEventListener('pagehide', _onPageHide);
+                _mutationObs.disconnect();
+            }
+        });
+        _mutationObs.observe(container, { childList: true, subtree: false });
 
         // ── Success screen ───────────────────────────────────────────────
         function showSuccess() {
