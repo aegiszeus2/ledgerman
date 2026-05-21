@@ -152,8 +152,10 @@
   display: none;             /* hidden at full-width sidebar */
 }
 
-/* Only enable tooltips when sidebar is collapsed (≤1024px) */
-@media (max-width: 1024px) {
+/* Only enable tooltips when sidebar is collapsed (769–1024px).
+   At ≤768px the sidebar opens as a full overlay with visible labels —
+   tooltips must be disabled there so the ::after doesn't overlap label text. */
+@media (min-width: 769px) and (max-width: 1024px) {
   .nav-item[data-tooltip]::after { display: block; }
   .nav-item[data-tooltip]:hover::after { opacity: 1; }
 }
