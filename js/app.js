@@ -276,7 +276,10 @@ window.LMIcons = {
                     name:       payload.name || 'Worker',
                     company_id: AppData.getCompanyId(),
                     role:       payload.workerRole || 'Worker',
-                    email:      ''
+                    // email intentionally omitted — sync failed and cache is empty so
+                    // email status is unknown. Leaving it undefined prevents the email
+                    // prompt from firing for workers whose email was set by the admin
+                    // but whose data hasn't been loaded yet (Render cold-start, etc).
                 };
                 this.currentUser = { type: 'worker', name: worker.name, id: worker.id };
                 this._completeWorkerLogin(worker, 'Session restored (page refresh)');
@@ -921,10 +924,16 @@ window.LMIcons = {
         _completeWorkerLogin(worker, auditNote) {
             this.currentUser = { type: 'worker', name: worker.name, id: worker.id };
             AppData.addAuditLog(worker.name, 'Worker Login', auditNote || '');
-            // Ask for email only if not on file AND worker hasn't already skipped this prompt
+            // Ask for email only if email is *confirmed* empty on the server AND
+            // the worker hasn't already been prompted in this browser.
+            //
+            // worker.email === ''  → server confirmed no email (fresh login or successful sync)
+            // worker.email === undefined → email status unknown (sync failed, no cache) —
+            //   do NOT prompt: the worker may have an admin-set email we just can't see yet.
+            //   Prompting here would incorrectly interrupt workers whose email is already on file.
             const emailPromptKey = 'worker_email_prompted_' + worker.id;
             const alreadyPrompted = AppData.getData(emailPromptKey);
-            if (!worker.email && !alreadyPrompted) {
+            if (worker.email === '' && !alreadyPrompted) {
                 this._showEmailPrompt(worker);
             } else {
                 this.startWorkerPortal(worker);
