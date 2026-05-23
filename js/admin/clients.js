@@ -148,102 +148,85 @@ window.AdminClients = {
         const isEdit = !!client;
         const esc = Utils.escapeHtml;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:600px">
-                <div class="modal-header">
-                    <h3 style="margin:0">${isEdit ? 'Edit Client' : 'Add Client'}</h3>
+        const body = `
+            <form id="clientModalForm" novalidate>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Company / Client Name *</label>
+                    <input class="form-control" name="name" value="${esc(client ? client.name : '')}" required>
                 </div>
-                <div class="modal-body">
-                    <form id="clientModalForm" novalidate>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Company / Client Name *</label>
-                            <input class="form-control" name="name" value="${esc(client ? client.name : '')}" required>
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Contact Person</label>
-                            <input class="form-control" name="contactPerson" value="${esc(client ? client.contactPerson : '')}">
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Address</label>
-                            <input class="form-control" name="address" value="${esc(client ? client.address : '')}">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>City</label>
-                                <input class="form-control" name="city" value="${esc(client ? client.city : '')}">
-                            </div>
-                            <div class="form-group">
-                                <label>Province</label>
-                                <input class="form-control" name="province" value="${esc(client ? client.province : 'Ontario')}">
-                            </div>
-                            <div class="form-group">
-                                <label>Postal Code</label>
-                                <input class="form-control" name="postalCode" value="${esc(client ? client.postalCode : '')}">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Phone</label>
-                                <input class="form-control" name="phone" value="${esc(client ? client.phone : '')}" type="tel">
-                            </div>
-                            <div class="form-group">
-                                <label>Email</label>
-                                <input class="form-control" name="email" value="${esc(client ? client.email : '')}" type="email">
-                            </div>
-                        </div>
-                    </form>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Contact Person</label>
+                    <input class="form-control" name="contactPerson" value="${esc(client ? client.contactPerson : '')}">
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" form="clientModalForm" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Client</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Address</label>
+                    <input class="form-control" name="address" value="${esc(client ? client.address : '')}">
                 </div>
-            </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>City</label>
+                        <input class="form-control" name="city" value="${esc(client ? client.city : '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Province</label>
+                        <input class="form-control" name="province" value="${esc(client ? client.province : 'Ontario')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Postal Code</label>
+                        <input class="form-control" name="postalCode" value="${esc(client ? client.postalCode : '')}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input class="form-control" name="phone" value="${esc(client ? client.phone : '')}" type="tel">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input class="form-control" name="email" value="${esc(client ? client.email : '')}" type="email">
+                    </div>
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
 
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) overlay.remove();
-        });
-        overlay.querySelector('.modal-close').addEventListener('click', function() {
-            overlay.remove();
-        });
+        const { close, q, submitBtn } = UI.modal(
+            isEdit ? 'Edit Client' : 'Add Client',
+            body,
+            { width: '600px', submitLabel: isEdit ? 'Update Client' : 'Add Client' }
+        );
 
-        overlay.querySelector('#clientModalForm').addEventListener('submit', async function(e) {
+        q('#clientModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
-            if (!fd.name.trim()) {
-                Utils.showToast('Client name is required', 'error');
-                return;
-            }
+            if (!fd.name.trim()) { Utils.showToast('Client name is required', 'error'); return; }
             const clientData = {
-                id: isEdit ? client.id : AppData.generateId(),
-                name: fd.name.trim(),
+                id:            isEdit ? client.id : AppData.generateId(),
+                name:          fd.name.trim(),
                 contactPerson: (fd.contactPerson || '').trim(),
-                address: (fd.address || '').trim(),
-                city: (fd.city || '').trim(),
-                province: (fd.province || '').trim(),
-                postalCode: (fd.postalCode || '').trim(),
-                phone: (fd.phone || '').trim(),
-                email: (fd.email || '').trim()
+                address:       (fd.address       || '').trim(),
+                city:          (fd.city          || '').trim(),
+                province:      (fd.province      || '').trim(),
+                postalCode:    (fd.postalCode     || '').trim(),
+                phone:         (fd.phone         || '').trim(),
+                email:         (fd.email         || '').trim(),
             };
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(submitBtn);
             try {
                 await AppData.saveEntityAsync('clients', clientData);
-            } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Client'; }
+            } catch (err) {
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Client Updated' : 'Client Added', clientData.name);
             Utils.showToast(isEdit ? 'Client updated' : 'Client added');
-            overlay.remove();
+            close();
             self._renderList();
         });
+
+        // Wire the UI.modal submit button to the form
+        if (submitBtn) submitBtn.addEventListener('click', () => q('#clientModalForm').requestSubmit());
     }
 };
