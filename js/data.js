@@ -641,6 +641,38 @@ function deleteWorker(id) {
     }
 }
 
+/**
+ * getWorkerDetail(workerId)
+ * Admin-only. Fetches a full worker profile from the server including PIN display status.
+ * Returns the worker object augmented with:
+ *   pin_display  — plain-text PIN if available, '[hashed — reset required]' if bcrypt
+ *   pin_is_hashed — boolean; true = admin must reset the PIN, original is unrecoverable
+ * Requires: admin JWT. Throws on non-admin callers (403).
+ */
+async function getWorkerDetail(workerId) {
+    if (!isApiMode() || !getJwt()) {
+        // Offline fallback: return cached worker without PIN info
+        var w = getWorker(workerId);
+        if (!w) throw new Error('Worker not found');
+        return Object.assign({}, w, { pin_display: w.pin || '', pin_is_hashed: false });
+    }
+    return _apiFetch('/api/workers/' + workerId);
+}
+
+/**
+ * getWorkerTimecards(workerId)
+ * Admin/supervisor. Fetches all timecards for a given worker.
+ * Used to build the hours summary in the worker detail modal.
+ */
+async function getWorkerTimecards(workerId) {
+    if (!isApiMode() || !getJwt()) {
+        // Offline fallback: filter local timecard cache
+        var all = getData('timecards') || [];
+        return all.filter(function(tc) { return tc.workerId === workerId || tc.worker_id === workerId; });
+    }
+    return _apiFetch('/api/timecards?workerId=' + encodeURIComponent(workerId));
+}
+
 // NOTE: In API mode, PINs are NOT in the cache (stripped by server for security).
 // Worker login goes through apiLoginWorker() instead. This is legacy-mode fallback only.
 function getWorkerByPin(pin) {
@@ -1244,6 +1276,7 @@ window.AppData = {
     getCompanyModulesFromServer, saveCompanyModulesAsync,
     // Workers
     getWorkers, getWorker, saveWorker, deleteWorker, getWorkerByPin,
+    getWorkerDetail, getWorkerTimecards,
     // Clients
     getClients, getClient, saveClient, deleteClient,
     // Projects
