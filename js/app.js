@@ -1666,7 +1666,9 @@ window.LMIcons = {
             }
 
             // Inject "? How To" help button for worker pages
-            // setTimeout(300) ensures button fires after async module renders settle
+            // Positioned at bottom:128px so it stacks clearly above the AI Help FAB
+            // (FAB sits at bottom:80px ~33px tall → top edge ~113px; 15px gap below this button).
+            // Layout from bottom: 0–72px nav bar | 80–113px AI FAB | 128px+ this button.
             const _wHelpRoute = route;
             setTimeout(() => {
                 if (App.currentView !== _wHelpRoute) return; // user navigated away
@@ -1678,7 +1680,7 @@ window.LMIcons = {
                     helpBtn.innerHTML = '? How To';
                     helpBtn.style.cssText = [
                         'position:fixed',
-                        'bottom:70px',
+                        'bottom:128px',
                         'right:16px',
                         'z-index:888',
                         'background:#1a3a5c',
