@@ -163,21 +163,62 @@ window.AdminUsers = {
         }, 250));
 
         // Reveal/hide PIN buttons
+        // The worker list endpoint strips PINs for security. On first "Show" click
+        // we fetch the full worker detail (GET /api/workers/<id>) which returns
+        // pin_display. After the first fetch the value is cached in the DOM.
         container.querySelectorAll('.reveal-pin').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var id = btn.dataset.id;
                 var masked = container.querySelector('.pin-masked[data-id="' + id + '"]');
                 var revealed = container.querySelector('.pin-revealed[data-id="' + id + '"]');
                 if (!masked || !revealed) return;
-                if (revealed.style.display === 'none') {
+
+                // Already fetched — just toggle
+                if (btn.dataset.pinLoaded === 'true') {
+                    if (revealed.style.display === 'none') {
+                        masked.style.display = 'none';
+                        revealed.style.display = 'inline';
+                        btn.textContent = 'Hide';
+                    } else {
+                        masked.style.display = 'inline';
+                        revealed.style.display = 'none';
+                        btn.textContent = 'Show';
+                    }
+                    return;
+                }
+
+                // First reveal — fetch from server
+                btn.textContent = '…';
+                btn.disabled = true;
+                AppData.getWorkerDetail(id).then(function(detail) {
+                    var pin = detail.pin_display || '';
+                    var isHashed = detail.pin_is_hashed;
+                    if (isHashed || pin === '[hashed — reset required]') {
+                        // Replace the entire cell content with a reset-required notice
+                        var td = btn.closest('td');
+                        if (td) {
+                            td.innerHTML = '<span style="color:var(--text2);font-size:.8rem">Reset required</span>' +
+                                ' <button class="btn-ghost btn-sm reset-pin-worker" data-id="' + id + '" style="font-size:.75rem;padding:2px 6px;color:var(--warn)">Reset</button>';
+                            // Re-wire the reset button
+                            var resetBtn = td.querySelector('.reset-pin-worker');
+                            if (resetBtn) resetBtn.addEventListener('click', function() {
+                                var w = AppData.getWorker(id);
+                                if (w) self._showSetPinModal(w);
+                            });
+                        }
+                        return;
+                    }
+                    revealed.textContent = pin || '(no PIN set)';
+                    btn.dataset.pinLoaded = 'true';
                     masked.style.display = 'none';
                     revealed.style.display = 'inline';
                     btn.textContent = 'Hide';
-                } else {
-                    masked.style.display = 'inline';
-                    revealed.style.display = 'none';
+                    btn.disabled = false;
+                }).catch(function(err) {
                     btn.textContent = 'Show';
-                }
+                    btn.disabled = false;
+                    Utils.showToast('Could not load PIN: ' + (err.message || 'server error'), 'error');
+                });
             });
         });
 
