@@ -1322,6 +1322,31 @@ window.LMIcons = {
                 on('punch_lists',     false) ? item('punch-lists',     'pin',    'Punch Lists',     'Punch Lists — deficiency tracking and sign-off') : '',
                 on('gantt_chart',     false) ? item('gantt-chart',     'clock',  'Timeline',        'Project Timeline — visual schedule of milestones') : '',
 
+                // ── Contract Administration ────────────────────────────────────
+                on('rfis',             false) ? item('rfis',              'doc',       'RFIs',                    'RFIs — request for information log') : '',
+                on('submittals',       false) ? item('submittals',        'doc',       'Submittals',              'Submittals — review workflow and spec compliance') : '',
+                on('change_orders',    false) ? item('change-orders',     'doc',       'Change Orders',           'Change Orders — scope changes, approvals, cost impacts') : '',
+                on('scope_management', false) ? item('scope-management',  'flag',      'Scope Management',        'Scope Management — scope creep tracking and approvals') : '',
+
+                // ── Financial Controls ────────────────────────────────────────
+                on('progress_billing',  false) ? item('progress-billing',  'money',     'Progress Billing',        'Progress Billing — Schedule of Values and draw requests') : '',
+                on('ap_ar_tracking',    false) ? item('ap-ar-tracking',    'receipt',   'AP/AR Tracking',          'AP/AR — accounts payable and receivable') : '',
+                on('cost_allocation',   false) ? item('cost-allocation',   'chart',     'Cost Allocation',         'Cost Allocation — labour, equipment, material costs by project') : '',
+                on('financial_tracking',false) ? item('financial-tracking','chart',     'Financial Tracking',      'Financial Tracking — budget vs actual, margin analysis') : '',
+                on('certified_payroll', false) ? item('certified-payroll', 'doc',       'Certified Payroll',       'Certified Payroll — prevailing wage and payroll reports') : '',
+
+                // ── Field & Safety ────────────────────────────────────────────
+                on('gps_tracking',      false) ? item('gps-tracking',      'pin',       'GPS Tracking',            'GPS Tracking — crew location on clock-in/out') : '',
+                on('subcontractor_mgmt',false) ? item('subcontractor-mgmt','users',     'Subcontractors',          'Subcontractor Management — contracts, insurance, compliance') : '',
+                on('safety',            false) ? item('safety',            'flag',      'Safety & Incidents',      'Safety — incidents, toolbox talks, WSIB/OSHA') : '',
+                on('quality_assurance', false) ? item('quality-assurance', 'check',     'Quality Assurance',       'QA — inspections, checklists, deficiency tracking') : '',
+                on('photo_ocr',         false) ? item('photo-ocr',         'camera',    'Photo OCR',               'Photo OCR — extract text from field photos and receipts') : '',
+
+                // ── Planning & Reporting ──────────────────────────────────────
+                on('risk_management',   false) ? item('risk-management',   'flag',      'Risk Register',           'Risk Management — risk register, probability/impact scoring') : '',
+                on('resource_planning', false) ? item('resource-planning', 'users',     'Resource Planning',       'Resource Planning — worker assignments and capacity') : '',
+                on('advanced_reporting',false) ? item('advanced-reporting','chart',     'Advanced Reporting',      'Advanced Reporting — custom analytics and exports') : '',
+
                 // ── AI Tools (platform-level modules from /api/company/modules) ─
                 this._modules.specSearch ? group('AI Tools') : '',
                 this._modules.specSearch ? item('spec-search', 'search', 'Spec Search', 'Spec Search — AI-powered specification search') : '',
@@ -1638,6 +1663,61 @@ window.LMIcons = {
                     break;
                 case 'spec-search':
                     if (window.AdminSpecSearch) AdminSpecSearch.render(content);
+                    break;
+                // ── Contract Administration ────────────────────────────────────
+                case 'rfis':
+                    if (window.AdminRfis) AdminRfis.render(content, params);
+                    break;
+                case 'submittals':
+                    if (window.AdminSubmittals) AdminSubmittals.render(content, params);
+                    break;
+                case 'change-orders':
+                    if (window.AdminChangeOrders) AdminChangeOrders.render(content, params);
+                    break;
+                case 'scope-management':
+                    if (window.AdminScopeManagement) AdminScopeManagement.render(content, params);
+                    break;
+                // ── Financial Controls ────────────────────────────────────────
+                case 'progress-billing':
+                    if (window.AdminProgressBilling) AdminProgressBilling.render(content, params);
+                    break;
+                case 'ap-ar-tracking':
+                    if (window.AdminApArTracking) AdminApArTracking.render(content, params);
+                    break;
+                case 'cost-allocation':
+                    if (window.AdminCostAllocation) AdminCostAllocation.render(content, params);
+                    break;
+                case 'financial-tracking':
+                    if (window.AdminFinancialTracking) AdminFinancialTracking.render(content, params);
+                    break;
+                case 'certified-payroll':
+                    if (window.AdminCertifiedPayroll) AdminCertifiedPayroll.render(content, params);
+                    break;
+                // ── Field & Safety ────────────────────────────────────────────
+                case 'gps-tracking':
+                    if (window.AdminGpsTracking) AdminGpsTracking.render(content, params);
+                    break;
+                case 'subcontractor-mgmt':
+                    if (window.AdminSubcontractorMgmt) AdminSubcontractorMgmt.render(content, params);
+                    break;
+                case 'safety':
+                    if (window.AdminSafety) AdminSafety.render(content, params);
+                    break;
+                case 'quality-assurance':
+                    if (window.AdminQualityAssurance) AdminQualityAssurance.render(content, params);
+                    break;
+                case 'photo-ocr':
+                    if (window.AdminPhotoOcr) AdminPhotoOcr.render(content, params);
+                    break;
+                // ── Planning & Reporting ──────────────────────────────────────
+                case 'risk-management':
+                    if (window.AdminRiskManagement) AdminRiskManagement.render(content, params);
+                    break;
+                case 'resource-planning':
+                    if (window.AdminResourcePlanning) AdminResourcePlanning.render(content, params);
+                    break;
+                case 'advanced-reporting':
+                    if (window.AdminAdvancedReporting) AdminAdvancedReporting.render(content, params);
                     break;
                 default:
                     content.innerHTML = '<div class="empty-state"><h2>Page not found</h2></div>';
