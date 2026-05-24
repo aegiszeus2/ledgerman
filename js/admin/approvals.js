@@ -417,39 +417,34 @@ window.AdminApprovals = {
 
     _showRejectModal(subId) {
         const self = this;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:400px">
-                <h3>Reject Submission</h3>
-                <div class="form-group" style="margin-bottom:12px">
-                    <label>Reason for rejection</label>
-                    <textarea class="form-control" id="rejectReason" rows="3" placeholder="Enter reason..."></textarea>
-                </div>
-                <div class="form-actions">
-                    <button class="btn btn-danger" id="confirmReject">Reject</button>
-                    <button class="btn btn-secondary modal-close">Cancel</button>
-                </div>
+        const bodyHtml = `
+            <div class="form-group" style="margin-bottom:12px">
+                <label>Reason for rejection</label>
+                <textarea class="form-control" id="rejectReason" rows="3" placeholder="Enter reason..."></textarea>
             </div>
         `;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        const modal = UI.modal('Reject Submission', bodyHtml, {
+            width: '400px',
+            submitLabel: 'Reject',
+            danger: true,
+        });
+        const q = s => modal.q(s);
 
-        overlay.querySelector('#confirmReject').addEventListener('click', async function() {
-            const reason = overlay.querySelector('#rejectReason').value.trim();
+        modal.submitBtn.addEventListener('click', async function() {
+            const reason = q('#rejectReason').value.trim();
             const sub = AppData.getSubmission(subId);
-            if (!sub) { overlay.remove(); return; }
+            if (!sub) { modal.close(); return; }
 
             sub.status = 'Rejected';
             sub.rejectionReason = reason;
             sub.reviewedAt = new Date().toISOString();
             sub.reviewedBy = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('submissions', sub);
             } catch (e) {
                 Utils.showToast('Failed to reject submission: ' + e.message, 'error');
+                restore();
                 return;
             }
 
@@ -457,7 +452,7 @@ window.AdminApprovals = {
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Submission Rejected', (worker ? worker.name : 'Worker') + (reason ? ' - ' + reason : ''));
             Utils.showToast('Submission rejected');
-            overlay.remove();
+            modal.close();
             self._renderContent();
         });
     },
@@ -507,109 +502,100 @@ window.AdminApprovals = {
             '</div>';
         }
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:500px;max-height:90vh;overflow-y:auto">
-                <h3>Edit Submission</h3>
-                <p style="font-size:.85rem;color:var(--text2);margin-top:-8px;margin-bottom:14px">
-                    ${Utils.escapeHtml(worker ? worker.name : 'Worker')} &mdash; ${Utils.escapeHtml(project ? project.name : 'Project')}
-                    <span style="font-size:.78rem;padding:2px 7px;border-radius:10px;margin-left:6px;background:${isApproved ? 'rgba(46,204,113,.2);color:var(--success)' : isRejected ? 'rgba(233,69,96,.2);color:var(--accent)' : 'rgba(255,193,7,.2);color:#856404'}">${sub.status || 'Pending'}</span>
-                </p>
+        const bodyHtml = `
+            <p style="font-size:.85rem;color:var(--text2);margin:-8px 0 14px">
+                ${Utils.escapeHtml(worker ? worker.name : 'Worker')} &mdash; ${Utils.escapeHtml(project ? project.name : 'Project')}
+                <span style="font-size:.78rem;padding:2px 7px;border-radius:10px;margin-left:6px;background:${isApproved ? 'rgba(46,204,113,.2);color:var(--success)' : isRejected ? 'rgba(233,69,96,.2);color:var(--accent)' : 'rgba(255,193,7,.2);color:#856404'}">${sub.status || 'Pending'}</span>
+            </p>
 
-                ${statusBanner}
-                ${historyHtml}
+            ${statusBanner}
+            ${historyHtml}
 
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" class="form-control" id="editDate" value="${sub.date || ''}">
+            </div>
+
+            <div class="form-group">
+                <label>Description / Notes</label>
+                <textarea class="form-control" id="editDescription" rows="2">${Utils.escapeHtml(sub.description || '')}</textarea>
+            </div>
+
+            ${isFlat ? `
+            <div class="form-group">
+                <label>Flat Amount ($)</label>
+                <input type="number" class="form-control" id="editFlatAmount" value="${sub.flatAmount || sub.flatRate || sub.amount || 0}" step="0.01" min="0">
+            </div>
+            ` : `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div class="form-group">
-                    <label>Date</label>
-                    <input type="date" class="form-control" id="editDate" value="${sub.date || ''}">
+                    <label>Start Time</label>
+                    <input type="time" class="form-control" id="editStartTime" value="${sub.startTime || ''}">
                 </div>
-
                 <div class="form-group">
-                    <label>Description / Notes</label>
-                    <textarea class="form-control" id="editDescription" rows="2">${Utils.escapeHtml(sub.description || '')}</textarea>
-                </div>
-
-                ${isFlat ? `
-                <div class="form-group">
-                    <label>Flat Amount ($)</label>
-                    <input type="number" class="form-control" id="editFlatAmount" value="${sub.flatAmount || sub.flatRate || sub.amount || 0}" step="0.01" min="0">
-                </div>
-                ` : `
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group">
-                        <label>Start Time</label>
-                        <input type="time" class="form-control" id="editStartTime" value="${sub.startTime || ''}">
-                    </div>
-                    <div class="form-group">
-                        <label>End Time</label>
-                        <input type="time" class="form-control" id="editEndTime" value="${sub.endTime || ''}">
-                    </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group">
-                        <label>Hours</label>
-                        <input type="number" class="form-control" id="editHours" value="${sub.hours || 0}" step="0.25" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Rate ($/hr)</label>
-                        <input type="number" class="form-control" id="editRate" value="${sub.rate || 0}" step="0.01" min="0">
-                    </div>
-                </div>
-                `}
-
-                <div class="form-group">
-                    <label>Reason for modification <span style="color:var(--text2);font-weight:normal">(recommended)</span></label>
-                    <input type="text" class="form-control" id="editReason" placeholder="e.g. Worker reported wrong hours, corrected to 7.5">
-                </div>
-
-                ${(isApproved || isRejected) ? `
-                <div class="form-group" style="display:flex;align-items:center;gap:8px">
-                    <input type="checkbox" id="editReApprove" ${isRejected ? 'checked' : ''}>
-                    <label for="editReApprove" style="margin:0;cursor:pointer">
-                        ${isApproved ? 'Require re-approval (moves back to Pending, removes linked expense)' : 'Move back to Pending for re-review'}
-                    </label>
-                </div>
-                ` : ''}
-
-                <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
-
-                <div class="form-actions">
-                    <button class="btn btn-primary" id="saveEditBtn">Save Changes</button>
-                    <button class="btn btn-secondary modal-close">Cancel</button>
+                    <label>End Time</label>
+                    <input type="time" class="form-control" id="editEndTime" value="${sub.endTime || ''}">
                 </div>
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-group">
+                    <label>Hours</label>
+                    <input type="number" class="form-control" id="editHours" value="${sub.hours || 0}" step="0.25" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Rate ($/hr)</label>
+                    <input type="number" class="form-control" id="editRate" value="${sub.rate || 0}" step="0.01" min="0">
+                </div>
+            </div>
+            `}
+
+            <div class="form-group">
+                <label>Reason for modification <span style="color:var(--text2);font-weight:normal">(recommended)</span></label>
+                <input type="text" class="form-control" id="editReason" placeholder="e.g. Worker reported wrong hours, corrected to 7.5">
+            </div>
+
+            ${(isApproved || isRejected) ? `
+            <div class="form-group" style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" id="editReApprove" ${isRejected ? 'checked' : ''}>
+                <label for="editReApprove" style="margin:0;cursor:pointer">
+                    ${isApproved ? 'Require re-approval (moves back to Pending, removes linked expense)' : 'Move back to Pending for re-review'}
+                </label>
+            </div>
+            ` : ''}
+
+            <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
         `;
 
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        const modal = UI.modal('Edit Submission', bodyHtml, {
+            width: '500px',
+            submitLabel: 'Save Changes',
+            scrollBody: true,
+        });
+        const q = s => modal.q(s);
 
-        overlay.querySelector('#saveEditBtn').addEventListener('click', async function() {
-            const saveBtn = overlay.querySelector('#saveEditBtn');
-            const errEl = overlay.querySelector('#editErrMsg');
+        modal.submitBtn.addEventListener('click', async function() {
+            const errEl = q('#editErrMsg');
             errEl.style.display = 'none';
 
-            const newDate = overlay.querySelector('#editDate').value;
+            const newDate = q('#editDate').value;
             if (!newDate) { errEl.textContent = 'Date is required.'; errEl.style.display = 'block'; return; }
 
-            const reason = overlay.querySelector('#editReason').value.trim();
-            const reApproveEl = overlay.querySelector('#editReApprove');
+            const reason = q('#editReason').value.trim();
+            const reApproveEl = q('#editReApprove');
             const requireReApproval = reApproveEl ? reApproveEl.checked : false;
 
-            const fields = { date: newDate, description: overlay.querySelector('#editDescription').value.trim() };
+            const fields = { date: newDate, description: q('#editDescription').value.trim() };
 
             if (isFlat) {
-                const flatAmt = parseFloat(overlay.querySelector('#editFlatAmount').value) || 0;
+                const flatAmt = parseFloat(q('#editFlatAmount').value) || 0;
                 fields.flatAmount = flatAmt;
                 fields.flatRate = flatAmt;
                 fields.amount = flatAmt;
             } else {
-                fields.startTime = overlay.querySelector('#editStartTime').value;
-                fields.endTime = overlay.querySelector('#editEndTime').value;
-                fields.hours = parseFloat(overlay.querySelector('#editHours').value) || 0;
-                fields.rate = parseFloat(overlay.querySelector('#editRate').value) || 0;
+                fields.startTime = q('#editStartTime').value;
+                fields.endTime = q('#editEndTime').value;
+                fields.hours = parseFloat(q('#editHours').value) || 0;
+                fields.rate = parseFloat(q('#editRate').value) || 0;
             }
 
             // If moving approved back to pending, also remove linked expense client-side
@@ -619,8 +605,7 @@ window.AdminApprovals = {
                 linked.forEach(function(e) { AppData.deleteExpense(e.id); });
             }
 
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 // Use editSubmissionAsync if available (dedicated route with full audit trail)
                 if (typeof AppData.editSubmissionAsync === 'function') {
@@ -634,13 +619,12 @@ window.AdminApprovals = {
             } catch (e) {
                 errEl.textContent = 'Failed to save: ' + e.message;
                 errEl.style.display = 'block';
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Changes';
+                restore();
                 return;
             }
 
             Utils.showToast('Submission updated' + (requireReApproval && (isApproved || isRejected) ? ' — moved to Pending' : ''));
-            overlay.remove();
+            modal.close();
             self._renderContent();
         });
     },
@@ -648,16 +632,12 @@ window.AdminApprovals = {
     _showPhotoLightbox(photo) {
         const blob = photo.blob || photo.thumbnail;
         if (!blob) return;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.style.cursor = 'pointer';
         const url = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
-        overlay.innerHTML = '<img src="' + url + '" style="max-width:90vw;max-height:90vh;object-fit:contain;border-radius:var(--radius)">';
-        overlay.addEventListener('click', function() {
-            URL.revokeObjectURL(url);
-            overlay.remove();
+        const modal = UI.modal('', '<img src="' + url + '" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:var(--radius);display:block;margin:0 auto">', {
+            noFooter: true,
         });
-        document.body.appendChild(overlay);
+        // Revoke URL when modal is closed
+        const origClose = modal.close.bind(modal);
+        modal.close = function() { URL.revokeObjectURL(url); origClose(); };
     }
 };

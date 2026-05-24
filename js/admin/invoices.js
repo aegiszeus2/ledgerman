@@ -1295,16 +1295,8 @@ window.AdminInvoices = {
         }).join('');
         if (!currentProjectId) projectOptionsHtml = '<option value="">— Select project —</option>' + projectOptionsHtml;
 
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.setAttribute('aria-labelledby', 'editInvoiceTitle');
-        overlay.style.display = 'flex';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">' +
-                '<h3 id="editInvoiceTitle" style="margin-bottom:16px">Edit Invoice</h3>' +
-                '<form id="editInvoiceForm" novalidate>' +
+        var bodyHtml =
+            '<form id="editInvoiceForm" novalidate>' +
                     '<div class="form-group" style="margin-bottom:16px;padding:12px;background:#f0f4ff;border-radius:8px;border:1px solid #c7d2fe">' +
                         '<label style="font-weight:700;color:#1a3a5c">Project</label>' +
                         '<select id="editProjectSelect" style="width:100%;margin-top:4px">' + projectOptionsHtml + '</select>' +
@@ -1360,15 +1352,16 @@ window.AdminInvoices = {
                     '<div id="editTotals" style="background:#f8f9fa;padding:12px;border-radius:6px;text-align:right;font-size:.9rem;margin-bottom:20px;border:1px solid #e5e7eb"></div>' +
 
                     '<div class="form-actions">' +
-                        '<button type="submit" class="btn-primary">Save Invoice</button>' +
-                        '<button type="button" class="btn-secondary modal-close">Cancel</button>' +
                     '</div>' +
-                '</form>' +
-            '</div>';
+                '</form>';
 
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        var modal = UI.modal('Edit Invoice', bodyHtml, {
+            width: '700px',
+            submitLabel: 'Save Invoice',
+            scrollBody: true,
+        });
+        var overlay = modal.overlay;
+        var q = function(s) { return modal.q(s); };
 
         function calcTotals() {
             var subtotal = editItems.reduce(function(s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
@@ -1381,7 +1374,7 @@ window.AdminInvoices = {
 
         function renderTotals() {
             var t = calcTotals();
-            var el = overlay.querySelector('#editTotals');
+            var el = q('#editTotals');
             if (!el) return;
             var html = '<div style="color:var(--text-secondary)"><strong>Subtotal:</strong> ' + Utils.formatCurrency(t.subtotal) + '</div>';
             if (hstEnabled) html += '<div style="color:var(--text-secondary)">HST (' + hstRate + '%): ' + Utils.formatCurrency(t.hstAmt) + '</div>';
@@ -1396,7 +1389,7 @@ window.AdminInvoices = {
         }
 
         function renderLineItems() {
-            var tbody = overlay.querySelector('#editLineItemsBody');
+            var tbody = q('#editLineItemsBody');
             if (!tbody) return;
             if (editItems.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;font-size:.85rem">No line items. Add from project expenses or add a custom item.</td></tr>';
@@ -1443,7 +1436,7 @@ window.AdminInvoices = {
         }
 
         function renderUnusedExpenses() {
-            var el = overlay.querySelector('#availableExpensesSection');
+            var el = q('#availableExpensesSection');
             if (!el) return;
             var available = getAvailableExpenses();
             if (available.length === 0) {
@@ -1511,7 +1504,7 @@ window.AdminInvoices = {
         }
 
         // Project selector — live-refresh available expenses when project changes
-        overlay.querySelector('#editProjectSelect').addEventListener('change', function() {
+        q('#editProjectSelect').addEventListener('change', function() {
             currentProjectId = this.value;
             renderUnusedExpenses();
         });
@@ -1522,20 +1515,20 @@ window.AdminInvoices = {
         renderUnusedExpenses();
 
         // Add custom line item
-        overlay.querySelector('#addCustomItem').addEventListener('click', function() {
+        q('#addCustomItem').addEventListener('click', function() {
             editItems.push({ expenseId: null, description: '', category: 'Material', amount: 0 });
             renderLineItems();
             renderTotals();
         });
 
         // Tax toggles
-        overlay.querySelector('#editHst').addEventListener('change', function() { hstEnabled = this.checked; renderTotals(); });
-        overlay.querySelector('#editHstRate').addEventListener('input', function() { hstRate = parseFloat(this.value) || 0; renderTotals(); });
-        overlay.querySelector('#editHoldback').addEventListener('change', function() { holdbackEnabled = this.checked; renderTotals(); });
-        overlay.querySelector('#editHoldbackRate').addEventListener('input', function() { holdbackRate = parseFloat(this.value) || 0; renderTotals(); });
+        q('#editHst').addEventListener('change', function() { hstEnabled = this.checked; renderTotals(); });
+        q('#editHstRate').addEventListener('input', function() { hstRate = parseFloat(this.value) || 0; renderTotals(); });
+        q('#editHoldback').addEventListener('change', function() { holdbackEnabled = this.checked; renderTotals(); });
+        q('#editHoldbackRate').addEventListener('input', function() { holdbackRate = parseFloat(this.value) || 0; renderTotals(); });
 
         // Save
-        overlay.querySelector('#editInvoiceForm').addEventListener('submit', async function(e) {
+        q('#editInvoiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             var fd = Utils.getFormData(this);
             var t = calcTotals();
@@ -1615,72 +1608,62 @@ window.AdminInvoices = {
             inv.holdback = t.hbAmt;
             inv.total = t.total;
             inv.netPayable = t.net;
-            var submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            var restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('invoices', inv);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Invoice'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Invoice Edited', 'Invoice ' + inv.invoiceNumber + ' — ' + editItems.length + ' items, total ' + Utils.formatCurrency(t.total));
             Utils.showToast('Invoice saved');
-            overlay.remove();
+            modal.close();
             if (onComplete) onComplete();
         });
+
+        modal.submitBtn.addEventListener('click', function() { q('#editInvoiceForm').requestSubmit(); });
     },
 
     // ============ PAYMENT MODAL ============
 
     _showPaymentModal(invoiceId, maxAmount, onComplete) {
         var self = this;
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.setAttribute('aria-labelledby', 'recordPaymentTitle');
-        overlay.style.display = 'flex';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:450px">' +
-                '<h3 id="recordPaymentTitle">Record Payment</h3>' +
-                '<form id="paymentForm" novalidate>' +
-                    '<div class="form-row">' +
-                        '<div class="form-group">' +
-                            '<label>Payment Date *</label>' +
-                            '<input type="date" name="date" value="' + Utils.today() + '" required>' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label>Amount ($) *</label>' +
-                            '<input type="number" name="amount" step="0.01" min="0.01" max="' + maxAmount.toFixed(2) + '" value="' + maxAmount.toFixed(2) + '" required>' +
-                        '</div>' +
+        var bodyHtml =
+            '<form id="paymentForm" novalidate>' +
+                '<div class="form-row">' +
+                    '<div class="form-group">' +
+                        '<label>Payment Date *</label>' +
+                        '<input type="date" name="date" value="' + Utils.today() + '" required>' +
                     '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Payment Method</label>' +
-                        '<select name="method">' +
-                            '<option value="Cheque">Cheque</option>' +
-                            '<option value="E-Transfer">E-Transfer</option>' +
-                            '<option value="Cash">Cash</option>' +
-                            '<option value="Other">Other</option>' +
-                        '</select>' +
+                    '<div class="form-group">' +
+                        '<label>Amount ($) *</label>' +
+                        '<input type="number" name="amount" step="0.01" min="0.01" max="' + maxAmount.toFixed(2) + '" value="' + maxAmount.toFixed(2) + '" required>' +
                     '</div>' +
-                    '<div class="form-group" style="margin-bottom:12px">' +
-                        '<label>Notes</label>' +
-                        '<textarea name="notes" rows="2"></textarea>' +
-                    '</div>' +
-                    '<div class="form-actions">' +
-                        '<button type="submit" class="btn-primary">Record Payment</button>' +
-                        '<button type="button" class="btn-secondary modal-close">Cancel</button>' +
-                    '</div>' +
-                '</form>' +
-            '</div>';
+                '</div>' +
+                '<div class="form-group" style="margin-bottom:12px">' +
+                    '<label>Payment Method</label>' +
+                    '<select name="method">' +
+                        '<option value="Cheque">Cheque</option>' +
+                        '<option value="E-Transfer">E-Transfer</option>' +
+                        '<option value="Cash">Cash</option>' +
+                        '<option value="Other">Other</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="form-group" style="margin-bottom:12px">' +
+                    '<label>Notes</label>' +
+                    '<textarea name="notes" rows="2"></textarea>' +
+                '</div>' +
+            '</form>';
 
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        var modal = UI.modal('Record Payment', bodyHtml, {
+            width: '450px',
+            submitLabel: 'Record Payment',
+        });
+        var q = function(s) { return modal.q(s); };
 
-        overlay.querySelector('#paymentForm').addEventListener('submit', async function(e) {
+        q('#paymentForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             var fd = Utils.getFormData(this);
@@ -1708,22 +1691,22 @@ window.AdminInvoices = {
                 inv.status = totalPaid >= (parseFloat(inv.total) || 0) - 0.01 ? 'Paid' : 'Partially Paid';
             }
 
-            // Confirmed-persistence save — modal stays open on failure
-            var submitBtn2 = this.querySelector('[type="submit"]');
-            if (submitBtn2) { submitBtn2.disabled = true; submitBtn2.textContent = 'Saving…'; }
+            var restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('payments', payment);
                 if (inv) { await AppData.saveEntityAsync('invoices', inv); }
             } catch(err) {
-                if (submitBtn2) { submitBtn2.disabled = false; submitBtn2.textContent = 'Record Payment'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Payment Recorded', Utils.formatCurrency(amount) + ' via ' + payment.method + ' for invoice ' + (inv ? inv.invoiceNumber : ''));
             Utils.showToast('Payment of ' + Utils.formatCurrency(amount) + ' recorded');
-            overlay.remove();
+            modal.close();
             if (onComplete) onComplete();
         });
+
+        modal.submitBtn.addEventListener('click', function() { q('#paymentForm').requestSubmit(); });
     }
 };

@@ -544,131 +544,123 @@ window.AdminUsers = {
             });
         }
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:640px">
-                <div class="modal-header">
-                    <h3 style="margin:0">${isEdit ? 'Edit Worker' : 'Add Worker'}</h3>
+        const bodyHtml = `
+            <form id="workerModalForm" novalidate>
+
+                <!-- Personal Information -->
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Personal Information</div>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group">
+                        <label>Worker Name *</label>
+                        <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input class="form-control" type="tel" name="phone" value="${esc(worker ? worker.phone || '' : '')}" placeholder="e.g. 905-555-0100">
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form id="workerModalForm" novalidate>
-
-                        <!-- Personal Information -->
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Personal Information</div>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group">
-                                <label>Worker Name *</label>
-                                <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Phone Number</label>
-                                <input class="form-control" type="tel" name="phone" value="${esc(worker ? worker.phone || '' : '')}" placeholder="e.g. 905-555-0100">
-                            </div>
-                        </div>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group">
-                                <label>Date of Birth</label>
-                                <input class="form-control" type="date" name="dob" value="${esc(worker ? worker.dob || '' : '')}">
-                            </div>
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select class="form-control" name="status">
-                                    <option value="Active" ${(!worker || worker.status === 'Active') ? 'selected' : ''}>Active</option>
-                                    <option value="Inactive" ${worker && worker.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Home Address</label>
-                            <input class="form-control" name="address" value="${esc(worker ? worker.address || '' : '')}" placeholder="Street, City, Province, Postal Code">
-                        </div>
-                        <div class="form-group" style="margin-bottom:16px">
-                            <label>Social Insurance Number (SIN)</label>
-                            <div style="position:relative">
-                                <input class="form-control" name="sin" id="workerSinInput" type="password" value="${esc(worker ? worker.sin || '' : '')}" placeholder="9-digit SIN" maxlength="9" inputmode="numeric" style="padding-right:50px">
-                                <button type="button" id="toggleSinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
-                            </div>
-                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Stored securely. Visible only to admins. Never shared with workers.</p>
-                        </div>
-
-                        <!-- Account & Access -->
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Account &amp; Access</div>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group">
-                                <label>Role *</label>
-                                <select class="form-control" name="role">
-                                    <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
-                                    <option value="Supervisor" ${worker && worker.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
-                                    <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Email Address</label>
-                                <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
-                            </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-                                <input type="checkbox" name="email2FA" ${worker && worker.email2FAEnabled ? 'checked' : ''}>
-                                Enable Email 2FA
-                            </label>
-                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
-                        </div>
-                        <div class="form-group" style="margin-bottom:16px">
-                            <label>PIN (6+ digits)${isEdit ? ' — leave blank to keep current' : ' *'}</label>
-                            <div style="position:relative;max-width:200px">
-                                <input class="form-control" name="pin" id="workerPinInput" type="password" maxlength="12" inputmode="numeric" value="" placeholder="${isEdit ? 'Leave blank to keep current' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
-                                <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
-                            </div>
-                        </div>
-
-                        <!-- Rates -->
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Rates</div>
-                        <div class="form-row" style="margin-bottom:4px">
-                            <div class="form-group">
-                                <label>Pay Rate ($/hr)</label>
-                                <input class="form-control" type="number" name="payRate" step="0.01" min="0" value="${worker ? (worker.payRate || worker.defaultRate || '') : ''}" placeholder="0.00">
-                            </div>
-                            <div class="form-group">
-                                <label>Cost Rate ($/hr)</label>
-                                <input class="form-control" type="number" name="costRate" step="0.01" min="0" value="${worker ? worker.costRate || '' : ''}" placeholder="0.00">
-                            </div>
-                        </div>
-                        <p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">
-                            <strong>Pay Rate</strong> — what the worker earns; applied to project labour cost tracking.<br>
-                            <strong>Cost Rate</strong> — billable rate charged to the client on invoices.
-                        </p>
-
-                        <!-- Project Assignment -->
-                        ${projects.length > 0 ? `
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Project Assignment</div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-                                ${projects.map(function(p) {
-                                    const checked = assignedProjects.includes(p.id) ? ' checked' : '';
-                                    return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
-                                        '<input type="checkbox" class="project-checkbox" value="' + p.id + '"' + checked + '> ' +
-                                        esc(p.name) +
-                                    '</label>';
-                                }).join('')}
-                            </div>
-                        </div>` : ''}
-
-                    </form>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input class="form-control" type="date" name="dob" value="${esc(worker ? worker.dob || '' : '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select class="form-control" name="status">
+                            <option value="Active" ${(!worker || worker.status === 'Active') ? 'selected' : ''}>Active</option>
+                            <option value="Inactive" ${worker && worker.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" form="workerModalForm" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Worker</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Home Address</label>
+                    <input class="form-control" name="address" value="${esc(worker ? worker.address || '' : '')}" placeholder="Street, City, Province, Postal Code">
                 </div>
-            </div>
+                <div class="form-group" style="margin-bottom:16px">
+                    <label>Social Insurance Number (SIN)</label>
+                    <div style="position:relative">
+                        <input class="form-control" name="sin" id="workerSinInput" type="password" value="${esc(worker ? worker.sin || '' : '')}" placeholder="9-digit SIN" maxlength="9" inputmode="numeric" style="padding-right:50px">
+                        <button type="button" id="toggleSinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                    </div>
+                    <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Stored securely. Visible only to admins. Never shared with workers.</p>
+                </div>
+
+                <!-- Account & Access -->
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Account &amp; Access</div>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select class="form-control" name="role">
+                            <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
+                            <option value="Supervisor" ${worker && worker.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
+                            <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" name="email2FA" ${worker && worker.email2FAEnabled ? 'checked' : ''}>
+                        Enable Email 2FA
+                    </label>
+                    <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
+                </div>
+                <div class="form-group" style="margin-bottom:16px">
+                    <label>PIN (6+ digits)${isEdit ? ' — leave blank to keep current' : ' *'}</label>
+                    <div style="position:relative;max-width:200px">
+                        <input class="form-control" name="pin" id="workerPinInput" type="password" maxlength="12" inputmode="numeric" value="" placeholder="${isEdit ? 'Leave blank to keep current' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
+                        <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                    </div>
+                </div>
+
+                <!-- Rates -->
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Rates</div>
+                <div class="form-row" style="margin-bottom:4px">
+                    <div class="form-group">
+                        <label>Pay Rate ($/hr)</label>
+                        <input class="form-control" type="number" name="payRate" step="0.01" min="0" value="${worker ? (worker.payRate || worker.defaultRate || '') : ''}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Cost Rate ($/hr)</label>
+                        <input class="form-control" type="number" name="costRate" step="0.01" min="0" value="${worker ? worker.costRate || '' : ''}" placeholder="0.00">
+                    </div>
+                </div>
+                <p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">
+                    <strong>Pay Rate</strong> — what the worker earns; applied to project labour cost tracking.<br>
+                    <strong>Cost Rate</strong> — billable rate charged to the client on invoices.
+                </p>
+
+                <!-- Project Assignment -->
+                ${projects.length > 0 ? `
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Project Assignment</div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+                        ${projects.map(function(p) {
+                            const checked = assignedProjects.includes(p.id) ? ' checked' : '';
+                            return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
+                                '<input type="checkbox" class="project-checkbox" value="' + p.id + '"' + checked + '> ' +
+                                esc(p.name) +
+                            '</label>';
+                        }).join('')}
+                    </div>
+                </div>` : ''}
+
+            </form>
         `;
-        document.body.appendChild(overlay);
+
+        const modal = UI.modal(
+            isEdit ? 'Edit Worker' : 'Add Worker',
+            bodyHtml,
+            { width: '640px', submitLabel: (isEdit ? 'Update' : 'Add') + ' Worker' }
+        );
+        const q = s => modal.q(s);
 
         // Toggle PIN visibility
-        overlay.querySelector('#togglePinVisibility').addEventListener('click', function() {
-            const pinInput = overlay.querySelector('#workerPinInput');
+        q('#togglePinVisibility').addEventListener('click', function() {
+            const pinInput = q('#workerPinInput');
             if (pinInput.type === 'password') {
                 pinInput.type = 'text';
                 this.textContent = 'Hide';
@@ -679,8 +671,8 @@ window.AdminUsers = {
         });
 
         // Toggle SIN visibility
-        overlay.querySelector('#toggleSinVisibility').addEventListener('click', function() {
-            const sinInput = overlay.querySelector('#workerSinInput');
+        q('#toggleSinVisibility').addEventListener('click', function() {
+            const sinInput = q('#workerSinInput');
             if (sinInput.type === 'password') {
                 sinInput.type = 'text';
                 this.textContent = 'Hide';
@@ -690,14 +682,7 @@ window.AdminUsers = {
             }
         });
 
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) overlay.remove();
-        });
-        overlay.querySelector('.modal-close').addEventListener('click', function() {
-            overlay.remove();
-        });
-
-        overlay.querySelector('#workerModalForm').addEventListener('submit', async function(e) {
+        q('#workerModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -735,14 +720,13 @@ window.AdminUsers = {
                 email2FAEnabled: fd.email2FA === 'on' && !!((fd.email || '').trim() || (isEdit ? worker.email || '' : ''))
             };
             // Workers use dedicated endpoint — saveWorkerAsync handles POST vs PUT
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveWorkerAsync(workerData);
                 // Also persist project assignment changes (fire-and-forget is acceptable here
                 // since project data was already confirmed by prior loads — just updating an array field)
                 const selectedProjects = [];
-                overlay.querySelectorAll('.project-checkbox:checked').forEach(function(cb) {
+                modal.overlay.querySelectorAll('.project-checkbox:checked').forEach(function(cb) {
                     selectedProjects.push(cb.value);
                 });
                 const allProjects = AppData.getProjects();
@@ -759,16 +743,18 @@ window.AdminUsers = {
                     }
                 }
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Worker' : 'Add Worker'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Worker Updated' : 'Worker Added', workerData.name + ' (' + workerData.role + ')');
             Utils.showToast(isEdit ? 'Worker updated' : 'Worker added');
-            overlay.remove();
+            modal.close();
             self._renderList();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#workerModalForm').requestSubmit());
     },
 
     _showSetPinModal(worker) {

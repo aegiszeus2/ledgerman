@@ -475,12 +475,7 @@ window.AdminExpensesReview = {
             return;
         }
 
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.innerHTML = '<div class="modal" style="max-width:420px">' +
-            '<div class="modal-header"><h3>Select Project & Type</h3></div>' +
-            '<div class="modal-body">' +
-            '<div class="form-group"><label class="form-label">Project</label>' +
+        var bodyHtml = '<div class="form-group"><label class="form-label">Project</label>' +
             '<select class="form-control" id="erAddProject">' +
             projects.map(function(p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('') +
             '</select></div>' +
@@ -489,19 +484,18 @@ window.AdminExpensesReview = {
             '<option value="Labor">Labor</option>' +
             '<option value="Equipment">Equipment</option>' +
             '<option value="Material" selected>Material</option>' +
-            '</select></div>' +
-            '</div>' +
-            '<div class="modal-footer">' +
-            '<button class="btn btn-secondary modal-close-btn">Cancel</button>' +
-            '<button class="btn btn-primary" id="erAddProceed">Continue</button>' +
-            '</div></div>';
-        document.body.appendChild(overlay);
-        overlay.querySelector('.modal-close-btn').onclick = function() { overlay.remove(); };
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('#erAddProceed').onclick = function() {
-            var projectId = overlay.querySelector('#erAddProject').value;
-            var type = overlay.querySelector('#erAddType').value;
-            overlay.remove();
+            '</select></div>';
+
+        var modal = UI.modal('Select Project & Type', bodyHtml, {
+            width: '420px',
+            submitLabel: 'Continue',
+        });
+        var q = function(s) { return modal.q(s); };
+
+        modal.submitBtn.onclick = function() {
+            var projectId = q('#erAddProject').value;
+            var type = q('#erAddType').value;
+            modal.close();
             if (window.AdminExpenses) {
                 AdminExpenses._projectId = projectId;
                 AdminExpenses._container = self._container;

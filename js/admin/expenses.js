@@ -209,37 +209,26 @@ window.AdminExpenses = {
 
     _showTypeSelector() {
         const self = this;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:400px">
-                <h3>Select Expense Type</h3>
-                <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
-                    <button class="btn-primary" style="padding:16px;font-size:1rem" data-type="Labor">
-                        Labor
-                        <div style="font-size:.8rem;font-weight:normal;margin-top:4px">Worker hours, flat rate labor</div>
-                    </button>
-                    <button class="btn-secondary" style="padding:16px;font-size:1rem" data-type="Equipment">
-                        Equipment
-                        <div style="font-size:.8rem;font-weight:normal;margin-top:4px">Equipment rental, tools</div>
-                    </button>
-                    <button class="btn-secondary" style="padding:16px;font-size:1rem" data-type="Material">
-                        Material
-                        <div style="font-size:.8rem;font-weight:normal;margin-top:4px">Building materials, supplies</div>
-                    </button>
-                </div>
-                <div class="form-actions" style="justify-content:flex-end">
-                    <button class="btn-ghost modal-close">Cancel</button>
-                </div>
+        const typeBodyHtml = `
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+                <button class="btn-primary" style="padding:16px;font-size:1rem" data-type="Labor">
+                    Labor
+                    <div style="font-size:.8rem;font-weight:normal;margin-top:4px">Worker hours, flat rate labor</div>
+                </button>
+                <button class="btn-secondary" style="padding:16px;font-size:1rem" data-type="Equipment">
+                    Equipment
+                    <div style="font-size:.8rem;font-weight:normal;margin-top:4px">Equipment rental, tools</div>
+                </button>
+                <button class="btn-secondary" style="padding:16px;font-size:1rem" data-type="Material">
+                    Material
+                    <div style="font-size:.8rem;font-weight:normal;margin-top:4px">Building materials, supplies</div>
+                </button>
             </div>
         `;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
-        overlay.querySelectorAll('[data-type]').forEach(function(btn) {
+        const modal = UI.modal('Select Expense Type', typeBodyHtml, { width: '400px', noFooter: true });
+        modal.overlay.querySelectorAll('[data-type]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                overlay.remove();
+                modal.close();
                 self._showExpenseForm(btn.dataset.type, null);
             });
         });
@@ -266,10 +255,6 @@ window.AdminExpenses = {
             '</select></div>' +
             '<div class="form-group" id="vendorManualGroup" style="margin-bottom:12px;' + (isVendorManual ? '' : 'display:none') + '">' +
             '<label>Vendor Name</label><input class="form-control" name="vendorManual" value="' + esc(existingVendorManual) + '" placeholder="Enter vendor name"></div>';
-
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
 
         let formFields = '';
         if (isLabor) {
@@ -356,61 +341,58 @@ window.AdminExpenses = {
             `;
         }
 
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:550px">
-                <h3>${isEdit ? 'Edit' : 'Add'} ${type} Expense</h3>
-                <form id="expenseFormModal" novalidate>
-                    ${formFields}
-                    <div class="form-row">
-                        <div class="form-group">
-                            <div class="toggle-wrap">
-                                <label class="toggle">
-                                    <input type="checkbox" name="billable" ${(!existing || existing.billable) ? 'checked' : ''}>
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Billable</span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="toggle-wrap">
-                                <label class="toggle">
-                                    <input type="checkbox" name="changeOrder" ${existing && existing.changeOrder ? 'checked' : ''}>
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Change Order</span>
-                            </div>
+        const bodyHtml = `
+            <form id="expenseFormModal" novalidate>
+                ${formFields}
+                <div class="form-row">
+                    <div class="form-group">
+                        <div class="toggle-wrap">
+                            <label class="toggle">
+                                <input type="checkbox" name="billable" ${(!existing || existing.billable) ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Billable</span>
                         </div>
                     </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'} Expense</button>
-                        <button type="button" class="btn-secondary modal-close">Cancel</button>
+                    <div class="form-group">
+                        <div class="toggle-wrap">
+                            <label class="toggle">
+                                <input type="checkbox" name="changeOrder" ${existing && existing.changeOrder ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Change Order</span>
+                        </div>
                     </div>
-                </form>
-            </div>
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+
+        const modal = UI.modal(
+            (isEdit ? 'Edit' : 'Add') + ' ' + type + ' Expense',
+            bodyHtml,
+            { width: '550px', submitLabel: (isEdit ? 'Update' : 'Add') + ' Expense' }
+        );
+        const q = s => modal.q(s);
 
         // Labor rate type toggle
         if (isLabor) {
-            overlay.querySelector('#laborRateType').addEventListener('change', function() {
+            q('#laborRateType').addEventListener('change', function() {
                 const isFlat = this.value === 'flat';
-                overlay.querySelector('#hourlyFields').style.display = isFlat ? 'none' : '';
-                overlay.querySelector('#flatFields').style.display = isFlat ? '' : 'none';
+                q('#hourlyFields').style.display = isFlat ? 'none' : '';
+                q('#flatFields').style.display = isFlat ? '' : 'none';
             });
         }
 
         // Vendor select toggle
-        var vendorSelectToggle = overlay.querySelector('#vendorSelectField');
+        var vendorSelectToggle = q('#vendorSelectField');
         if (vendorSelectToggle) {
             vendorSelectToggle.addEventListener('change', function() {
-                var manualGroup = overlay.querySelector('#vendorManualGroup');
+                var manualGroup = q('#vendorManualGroup');
                 if (manualGroup) manualGroup.style.display = (this.value === '__manual__') ? '' : 'none';
             });
         }
 
-        overlay.querySelector('#expenseFormModal').addEventListener('submit', async function(e) {
+        q('#expenseFormModal').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -422,7 +404,7 @@ window.AdminExpenses = {
             let amount = 0;
             let rateType = '';
             if (isLabor) {
-                rateType = overlay.querySelector('#laborRateType').value;
+                rateType = q('#laborRateType').value;
                 if (rateType === 'flat') {
                     amount = parseFloat(fd.flatAmount) || 0;
                 } else {
@@ -439,8 +421,8 @@ window.AdminExpenses = {
                 return;
             }
 
-            const billable = !!overlay.querySelector('[name="billable"]').checked;
-            const changeOrder = !!overlay.querySelector('[name="changeOrder"]').checked;
+            const billable = !!q('[name="billable"]').checked;
+            const changeOrder = !!q('[name="changeOrder"]').checked;
 
             const expenseData = {
                 id: isEdit ? existing.id : AppData.generateId(),
@@ -466,11 +448,11 @@ window.AdminExpenses = {
             }
 
             // Vendor capture (all expense types)
-            var vendorSelEl = overlay.querySelector('[name="vendorSelect"]');
+            var vendorSelEl = q('[name="vendorSelect"]');
             if (vendorSelEl) {
                 var vendorVal = vendorSelEl.value;
                 if (vendorVal === '__manual__') {
-                    var vmEl = overlay.querySelector('[name="vendorManual"]');
+                    var vmEl = q('[name="vendorManual"]');
                     expenseData.vendorId = '';
                     expenseData.vendorName = vmEl ? vmEl.value.trim() : '';
                 } else if (vendorVal) {
@@ -490,20 +472,21 @@ window.AdminExpenses = {
                 if (!isLabor) expenseData.vendor = expenseData.vendorName || '';
             }
 
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('expenses', expenseData);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update' : 'Add Expense'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Expense Updated' : 'Expense Added', type + ': ' + expenseData.description + ' - ' + Utils.formatCurrency(amount));
             Utils.showToast(isEdit ? 'Expense updated' : 'Expense added');
-            overlay.remove();
+            modal.close();
             self._renderExpenses();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#expenseFormModal').requestSubmit());
     }
 };

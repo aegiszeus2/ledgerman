@@ -181,134 +181,126 @@ window.AdminProjects = {
         const assignedWorkers = (project && project.assignedWorkers) || [];
         const esc = Utils.escapeHtml;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:700px">
-                <div class="modal-header">
-                    <h3 style="margin:0">${isEdit ? 'Edit Project' : 'New Project'}</h3>
+        const bodyHtml = `
+            <form id="projectModalForm" novalidate>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group" style="flex:0 0 160px">
+                        <label>Project # <span style="font-size:.75rem;color:var(--text2)">(auto)</span></label>
+                        <input name="projectNumber" value="${esc(project ? (project.projectNumber || '') : AppData.getNextProjectNumber ? AppData.getNextProjectNumber(new Date().getFullYear()) : '')}" style="font-family:monospace">
+                    </div>
+                    <div class="form-group">
+                        <label>Project Name *</label>
+                        <input name="name" value="${esc(project ? project.name : '')}" required>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form id="projectModalForm" novalidate>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group" style="flex:0 0 160px">
-                                <label>Project # <span style="font-size:.75rem;color:var(--text2)">(auto)</span></label>
-                                <input name="projectNumber" value="${esc(project ? (project.projectNumber || '') : AppData.getNextProjectNumber ? AppData.getNextProjectNumber(new Date().getFullYear()) : '')}" style="font-family:monospace">
-                            </div>
-                            <div class="form-group">
-                                <label>Project Name *</label>
-                                <input name="name" value="${esc(project ? project.name : '')}" required>
-                            </div>
-                        </div>
 
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Client (select from address book or type manually)</label>
-                            <select id="projectClientSelect" style="margin-bottom:8px">
-                                <option value="">-- Select from address book --</option>
-                                ${clients.map(function(c) {
-                                    const sel = project && project.clientId === c.id ? ' selected' : '';
-                                    return '<option value="' + c.id + '"' + sel + '>' + esc(c.name) + '</option>';
-                                }).join('')}
-                            </select>
-                            <input name="clientName" value="${esc(project ? (project.clientName || project.client || '') : '')}" placeholder="Or type client name manually">
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Client Address</label>
-                                <input name="clientAddress" value="${esc(project ? project.clientAddress : '')}">
-                            </div>
-                            <div class="form-group">
-                                <label>Client City</label>
-                                <input name="clientCity" value="${esc(project ? project.clientCity : '')}">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Client Province</label>
-                                <input name="clientProvince" value="${esc(project ? project.clientProvince : '')}">
-                            </div>
-                            <div class="form-group">
-                                <label>Client Postal Code</label>
-                                <input name="clientPostalCode" value="${esc(project ? project.clientPostalCode : '')}">
-                            </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Job Site Address</label>
-                            <input name="jobSiteAddress" value="${esc(project ? project.jobSiteAddress : '')}">
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Contract / PO Number</label>
-                            <input name="contractNumber" value="${esc(project ? project.contractNumber : '')}">
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Start Date</label>
-                                <input type="date" name="startDate" value="${project ? project.startDate || '' : Utils.today()}">
-                            </div>
-                            <div class="form-group">
-                                <label>Estimated End Date</label>
-                                <input type="date" name="endDate" value="${project ? project.endDate || '' : ''}">
-                            </div>
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select name="status">
-                                    <option value="Active" ${(!project || project.status === 'Active') ? 'selected' : ''}>Active</option>
-                                    <option value="Completed" ${project && project.status === 'Completed' ? 'selected' : ''}>Completed</option>
-                                    <option value="On Hold" ${project && project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
-                                </select>
-                            </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Project Budget / Contract Value ($)</label>
-                                <input type="number" name="budget" step="0.01" min="0" value="${project ? project.budget || '' : ''}">
-                            </div>
-                        </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Description / Scope</label>
-                            <textarea name="description" rows="3">${esc(project ? project.description : '')}</textarea>
-                        </div>
-
-                        ${workers.length > 0 ? `
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Assign Workers</label>
-                            <div style="margin-bottom:8px">
-                                <label style="display:inline;cursor:pointer">
-                                    <input type="checkbox" id="assignAllWorkers"> Assign all active workers
-                                </label>
-                            </div>
-                            <div style="display:flex;flex-wrap:wrap;gap:8px">
-                                ${workers.map(function(w) {
-                                    const checked = assignedWorkers.includes(w.id) ? ' checked' : '';
-                                    return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
-                                        '<input type="checkbox" class="worker-checkbox" value="' + w.id + '"' + checked + '> ' +
-                                        esc(w.name) +
-                                    '</label>';
-                                }).join('')}
-                            </div>
-                        </div>` : ''}
-                    </form>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Client (select from address book or type manually)</label>
+                    <select id="projectClientSelect" style="margin-bottom:8px">
+                        <option value="">-- Select from address book --</option>
+                        ${clients.map(function(c) {
+                            const sel = project && project.clientId === c.id ? ' selected' : '';
+                            return '<option value="' + c.id + '"' + sel + '>' + esc(c.name) + '</option>';
+                        }).join('')}
+                    </select>
+                    <input name="clientName" value="${esc(project ? (project.clientName || project.client || '') : '')}" placeholder="Or type client name manually">
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" form="projectModalForm" class="btn-primary">${isEdit ? 'Update' : 'Create'} Project</button>
-                    <button type="button" class="btn-secondary modal-close">Cancel</button>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Client Address</label>
+                        <input name="clientAddress" value="${esc(project ? project.clientAddress : '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Client City</label>
+                        <input name="clientCity" value="${esc(project ? project.clientCity : '')}">
+                    </div>
                 </div>
-            </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Client Province</label>
+                        <input name="clientProvince" value="${esc(project ? project.clientProvince : '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Client Postal Code</label>
+                        <input name="clientPostalCode" value="${esc(project ? project.clientPostalCode : '')}">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Job Site Address</label>
+                    <input name="jobSiteAddress" value="${esc(project ? project.jobSiteAddress : '')}">
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Contract / PO Number</label>
+                    <input name="contractNumber" value="${esc(project ? project.contractNumber : '')}">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" name="startDate" value="${project ? project.startDate || '' : Utils.today()}">
+                    </div>
+                    <div class="form-group">
+                        <label>Estimated End Date</label>
+                        <input type="date" name="endDate" value="${project ? project.endDate || '' : ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="Active" ${(!project || project.status === 'Active') ? 'selected' : ''}>Active</option>
+                            <option value="Completed" ${project && project.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                            <option value="On Hold" ${project && project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
+                        </select>
+                    </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Project Budget / Contract Value ($)</label>
+                        <input type="number" name="budget" step="0.01" min="0" value="${project ? project.budget || '' : ''}">
+                    </div>
+                </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Description / Scope</label>
+                    <textarea name="description" rows="3">${esc(project ? project.description : '')}</textarea>
+                </div>
+
+                ${workers.length > 0 ? `
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Assign Workers</label>
+                    <div style="margin-bottom:8px">
+                        <label style="display:inline;cursor:pointer">
+                            <input type="checkbox" id="assignAllWorkers"> Assign all active workers
+                        </label>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        ${workers.map(function(w) {
+                            const checked = assignedWorkers.includes(w.id) ? ' checked' : '';
+                            return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
+                                '<input type="checkbox" class="worker-checkbox" value="' + w.id + '"' + checked + '> ' +
+                                esc(w.name) +
+                            '</label>';
+                        }).join('')}
+                    </div>
+                </div>` : ''}
+            </form>
         `;
-        document.body.appendChild(overlay);
+
+        const modal = UI.modal(
+            isEdit ? 'Edit Project' : 'New Project',
+            bodyHtml,
+            { width: '700px', submitLabel: isEdit ? 'Update Project' : 'Create Project' }
+        );
+        const q = s => modal.q(s);
 
         // Client dropdown auto-fill
-        overlay.querySelector('#projectClientSelect').addEventListener('change', function() {
+        q('#projectClientSelect').addEventListener('change', function() {
             const clientId = this.value;
             if (!clientId) return;
             const client = AppData.getClient(clientId);
             if (!client) return;
-            const form = overlay.querySelector('#projectModalForm');
+            const form = q('#projectModalForm');
             form.querySelector('[name="clientName"]').value = client.name || '';
             form.querySelector('[name="clientAddress"]').value = client.address || '';
             form.querySelector('[name="clientCity"]').value = client.city || '';
@@ -317,19 +309,16 @@ window.AdminProjects = {
         });
 
         // Assign all workers
-        const assignAll = overlay.querySelector('#assignAllWorkers');
+        const assignAll = q('#assignAllWorkers');
         if (assignAll) {
             assignAll.addEventListener('change', function() {
-                overlay.querySelectorAll('.worker-checkbox').forEach(function(cb) {
+                modal.overlay.querySelectorAll('.worker-checkbox').forEach(function(cb) {
                     cb.checked = assignAll.checked;
                 });
             });
         }
 
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
-
-        overlay.querySelector('#projectModalForm').addEventListener('submit', async function(e) {
+        q('#projectModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -338,10 +327,10 @@ window.AdminProjects = {
                 return;
             }
             const workerIds = [];
-            overlay.querySelectorAll('.worker-checkbox:checked').forEach(function(cb) {
+            modal.overlay.querySelectorAll('.worker-checkbox:checked').forEach(function(cb) {
                 workerIds.push(cb.value);
             });
-            const clientSelect = overlay.querySelector('#projectClientSelect');
+            const clientSelect = q('#projectClientSelect');
 
             // Auto-generate project number if blank on new project
             var projectNumber = (fd.projectNumber || '').trim();
@@ -371,14 +360,11 @@ window.AdminProjects = {
                 budget: parseFloat(fd.budget) || 0,
             };
 
-            // ── Confirmed-persistence save ──
-            // Modal stays open until server confirms. On failure: re-enable, show error, keep form.
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('projects', projectData);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Project'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return; // form stays open — user can retry or cancel
             }
@@ -386,9 +372,11 @@ window.AdminProjects = {
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Project Updated' : 'Project Created', projectData.name);
             Utils.showToast(isEdit ? 'Project updated' : 'Project created');
-            overlay.remove();
+            modal.close();
             self._renderList();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#projectModalForm').requestSubmit());
     },
 
     _renderDetail() {
@@ -565,74 +553,68 @@ window.AdminProjects = {
         const esc = Utils.escapeHtml;
         const workers = AppData.getWorkers();
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:500px">
-                <h3>${isEdit ? 'Edit Task' : 'Add Task'}</h3>
-                <form id="taskForm" novalidate>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Task Name *</label>
-                        <input name="name" value="${esc(task ? task.name : '')}" required>
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Description</label>
-                        <textarea name="description" rows="2">${esc(task ? (task.description || '') : '')}</textarea>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Assigned To</label>
-                            <select name="assigned_to">
-                                <option value="">-- Unassigned --</option>
-                                ${workers.map(function(w) {
-                                    return '<option value="' + w.id + '" ' + (task && task.assigned_to === w.id ? 'selected' : '') + '>' + esc(w.name) + '</option>';
-                                }).join('')}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select name="status">
-                                <option value="Todo" ${(!task || task.status === 'Todo') ? 'selected' : ''}>Todo</option>
-                                <option value="Active" ${task && task.status === 'Active' ? 'selected' : ''}>Active</option>
-                                <option value="Done" ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Start Date</label>
-                            <input type="date" name="start_date" value="${task && task.startDate ? esc(task.startDate) : ''}">
-                        </div>
-                        <div class="form-group">
-                            <label>Due Date</label>
-                            <input type="date" name="due_date" value="${task && task.due_date ? esc(task.due_date) : ''}">
-                        </div>
-                    </div>
-                    ${(() => {
-                        const workItems = AppData.getSubtasks ? AppData.getSubtasks(projectId) : [];
-                        if (workItems.length === 0) return '';
-                        return '<div class="form-group" style="margin-bottom:12px">' +
-                            '<label>Linked Work Item <span style="font-size:.75rem;color:var(--text2)">(optional — links this task to a budget line)</span></label>' +
-                            '<select name="workItemId">' +
-                            '<option value="">-- Not linked --</option>' +
-                            workItems.map(function(wi) {
-                                return '<option value="' + wi.id + '" ' + (task && task.workItemId === wi.id ? 'selected' : '') + '>' + esc(wi.name) + '</option>';
-                            }).join('') +
-                            '</select></div>';
-                    })()}
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'}</button>
-                        <button type="button" class="btn-secondary modal-close">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        const workItems = AppData.getSubtasks ? AppData.getSubtasks(projectId) : [];
+        const workItemsHtml = workItems.length === 0 ? '' :
+            '<div class="form-group" style="margin-bottom:12px">' +
+            '<label>Linked Work Item <span style="font-size:.75rem;color:var(--text2)">(optional — links this task to a budget line)</span></label>' +
+            '<select name="workItemId">' +
+            '<option value="">-- Not linked --</option>' +
+            workItems.map(function(wi) {
+                return '<option value="' + wi.id + '" ' + (task && task.workItemId === wi.id ? 'selected' : '') + '>' + esc(wi.name) + '</option>';
+            }).join('') +
+            '</select></div>';
 
-        overlay.querySelector('#taskForm').addEventListener('submit', async function(e) {
+        const bodyHtml = `
+            <form id="taskForm" novalidate>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Task Name *</label>
+                    <input name="name" value="${esc(task ? task.name : '')}" required>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Description</label>
+                    <textarea name="description" rows="2">${esc(task ? (task.description || '') : '')}</textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Assigned To</label>
+                        <select name="assigned_to">
+                            <option value="">-- Unassigned --</option>
+                            ${workers.map(function(w) {
+                                return '<option value="' + w.id + '" ' + (task && task.assigned_to === w.id ? 'selected' : '') + '>' + esc(w.name) + '</option>';
+                            }).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="Todo" ${(!task || task.status === 'Todo') ? 'selected' : ''}>Todo</option>
+                            <option value="Active" ${task && task.status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Done" ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" name="start_date" value="${task && task.startDate ? esc(task.startDate) : ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Due Date</label>
+                        <input type="date" name="due_date" value="${task && task.due_date ? esc(task.due_date) : ''}">
+                    </div>
+                </div>
+                ${workItemsHtml}
+            </form>
+        `;
+
+        const modal = UI.modal(
+            isEdit ? 'Edit Task' : 'Add Task',
+            bodyHtml,
+            { width: '500px', submitLabel: isEdit ? 'Update' : 'Add' }
+        );
+        const q = s => modal.q(s);
+
+        q('#taskForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -648,21 +630,22 @@ window.AdminProjects = {
                 status: fd.status || 'Todo',
                 workItemId: fd.workItemId || null
             };
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('tasks', data);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update' : 'Add Task'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Task Updated' : 'Task Added', data.name);
             Utils.showToast(isEdit ? 'Task updated' : 'Task added');
-            overlay.remove();
+            modal.close();
             self._renderDetail();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#taskForm').requestSubmit());
     },
 
     _renderBudgetTab(tabContent, project) {
@@ -864,66 +847,60 @@ window.AdminProjects = {
         const isEdit = !!st;
         const esc = Utils.escapeHtml;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:500px">
-                <h3>${isEdit ? 'Edit Work Item' : 'Add Work Item'}</h3>
-                <form id="subtaskForm" novalidate>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Subtask Name *</label>
-                        <input name="name" value="${esc(st ? st.name : '')}" required>
+        const bodyHtml = `
+            <form id="subtaskForm" novalidate>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Subtask Name *</label>
+                    <input name="name" value="${esc(st ? st.name : '')}" required>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Description</label>
+                    <textarea name="description" rows="2">${esc(st ? st.description : '')}</textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Unit of Measure</label>
+                        <input name="unitOfMeasure" value="${esc(st ? st.unitOfMeasure : '')}" placeholder="e.g. sq ft, hours, each">
                     </div>
-                    <div class="form-group" style="margin-bottom:12px">
-                        <label>Description</label>
-                        <textarea name="description" rows="2">${esc(st ? st.description : '')}</textarea>
+                    <div class="form-group">
+                        <label>Budgeted Qty</label>
+                        <input type="number" name="budgetedQty" step="0.01" min="0" value="${st ? st.budgetedQty || '' : ''}">
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Unit of Measure</label>
-                            <input name="unitOfMeasure" value="${esc(st ? st.unitOfMeasure : '')}" placeholder="e.g. sq ft, hours, each">
-                        </div>
-                        <div class="form-group">
-                            <label>Budgeted Qty</label>
-                            <input type="number" name="budgetedQty" step="0.01" min="0" value="${st ? st.budgetedQty || '' : ''}">
-                        </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Budgeted Cost ($)</label>
+                        <input type="number" name="budgetedCost" step="0.01" min="0" value="${st ? st.budgetedCost || '' : ''}">
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Budgeted Cost ($)</label>
-                            <input type="number" name="budgetedCost" step="0.01" min="0" value="${st ? st.budgetedCost || '' : ''}">
-                        </div>
-                        <div class="form-group">
-                            <label>Change Order?</label>
-                            <select name="changeOrder">
-                                <option value="no" ${(!st || !st.changeOrder) ? 'selected' : ''}>No</option>
-                                <option value="yes" ${st && st.changeOrder ? 'selected' : ''}>Yes</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label>Change Order?</label>
+                        <select name="changeOrder">
+                            <option value="no" ${(!st || !st.changeOrder) ? 'selected' : ''}>No</option>
+                            <option value="yes" ${st && st.changeOrder ? 'selected' : ''}>Yes</option>
+                        </select>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Planned Start Date</label>
-                            <input type="date" name="startDate" value="${esc(st ? st.startDate || '' : '')}">
-                        </div>
-                        <div class="form-group">
-                            <label>Planned End Date</label>
-                            <input type="date" name="endDate" value="${esc(st ? st.endDate || '' : '')}">
-                        </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Planned Start Date</label>
+                        <input type="date" name="startDate" value="${esc(st ? st.startDate || '' : '')}">
                     </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">${isEdit ? 'Update' : 'Add'}</button>
-                        <button type="button" class="btn-secondary modal-close">Cancel</button>
+                    <div class="form-group">
+                        <label>Planned End Date</label>
+                        <input type="date" name="endDate" value="${esc(st ? st.endDate || '' : '')}">
                     </div>
-                </form>
-            </div>
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
 
-        overlay.querySelector('#subtaskForm').addEventListener('submit', async function(e) {
+        const modal = UI.modal(
+            isEdit ? 'Edit Work Item' : 'Add Work Item',
+            bodyHtml,
+            { width: '500px', submitLabel: isEdit ? 'Update' : 'Add' }
+        );
+        const q = s => modal.q(s);
+
+        q('#subtaskForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -940,21 +917,22 @@ window.AdminProjects = {
                 startDate: (fd.startDate || '').trim(),
                 endDate: (fd.endDate || '').trim()
             };
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('subtasks', data);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update' : 'Add'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Subtask Updated' : 'Subtask Added', data.name);
             Utils.showToast(isEdit ? 'Subtask updated' : 'Subtask added');
-            overlay.remove();
+            modal.close();
             self._renderDetail();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#subtaskForm').requestSubmit());
     },
 
     _renderExpensesTab(tabContent, project) {

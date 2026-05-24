@@ -212,70 +212,61 @@ window.AdminImpactCodes = (function() {
             return '<option value="' + esc(s) + '"' + (existing && existing.defaultBillableStatus === s ? ' selected' : '') + '>' + esc(s) + '</option>';
         }).join('');
 
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:480px">' +
-                '<h3>' + (isEdit ? 'Edit Impact Code' : 'New Impact Code') + '</h3>' +
-                '<div class="form-group">' +
-                    '<label class="form-label">Short Code <span style="color:var(--text2);font-weight:400">(e.g. OD, UC)</span></label>' +
-                    '<input class="form-control" type="text" id="icCode" maxlength="10" value="' + esc(existing ? existing.code : '') + '" placeholder="e.g. OD">' +
-                '</div>' +
-                '<div class="form-group">' +
-                    '<label class="form-label">Name <span style="color:var(--accent)">*</span></label>' +
-                    '<input class="form-control" type="text" id="icName" value="' + esc(existing ? existing.name : '') + '" required>' +
-                '</div>' +
-                '<div class="form-group">' +
-                    '<label class="form-label">Description</label>' +
-                    '<textarea class="form-control" id="icDescription" rows="2">' + esc(existing ? existing.description : '') + '</textarea>' +
-                '</div>' +
-                '<div class="form-group">' +
-                    '<label class="form-label">Category <span style="color:var(--accent)">*</span></label>' +
-                    '<select class="form-control" id="icCategory">' + catOptions + '</select>' +
-                '</div>' +
-                '<div class="form-group">' +
-                    '<label class="form-label">Default Billable Status</label>' +
-                    '<select class="form-control" id="icBillableStatus">' + billableOptions + '</select>' +
-                '</div>' +
-                (isEdit ? '<div class="form-group" style="display:flex;align-items:center;gap:8px">' +
-                    '<input type="checkbox" id="icActive"' + (existing.active ? ' checked' : '') + '>' +
-                    '<label for="icActive" style="margin:0;cursor:pointer">Active</label>' +
-                '</div>' : '') +
-                '<div id="icErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>' +
-                '<div class="form-actions">' +
-                    '<button class="btn btn-primary" id="icSaveBtn">' + (isEdit ? 'Save Changes' : 'Create') + '</button>' +
-                    '<button class="btn btn-secondary modal-close">Cancel</button>' +
-                '</div>' +
-            '</div>';
+        var bodyHtml =
+            '<div class="form-group">' +
+                '<label class="form-label">Short Code <span style="color:var(--text2);font-weight:400">(e.g. OD, UC)</span></label>' +
+                '<input class="form-control" type="text" id="icCode" maxlength="10" value="' + esc(existing ? existing.code : '') + '" placeholder="e.g. OD">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Name <span style="color:var(--accent)">*</span></label>' +
+                '<input class="form-control" type="text" id="icName" value="' + esc(existing ? existing.name : '') + '" required>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Description</label>' +
+                '<textarea class="form-control" id="icDescription" rows="2">' + esc(existing ? existing.description : '') + '</textarea>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Category <span style="color:var(--accent)">*</span></label>' +
+                '<select class="form-control" id="icCategory">' + catOptions + '</select>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Default Billable Status</label>' +
+                '<select class="form-control" id="icBillableStatus">' + billableOptions + '</select>' +
+            '</div>' +
+            (isEdit ? '<div class="form-group" style="display:flex;align-items:center;gap:8px">' +
+                '<input type="checkbox" id="icActive"' + (existing.active ? ' checked' : '') + '>' +
+                '<label for="icActive" style="margin:0;cursor:pointer">Active</label>' +
+            '</div>' : '') +
+            '<div id="icErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>';
 
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        var modal = UI.modal(
+            isEdit ? 'Edit Impact Code' : 'New Impact Code',
+            bodyHtml,
+            { width: '480px', submitLabel: isEdit ? 'Save Changes' : 'Create' }
+        );
+        var q = function(s) { return modal.q(s); };
 
-        overlay.querySelector('#icSaveBtn').addEventListener('click', async function() {
-            var saveBtn = overlay.querySelector('#icSaveBtn');
-            var errEl   = overlay.querySelector('#icErrMsg');
+        modal.submitBtn.addEventListener('click', async function() {
+            var errEl = q('#icErrMsg');
             errEl.style.display = 'none';
 
-            var name     = (overlay.querySelector('#icName').value || '').trim();
-            var category = overlay.querySelector('#icCategory').value;
+            var name     = (q('#icName').value || '').trim();
+            var category = q('#icCategory').value;
             if (!name)     { errEl.textContent = 'Name is required.';     errEl.style.display = 'block'; return; }
             if (!category) { errEl.textContent = 'Category is required.'; errEl.style.display = 'block'; return; }
 
             var payload = {
-                code:                  (overlay.querySelector('#icCode').value || '').trim(),
+                code:                  (q('#icCode').value || '').trim(),
                 name:                  name,
-                description:           (overlay.querySelector('#icDescription').value || '').trim(),
+                description:           (q('#icDescription').value || '').trim(),
                 category:              category,
-                defaultBillableStatus: overlay.querySelector('#icBillableStatus').value,
+                defaultBillableStatus: q('#icBillableStatus').value,
             };
             if (isEdit) {
-                payload.active = overlay.querySelector('#icActive').checked;
+                payload.active = q('#icActive').checked;
             }
 
-            saveBtn.disabled    = true;
-            saveBtn.textContent = 'Saving…';
+            var restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isEdit) {
                     await _api('/api/impact-codes/' + existing.id, {
@@ -290,14 +281,13 @@ window.AdminImpactCodes = (function() {
                     });
                     Utils.showToast('Impact code created', 'success');
                 }
-                overlay.remove();
+                modal.close();
                 await _load();
                 _render();
             } catch (e) {
                 errEl.textContent   = 'Failed: ' + e.message;
                 errEl.style.display = 'block';
-                saveBtn.disabled    = false;
-                saveBtn.textContent = isEdit ? 'Save Changes' : 'Create';
+                restore();
             }
         });
     }

@@ -273,54 +273,47 @@ window.ResourceGroups = (function () {
         const g = editId ? _groups.find(x => x.id === editId) || _selected : null;
         const isEdit = !!g;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:500px">
-                <div class="modal-header"><h3 style="margin:0">${isEdit ? 'Edit Crew' : 'New Crew'}</h3></div>
-                <div class="modal-body">
-                    <form id="groupForm">
-                        <div class="form-group">
-                            <label>Name *</label>
-                            <input name="name" value="${esc(g ? g.name : '')}" placeholder="e.g. Road Grading Crew" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <textarea name="description" style="resize:vertical;height:60px">${esc(g ? g.description : '')}</textarea>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Default Production Rate</label>
-                                <input type="number" name="defaultProductionRate" min="0" step="any"
-                                    value="${g ? (g.defaultProductionRate || '') : ''}" placeholder="units/hr">
-                            </div>
-                            <div class="form-group">
-                                <label>Production Unit</label>
-                                <input name="productionUnit" value="${esc(g ? g.productionUnit : '')}" placeholder="m2/hr, m3/day…">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Notes</label>
-                            <textarea name="notes" style="resize:vertical;height:50px">${esc(g ? g.notes : '')}</textarea>
-                        </div>
-                        <div class="form-group" style="display:flex;align-items:center;gap:8px">
-                            <input type="checkbox" name="active" id="chkActive" ${!g || g.active ? 'checked' : ''}>
-                            <label for="chkActive" style="margin:0">Active</label>
-                        </div>
-                    </form>
+        const bodyHtml = `
+            <form id="groupForm">
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input name="name" value="${esc(g ? g.name : '')}" placeholder="e.g. Road Grading Crew" required>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="saveBtn">${isEdit ? 'Update' : 'Create'}</button>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" style="resize:vertical;height:60px">${esc(g ? g.description : '')}</textarea>
                 </div>
-            </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Default Production Rate</label>
+                        <input type="number" name="defaultProductionRate" min="0" step="any"
+                            value="${g ? (g.defaultProductionRate || '') : ''}" placeholder="units/hr">
+                    </div>
+                    <div class="form-group">
+                        <label>Production Unit</label>
+                        <input name="productionUnit" value="${esc(g ? g.productionUnit : '')}" placeholder="m2/hr, m3/day…">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" style="resize:vertical;height:50px">${esc(g ? g.notes : '')}</textarea>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px">
+                    <input type="checkbox" name="active" id="chkActive" ${!g || g.active ? 'checked' : ''}>
+                    <label for="chkActive" style="margin:0">Active</label>
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
-            const fd   = new FormData(overlay.querySelector('#groupForm'));
+        const modal = UI.modal(isEdit ? 'Edit Crew' : 'New Crew', bodyHtml, {
+            width: '500px',
+            submitLabel: isEdit ? 'Update' : 'Create',
+        });
+        const q = s => modal.q(s);
+
+        q('#groupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd   = new FormData(q('#groupForm'));
             const name = fd.get('name').trim();
             if (!name) { Utils.showToast('Name is required', 'error'); return; }
 
@@ -333,10 +326,7 @@ window.ResourceGroups = (function () {
                 active: fd.get('active') === 'on',
             };
 
-            const saveBtn = overlay.querySelector('#saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 let saved;
                 if (isEdit) {
@@ -348,69 +338,63 @@ window.ResourceGroups = (function () {
                         method: 'POST', body: JSON.stringify(payload)
                     });
                 }
-                overlay.remove();
+                modal.close();
                 Utils.showToast(isEdit ? 'Crew updated' : 'Crew created');
                 _selected = null;
                 await _renderList();
                 await _loadGroupDetail(saved.id);
             } catch (err) {
                 Utils.showToast('Error: ' + err.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isEdit ? 'Update' : 'Create';
+                restore();
             }
         });
+
+        modal.submitBtn.addEventListener('click', () => q('#groupForm').requestSubmit());
     }
 
     // ── Labour line form ──────────────────────────────────────────────────────
     function _showLabourForm(groupId, line) {
         const isEdit = !!line;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:460px">
-                <div class="modal-header"><h3 style="margin:0">${isEdit ? 'Edit Labour Line' : 'Add Labour Line'}</h3></div>
-                <div class="modal-body">
-                    <form id="labourForm">
-                        <div class="form-group">
-                            <label>Role / Trade *</label>
-                            <input name="role" value="${esc(line ? line.role : '')}" placeholder="Carpenter, Labourer, Operator…" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Headcount</label>
-                                <input type="number" name="quantity" min="0.5" step="0.5" value="${line ? line.quantity : 1}">
-                            </div>
-                            <div class="form-group">
-                                <label>Straight $/hr *</label>
-                                <input type="number" name="hourlyRate" min="0" step="0.01" value="${line ? line.hourlyRate : 0}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>OT $/hr</label>
-                                <input type="number" name="otRate" min="0" step="0.01" value="${line ? (line.otRate || '') : ''}">
-                            </div>
-                            <div class="form-group">
-                                <label>DT $/hr</label>
-                                <input type="number" name="dtRate" min="0" step="0.01" value="${line ? (line.dtRate || '') : ''}">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Notes</label>
-                            <input name="notes" value="${esc(line ? line.notes : '')}">
-                        </div>
-                    </form>
+        const bodyHtml = `
+            <form id="labourForm">
+                <div class="form-group">
+                    <label>Role / Trade *</label>
+                    <input name="role" value="${esc(line ? line.role : '')}" placeholder="Carpenter, Labourer, Operator…" required>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="saveBtn">${isEdit ? 'Update' : 'Add'}</button>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Headcount</label>
+                        <input type="number" name="quantity" min="0.5" step="0.5" value="${line ? line.quantity : 1}">
+                    </div>
+                    <div class="form-group">
+                        <label>Straight $/hr *</label>
+                        <input type="number" name="hourlyRate" min="0" step="0.01" value="${line ? line.hourlyRate : 0}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>OT $/hr</label>
+                        <input type="number" name="otRate" min="0" step="0.01" value="${line ? (line.otRate || '') : ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>DT $/hr</label>
+                        <input type="number" name="dtRate" min="0" step="0.01" value="${line ? (line.dtRate || '') : ''}">
+                    </div>
                 </div>
-            </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input name="notes" value="${esc(line ? line.notes : '')}">
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
-            const fd   = new FormData(overlay.querySelector('#labourForm'));
+        const modal = UI.modal(isEdit ? 'Edit Labour Line' : 'Add Labour Line', bodyHtml, {
+            width: '460px',
+            submitLabel: isEdit ? 'Update' : 'Add',
+        });
+        const q = s => modal.q(s);
+
+        q('#labourForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd   = new FormData(q('#labourForm'));
             const role = fd.get('role').trim();
             if (!role) { Utils.showToast('Role is required', 'error'); return; }
 
@@ -423,10 +407,7 @@ window.ResourceGroups = (function () {
                 notes:      fd.get('notes').trim(),
             };
 
-            const saveBtn = overlay.querySelector('#saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isEdit) {
                     await _api(`/api/resource-groups/${groupId}/labour/${line.id}`, {
@@ -437,67 +418,61 @@ window.ResourceGroups = (function () {
                         method: 'POST', body: JSON.stringify(payload)
                     });
                 }
-                overlay.remove();
+                modal.close();
                 Utils.showToast(isEdit ? 'Labour line updated' : 'Labour line added');
                 await _loadGroupDetail(groupId);
             } catch (err) {
                 Utils.showToast('Error: ' + err.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isEdit ? 'Update' : 'Add';
+                restore();
             }
         });
+
+        modal.submitBtn.addEventListener('click', () => q('#labourForm').requestSubmit());
     }
 
     // ── Equipment line form ───────────────────────────────────────────────────
     function _showEquipForm(groupId, eq) {
         const isEdit = !!eq;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:460px">
-                <div class="modal-header"><h3 style="margin:0">${isEdit ? 'Edit Equipment Line' : 'Add Equipment Line'}</h3></div>
-                <div class="modal-body">
-                    <form id="equipForm">
-                        <div class="form-group">
-                            <label>Equipment Name *</label>
-                            <input name="name" value="${esc(eq ? eq.name : '')}" placeholder="Excavator 30T, Compactor, etc." required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Quantity</label>
-                                <input type="number" name="quantity" min="0.5" step="0.5" value="${eq ? eq.quantity : 1}">
-                            </div>
-                            <div class="form-group">
-                                <label>$/hr *</label>
-                                <input type="number" name="hourlyRate" min="0" step="0.01" value="${eq ? eq.hourlyRate : 0}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>$/day</label>
-                                <input type="number" name="dailyRate" min="0" step="0.01" value="${eq ? (eq.dailyRate || '') : ''}">
-                            </div>
-                            <div class="form-group">
-                                <label>Standby $/hr</label>
-                                <input type="number" name="standbyRate" min="0" step="0.01" value="${eq ? (eq.standbyRate || '') : ''}">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Notes</label>
-                            <input name="notes" value="${esc(eq ? eq.notes : '')}">
-                        </div>
-                    </form>
+        const bodyHtml = `
+            <form id="equipForm">
+                <div class="form-group">
+                    <label>Equipment Name *</label>
+                    <input name="name" value="${esc(eq ? eq.name : '')}" placeholder="Excavator 30T, Compactor, etc." required>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="saveBtn">${isEdit ? 'Update' : 'Add'}</button>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" name="quantity" min="0.5" step="0.5" value="${eq ? eq.quantity : 1}">
+                    </div>
+                    <div class="form-group">
+                        <label>$/hr *</label>
+                        <input type="number" name="hourlyRate" min="0" step="0.01" value="${eq ? eq.hourlyRate : 0}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>$/day</label>
+                        <input type="number" name="dailyRate" min="0" step="0.01" value="${eq ? (eq.dailyRate || '') : ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Standby $/hr</label>
+                        <input type="number" name="standbyRate" min="0" step="0.01" value="${eq ? (eq.standbyRate || '') : ''}">
+                    </div>
                 </div>
-            </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input name="notes" value="${esc(eq ? eq.notes : '')}">
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
-            const fd   = new FormData(overlay.querySelector('#equipForm'));
+        const modal = UI.modal(isEdit ? 'Edit Equipment Line' : 'Add Equipment Line', bodyHtml, {
+            width: '460px',
+            submitLabel: isEdit ? 'Update' : 'Add',
+        });
+        const q = s => modal.q(s);
+
+        q('#equipForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd   = new FormData(q('#equipForm'));
             const name = fd.get('name').trim();
             if (!name) { Utils.showToast('Name is required', 'error'); return; }
 
@@ -510,10 +485,7 @@ window.ResourceGroups = (function () {
                 notes:        fd.get('notes').trim(),
             };
 
-            const saveBtn = overlay.querySelector('#saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isEdit) {
                     await _api(`/api/resource-groups/${groupId}/equipment/${eq.id}`, {
@@ -524,15 +496,16 @@ window.ResourceGroups = (function () {
                         method: 'POST', body: JSON.stringify(payload)
                     });
                 }
-                overlay.remove();
+                modal.close();
                 Utils.showToast(isEdit ? 'Equipment line updated' : 'Equipment line added');
                 await _loadGroupDetail(groupId);
             } catch (err) {
                 Utils.showToast('Error: ' + err.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isEdit ? 'Update' : 'Add';
+                restore();
             }
         });
+
+        modal.submitBtn.addEventListener('click', () => q('#equipForm').requestSubmit());
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
