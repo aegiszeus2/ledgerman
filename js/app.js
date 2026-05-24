@@ -149,13 +149,20 @@ window.LMIcons = {
                     if (creds.companyId) AppData.setCompanyId(creds.companyId);
 
                     try {
-                        const data = await Promise.race([AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin), timeoutPromise]);
+                        // Support both new format {email, pin} and legacy format {companyName, workerName, pin}
+                        let data;
+                        if (creds.email) {
+                            data = await Promise.race([AppData.apiLoginWorkerByEmail(creds.email, creds.pin, true), timeoutPromise]);
+                        } else {
+                            data = await Promise.race([AppData.apiLoginWorkerByNameAndPin(creds.companyName, creds.workerName, creds.pin), timeoutPromise]);
+                        }
 
-                        // 2FA required — route to 2FA prompt instead of crashing on data.worker
+                        // TOTP 2FA required — route to authenticator-app step
                         if (data.twoFARequired) {
                             this._worker2FAData = {
-                                companyName:    creds.companyName,
-                                workerName:     creds.workerName,
+                                email:          creds.email || '',
+                                companyName:    creds.companyName || '',
+                                workerName:     creds.workerName  || '',
                                 pin:            creds.pin,
                                 keepMeSignedIn: true,
                                 workerId:       data.workerId
@@ -164,20 +171,34 @@ window.LMIcons = {
                             return;
                         }
 
+                        // Email verification required — trusted device cookie may have expired
+                        if (data.verificationRequired) {
+                            this._worker2FAData = {
+                                email:          creds.email || '',
+                                pin:            creds.pin,
+                                keepMeSignedIn: true,
+                                workerId:       data.workerId,
+                                companyId:      data.companyId
+                            };
+                            this._showVerificationStep(data.workerId, data.companyId, creds.email || '', true);
+                            return;
+                        }
+
                         await Promise.race([AppData.syncFromServer(), timeoutPromise]);
                         const worker = AppData.getWorker(data.worker.id) || data.worker;
-                        // Refresh persistent login with fresh JWT so expiry resets
+                        // Refresh persistent login with fresh JWT
                         AppData.savePersistentLogin('worker', {
-                            companyName: creds.companyName,
-                            workerName:  creds.workerName,
-                            pin:         creds.pin,
-                            jwt:         AppData.getJwt(),
-                            companyId:   AppData.getCompanyId()
+                            email:     creds.email     || '',
+                            companyName: creds.companyName || '',
+                            workerName:  creds.workerName  || '',
+                            pin:       creds.pin,
+                            jwt:       AppData.getJwt(),
+                            companyId: AppData.getCompanyId()
                         });
                         this._completeWorkerLogin(worker, 'Restored from persistent login');
                         return;
                     } catch(err) {
-                        // Credentials invalid OR timeout — clear ALL auth state (JWT + companyId + persistent)
+                        // Credentials invalid OR timeout — clear ALL auth state
                         console.log('[Ledgerman] Persistent worker restore failed:', err.message);
                         AppData.clearAuthState();
                         this.showWorkerLogin();
@@ -228,28 +249,39 @@ window.LMIcons = {
         showWorkerLogin() {
             const app = document.getElementById('app');
 
-            // Parse pre-filled credentials from URL (for invitations)
+            // Parse pre-filled credentials from URL.
+            // New format: ?email=...&pin=... (from new invite generation)
+            // Legacy format: ?company=...&name=...&pin=... (old invite URLs — kept for compat)
             const params = new URLSearchParams(window.location.search);
-            const prefilledCompany = params.get('company') || '';
-            const prefilledName = params.get('name') || '';
-            const prefilledPin = params.get('pin') || '';
+            const prefilledEmail = params.get('email') || '';
+            const prefilledPin   = params.get('pin')   || '';
+            // Legacy URL params (for backward compat with old invite links)
+            const legacyCompany  = params.get('company') || '';
+            const legacyName     = params.get('name')    || '';
 
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-card">
                         <h2>Worker Login</h2>
-                        <p class="text-muted">Enter your company name, name, and PIN</p>
+                        <p class="text-muted">Enter your email address and PIN</p>
                         <form id="workerLoginForm">
                             <div class="form-group">
-                                <input type="text" class="form-control" id="workerCompanyName"
-                                    placeholder="Company Name" value="${Utils.escapeHtml(prefilledCompany)}" required autocomplete="off">
+                                <input type="email" class="form-control" id="workerEmail"
+                                    placeholder="Email address"
+                                    value="${Utils.escapeHtml(prefilledEmail)}"
+                                    required autocomplete="email">
                             </div>
                             <div class="form-group">
-                                <input type="text" class="form-control" id="workerName"
-                                    placeholder="Employee Name" value="${Utils.escapeHtml(prefilledName)}" required autocomplete="off">
-                            </div>
-                            <div class="form-group">
-                                <div style="position:relative"><input type="password" class="form-control pin-input" id="workerPin" placeholder="Enter PIN" maxlength="12" inputmode="numeric" pattern="[0-9]{4,12}" value="${Utils.escapeHtml(prefilledPin)}" required autocomplete="off" style="padding-right:40px"><button type="button" class="password-toggle" data-toggle="workerPin" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button></div>
+                                <div style="position:relative">
+                                    <input type="password" class="form-control pin-input" id="workerPin"
+                                        placeholder="PIN" maxlength="12" inputmode="numeric"
+                                        pattern="[0-9]{4,12}"
+                                        value="${Utils.escapeHtml(prefilledPin)}"
+                                        required autocomplete="current-password"
+                                        style="padding-right:40px">
+                                    <button type="button" class="password-toggle" data-toggle="workerPin"
+                                        style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">Show</button>
+                                </div>
                             </div>
                             <div class="form-group" style="display:flex;align-items:center;margin-bottom:16px">
                                 <input type="checkbox" id="workerKeepMeSignedIn" style="margin-right:8px;cursor:pointer">
@@ -258,41 +290,45 @@ window.LMIcons = {
                             <div class="form-error" id="workerLoginError" style="display:none"></div>
                             <button type="submit" class="btn btn-primary btn-block">Login</button>
                             <button type="button" class="btn btn-secondary btn-block mt-1" id="backToLogin">Back</button>
-                            <button type="button" class="btn btn-link btn-block mt-1" id="forgotPin" style="color:var(--primary);font-size:.875rem">Forgot PIN?</button>
+                            <button type="button" class="btn btn-link btn-block mt-1" id="forgotPin"
+                                style="color:var(--primary);font-size:.875rem">Forgot PIN?</button>
                         </form>
                     </div>
                 </div>
             `;
 
-            // Auto-submit if all credentials are pre-filled
-            if (prefilledCompany && prefilledName && prefilledPin) {
-                setTimeout(() => {
-                    document.getElementById('workerLoginForm').dispatchEvent(new Event('submit'));
-                }, 100);
-            } else {
-                document.getElementById('workerCompanyName').focus();
-            }
-            document.getElementById('backToLogin').onclick = () => this.showLogin();
-            document.getElementById('forgotPin').onclick = () => this._showPinReset();
             // Show/Hide PIN toggle
             document.querySelectorAll('.password-toggle[data-toggle]').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     var fieldId = this.getAttribute('data-toggle');
-                    var field = document.getElementById(fieldId);
+                    var field   = document.getElementById(fieldId);
                     if (!field) return;
-                    field.type = field.type === 'password' ? 'text' : 'password';
+                    field.type      = field.type === 'password' ? 'text' : 'password';
                     this.textContent = field.type === 'password' ? 'Show' : 'Hide';
                 });
             });
+
+            document.getElementById('backToLogin').onclick = () => this.showLogin();
+            document.getElementById('forgotPin').onclick   = () => this._showPinReset();
+
+            // Auto-submit if all credentials are pre-filled from URL
+            if (prefilledEmail && prefilledPin) {
+                setTimeout(() => {
+                    document.getElementById('workerLoginForm').dispatchEvent(new Event('submit'));
+                }, 100);
+            } else {
+                document.getElementById('workerEmail').focus();
+            }
+
             document.getElementById('workerLoginForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const companyName = document.getElementById('workerCompanyName').value.trim();
-                const workerName = document.getElementById('workerName').value.trim();
-                const pin = document.getElementById('workerPin').value.trim();
+                const email         = document.getElementById('workerEmail').value.trim();
+                const pin           = document.getElementById('workerPin').value.trim();
                 const keepMeSignedIn = document.getElementById('workerKeepMeSignedIn').checked;
-                const errEl = document.getElementById('workerLoginError');
+                const errEl         = document.getElementById('workerLoginError');
                 errEl.style.display = 'none';
 
+                // Client-side lockout after 5 failed attempts
                 if (Date.now() < this._loginLockoutUntil) {
                     const secs = Math.ceil((this._loginLockoutUntil - Date.now()) / 1000);
                     errEl.textContent = 'Too many attempts. Try again in ' + secs + ' seconds.';
@@ -300,62 +336,72 @@ window.LMIcons = {
                     return;
                 }
 
-                if (AppData.isApiMode() || companyName) {
-                    // API mode — validate company name + worker name + PIN server-side
+                if (AppData.isApiMode() || email) {
+                    // ── API / email-based login ────────────────────────────────────
                     const loginBtn = document.querySelector('#workerLoginForm button[type="submit"]');
                     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Logging in…'; }
                     try {
-                        const data = await AppData.apiLoginWorkerByNameAndPin(companyName, workerName, pin, keepMeSignedIn);
+                        const data = await AppData.apiLoginWorkerByEmail(email, pin, keepMeSignedIn);
+
                         if (data.twoFARequired) {
-                            // Server says 2FA needed — store for later and go to verification step
-                            this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn, workerId: data.workerId, workerName: data.workerName };
+                            // TOTP 2FA — route to authenticator-app code step
+                            this._worker2FAData = {
+                                email, pin, keepMeSignedIn,
+                                workerId:   data.workerId,
+                                workerName: data.workerName
+                            };
                             this._show2FAStep({ id: data.workerId, name: data.workerName });
+
+                        } else if (data.verificationRequired) {
+                            // Email verification step — new server-backed flow
+                            this._worker2FAData = {
+                                email, pin, keepMeSignedIn,
+                                workerId:   data.workerId,
+                                companyId:  data.companyId
+                            };
+                            this._showVerificationStep(data.workerId, data.companyId, email, keepMeSignedIn);
+
                         } else {
+                            // Trusted device — JWT issued immediately
                             await AppData.syncFromServer();
-                            const worker = AppData.getWorker(data.worker.id);
-                            // Save persistent login if checkbox is checked
+                            const worker = AppData.getWorker(data.worker.id) || data.worker;
                             if (keepMeSignedIn) {
                                 AppData.savePersistentLogin('worker', {
-                                    companyName: companyName,
-                                    workerName: workerName,
-                                    pin: pin,
-                                    jwt: AppData.getJwt(),
+                                    email:     email,
+                                    pin:       pin,
+                                    jwt:       AppData.getJwt(),
                                     companyId: AppData.getCompanyId()
                                 });
                             }
-                            this._completeWorkerLogin(worker || data.worker);
+                            this._completeWorkerLogin(worker);
                         }
                     } catch(err) {
                         if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login'; }
                         this._loginAttempts++;
                         if (window.LedgermanAnalytics) LedgermanAnalytics.logLoginFailure('worker');
                         if (this._loginAttempts >= 5) {
-                            this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
+                            this._loginLockoutUntil = Date.now() + 60000; // 1-minute lockout
                             this._loginAttempts = 0;
                         }
-                        errEl.textContent = err.message || 'Invalid PIN or worker not found.';
+                        errEl.textContent = err.message || 'Invalid email or PIN.';
                         errEl.style.display = 'block';
                         document.getElementById('workerPin').value = '';
                         document.getElementById('workerPin').focus();
                     }
                 } else {
-                    // Legacy localStorage mode
+                    // ── Legacy localStorage-only mode (offline / no backend) ────────
+                    // Fall back to PIN-only lookup against cached workers.
                     const worker = AppData.getWorkerByPin(pin);
                     if (worker) {
-                        // Check if email 2FA is enabled (preferred over TOTP)
                         if (worker.email2FAEnabled && worker.email) {
-                            this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn };
+                            this._worker2FAData = { email, pin, keepMeSignedIn };
                             this._showEmail2FAStep(worker);
                         } else if (worker.twoFAEnabled && worker.totpSecret) {
-                            this._worker2FAData = { companyName, workerName, pin, keepMeSignedIn };
+                            this._worker2FAData = { email, pin, keepMeSignedIn };
                             this._show2FAStep(worker);
                         } else {
                             if (keepMeSignedIn) {
-                                AppData.savePersistentLogin('worker', {
-                                    companyName: companyName,
-                                    workerName: workerName,
-                                    pin: pin
-                                });
+                                AppData.savePersistentLogin('worker', { email, pin });
                             }
                             this._completeWorkerLogin(worker);
                         }
@@ -363,14 +409,134 @@ window.LMIcons = {
                         this._loginAttempts++;
                         if (window.LedgermanAnalytics) LedgermanAnalytics.logLoginFailure('worker');
                         if (this._loginAttempts >= 5) {
-                            this._loginLockoutUntil = Date.now() + 60000; // 1 minute lockout
+                            this._loginLockoutUntil = Date.now() + 60000;
                             this._loginAttempts = 0;
                         }
-                        errEl.textContent = err.message || 'Invalid PIN or worker not found.';
+                        errEl.textContent = 'Invalid email or PIN.';
                         errEl.style.display = 'block';
                         document.getElementById('workerPin').value = '';
                         document.getElementById('workerPin').focus();
                     }
+                }
+            };
+
+            // ── Legacy invite URL backward compat ─────────────────────────────────
+            // Old invite links use ?company=...&name=...&pin=... and auto-submitted the
+            // old 3-field form.  If those params are present but no email param, show a
+            // helpful message rather than silently failing.
+            if (legacyCompany && legacyName && prefilledPin && !prefilledEmail) {
+                const errEl = document.getElementById('workerLoginError');
+                errEl.textContent = 'This invite link is outdated. Contact your admin for a new one, or enter your email above.';
+                errEl.style.display = 'block';
+            }
+        },
+
+        // ── Email verification step (server-side codes, trusted-device cookie) ──
+
+        _showVerificationStep(workerId, companyId, email, keepMeSignedIn) {
+            const app = document.getElementById('app');
+
+            // Mask email for display: show first 2 chars + *** + domain
+            const maskEmail = (addr) => {
+                const [local, domain] = (addr || '').split('@');
+                if (!domain) return addr;
+                const visible = local.length > 2 ? local.slice(0, 2) : local;
+                return visible + '***@' + domain;
+            };
+            const maskedEmail = maskEmail(email);
+
+            app.innerHTML = `
+                <div class="login-screen">
+                    <div class="login-card">
+                        <div style="font-size:2rem;margin-bottom:8px">📧</div>
+                        <h2>Verify Your Identity</h2>
+                        <p class="text-muted">
+                            We sent a 6-digit code to <strong>${Utils.escapeHtml(maskedEmail)}</strong>.
+                            Enter it below to complete sign-in.
+                        </p>
+                        <form id="verificationForm">
+                            <div class="form-group" style="margin-bottom:12px">
+                                <input type="text" class="form-control" id="verificationCodeInput"
+                                    placeholder="000 000" maxlength="7" inputmode="numeric"
+                                    autocomplete="one-time-code"
+                                    style="letter-spacing:6px;text-align:center;font-size:1.4rem;padding:14px">
+                            </div>
+                            <div class="form-group" style="display:flex;align-items:center;margin-bottom:16px">
+                                <input type="checkbox" id="trustThisDevice" style="margin-right:8px;cursor:pointer">
+                                <label for="trustThisDevice" style="cursor:pointer;font-size:.9rem">
+                                    Trust this device for 30 days
+                                </label>
+                            </div>
+                            <div class="form-error" id="verificationError" style="display:none"></div>
+                            <button type="submit" class="btn btn-primary btn-block">Verify &amp; Sign In</button>
+                            <button type="button" class="btn btn-secondary btn-block mt-1" id="resendVerificationCode">Resend Code</button>
+                            <button type="button" class="btn btn-ghost btn-block mt-1" id="backToWorkerLoginFromVerify">Back</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('verificationCodeInput').focus();
+            document.getElementById('backToWorkerLoginFromVerify').onclick = () => this.showWorkerLogin();
+
+            // Auto-send the code when the step is shown
+            const doSendCode = async (btn, label) => {
+                if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+                try {
+                    await AppData.apiSendWorkerVerification(workerId, companyId);
+                } catch(err) {
+                    const errEl = document.getElementById('verificationError');
+                    if (errEl) {
+                        errEl.textContent = err.message || 'Failed to send verification code. Please try again.';
+                        errEl.style.display = 'block';
+                    }
+                } finally {
+                    if (btn) { btn.disabled = false; btn.textContent = label; }
+                }
+            };
+            doSendCode(null, '');
+
+            document.getElementById('resendVerificationCode').onclick = async () => {
+                const btn = document.getElementById('resendVerificationCode');
+                await doSendCode(btn, 'Resend Code');
+                Utils.showToast('New code sent!');
+            };
+
+            document.getElementById('verificationForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const code       = (document.getElementById('verificationCodeInput').value || '').replace(/\s/g, '');
+                const trustDevice = document.getElementById('trustThisDevice').checked;
+                const errEl      = document.getElementById('verificationError');
+                const submitBtn  = document.querySelector('#verificationForm button[type="submit"]');
+                errEl.style.display = 'none';
+
+                if (!code) {
+                    errEl.textContent = 'Please enter the verification code.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Verifying…'; }
+                try {
+                    const data = await AppData.apiVerifyWorkerLogin(workerId, companyId, code, trustDevice);
+                    await AppData.syncFromServer();
+                    const worker = AppData.getWorker(data.worker.id) || data.worker;
+                    if (keepMeSignedIn) {
+                        AppData.savePersistentLogin('worker', {
+                            email:     email,
+                            pin:       this._worker2FAData ? this._worker2FAData.pin : '',
+                            jwt:       AppData.getJwt(),
+                            companyId: AppData.getCompanyId()
+                        });
+                    }
+                    this._worker2FAData = null;
+                    this._completeWorkerLogin(worker, 'Email verified');
+                } catch(err) {
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Verify & Sign In'; }
+                    errEl.textContent = err.message || 'Invalid verification code.';
+                    errEl.style.display = 'block';
+                    document.getElementById('verificationCodeInput').value = '';
+                    document.getElementById('verificationCodeInput').focus();
                 }
             };
         },
@@ -416,10 +582,11 @@ window.LMIcons = {
                         // Save persistent login if checkbox was checked
                         if (this._worker2FAData && this._worker2FAData.keepMeSignedIn) {
                             AppData.savePersistentLogin('worker', {
-                                companyName: this._worker2FAData.companyName,
-                                workerName: this._worker2FAData.workerName,
-                                pin: this._worker2FAData.pin,
-                                jwt: AppData.getJwt(),
+                                email:      this._worker2FAData.email      || '',
+                                companyName: this._worker2FAData.companyName || '',
+                                workerName:  this._worker2FAData.workerName  || '',
+                                pin:       this._worker2FAData.pin,
+                                jwt:       AppData.getJwt(),
                                 companyId: AppData.getCompanyId()
                             });
                         }
@@ -439,9 +606,10 @@ window.LMIcons = {
                         // Save persistent login if checkbox was checked
                         if (this._worker2FAData && this._worker2FAData.keepMeSignedIn) {
                             AppData.savePersistentLogin('worker', {
-                                companyName: this._worker2FAData.companyName,
-                                workerName: this._worker2FAData.workerName,
-                                pin: this._worker2FAData.pin
+                                email:      this._worker2FAData.email      || '',
+                                companyName: this._worker2FAData.companyName || '',
+                                workerName:  this._worker2FAData.workerName  || '',
+                                pin:        this._worker2FAData.pin
                             });
                         }
                         this._worker2FAData = null;
@@ -677,21 +845,16 @@ window.LMIcons = {
             };
         },
 
-        // ============ PIN RESET (WORKER) ============
+        // ============ PIN RESET (WORKER) — server-backed ============
 
         _showPinReset() {
-            if (!EmailService.isConfigured()) {
-                Utils.showToast('Email service not configured. Contact your admin to reset your PIN.', 'error');
-                return;
-            }
-
             const app = document.getElementById('app');
             app.innerHTML = `
                 <div class="login-screen">
                     <div class="login-card">
                         <div style="font-size:2rem;margin-bottom:8px">🔑</div>
                         <h2>Reset PIN</h2>
-                        <p class="text-muted">Enter the email address on your account. We'll send a verification code.</p>
+                        <p class="text-muted">Enter your email address. We'll send a reset code.</p>
                         <div id="pinResetStep1">
                             <form id="pinResetEmailForm">
                                 <div class="form-group" style="margin-bottom:12px">
@@ -709,12 +872,13 @@ window.LMIcons = {
                                     <label>Verification Code</label>
                                     <input type="text" class="form-control" id="pinResetCodeInput"
                                         placeholder="000 000" maxlength="7" inputmode="numeric"
+                                        autocomplete="one-time-code"
                                         style="letter-spacing:6px;text-align:center;font-size:1.4rem;padding:14px">
                                 </div>
                                 <div class="form-group" style="margin-bottom:12px">
-                                    <label>New PIN (6+ digits)</label>
+                                    <label>New PIN (4–12 digits)</label>
                                     <input type="password" class="form-control" id="pinResetNewPin"
-                                        pattern="[0-9]{6,12}" minlength="6" maxlength="12"
+                                        pattern="[0-9]{4,12}" minlength="4" maxlength="12"
                                         inputmode="numeric" required placeholder="Enter new PIN">
                                 </div>
                                 <div class="form-error" id="pinResetError2" style="display:none"></div>
@@ -726,98 +890,77 @@ window.LMIcons = {
                 </div>
             `;
 
-            let _resetWorker = null;
+            let _resetEmail = null;
 
             document.getElementById('backToWorkerLogin').onclick = () => this.showWorkerLogin();
 
             document.getElementById('pinResetEmailForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const email = document.getElementById('pinResetEmail').value.trim();
+                const email = document.getElementById('pinResetEmail').value.trim().toLowerCase();
                 const errEl = document.getElementById('pinResetError1');
+                const btn   = e.target.querySelector('button[type="submit"]');
                 errEl.style.display = 'none';
 
-                // Find worker by email
-                const workers = AppData.getWorkers();
-                const worker = workers.find(w => w.email && w.email.toLowerCase() === email.toLowerCase() && w.status === 'Active');
-                if (!worker) {
-                    errEl.textContent = 'No active account found with this email.';
-                    errEl.style.display = 'block';
-                    return;
-                }
-
-                _resetWorker = worker;
-                const btn = e.target.querySelector('button[type="submit"]');
                 btn.disabled = true; btn.textContent = 'Sending…';
                 try {
-                    await EmailService.sendPasswordReset(email, worker.name);
+                    // Always succeeds on API side (anti-enumeration) — show step 2 regardless
+                    await AppData.apiWorkerPinResetRequest(email);
+                    _resetEmail = email;
                     document.getElementById('pinResetStep1').style.display = 'none';
                     document.getElementById('pinResetStep2').style.display = 'block';
                     document.getElementById('pinResetCodeInput').focus();
-                    Utils.showToast('Code sent to ' + email);
+                    Utils.showToast('If that email is on file, a code has been sent.');
                 } catch (err) {
                     btn.disabled = false; btn.textContent = 'Send Code';
-                    errEl.textContent = err.message;
+                    errEl.textContent = err.message || 'Failed to send reset code. Try again.';
                     errEl.style.display = 'block';
                 }
             };
 
             document.getElementById('resendPinCode').onclick = async () => {
-                if (!_resetWorker) return;
+                if (!_resetEmail) return;
                 const btn = document.getElementById('resendPinCode');
                 btn.disabled = true; btn.textContent = 'Sending…';
                 try {
-                    await EmailService.sendPasswordReset(_resetWorker.email, _resetWorker.name);
+                    await AppData.apiWorkerPinResetRequest(_resetEmail);
                     Utils.showToast('New code sent!');
                 } catch (err) {
-                    Utils.showToast(err.message, 'error');
+                    Utils.showToast(err.message || 'Failed to resend.', 'error');
                 }
                 btn.disabled = false; btn.textContent = 'Resend Code';
             };
 
-            document.getElementById('pinResetCodeForm').onsubmit = (e) => {
+            document.getElementById('pinResetCodeForm').onsubmit = async (e) => {
                 e.preventDefault();
-                const code = (document.getElementById('pinResetCodeInput').value || '').replace(/\s/g, '');
-                const newPin = document.getElementById('pinResetNewPin').value;
-                const errEl = document.getElementById('pinResetError2');
+                const code   = (document.getElementById('pinResetCodeInput').value || '').replace(/\s/g, '');
+                const newPin = document.getElementById('pinResetNewPin').value.trim();
+                const errEl  = document.getElementById('pinResetError2');
+                const btn    = document.querySelector('#pinResetCodeForm button[type="submit"]');
                 errEl.style.display = 'none';
 
-                if (!_resetWorker) {
+                if (!_resetEmail) {
                     errEl.textContent = 'Session expired. Please start over.';
                     errEl.style.display = 'block';
                     return;
                 }
-
-                // Verify code
-                const result = EmailService.verifyCode(_resetWorker.email, code);
-                if (!result.valid) {
-                    errEl.textContent = result.error;
+                if (!newPin || !/^\d{4,12}$/.test(newPin)) {
+                    errEl.textContent = 'PIN must be 4–12 digits.';
                     errEl.style.display = 'block';
                     return;
                 }
 
-                // Validate new PIN
-                if (!newPin || newPin.length < 6 || newPin.length > 12 || !/^\d+$/.test(newPin)) {
-                    errEl.textContent = 'PIN must be at least 6 digits.';
+                btn.disabled = true; btn.textContent = 'Resetting…';
+                try {
+                    await AppData.apiWorkerPinResetConfirm(_resetEmail, code, newPin);
+                    Utils.showToast('PIN reset successfully! Please log in.');
+                    this.showWorkerLogin();
+                } catch(err) {
+                    btn.disabled = false; btn.textContent = 'Reset PIN';
+                    errEl.textContent = err.message || 'Reset failed. Please try again.';
                     errEl.style.display = 'block';
-                    return;
+                    document.getElementById('pinResetCodeInput').value = '';
+                    document.getElementById('pinResetCodeInput').focus();
                 }
-
-                // Check for duplicate PIN
-                const existingPinWorker = AppData.getWorkers().find(w =>
-                    w.pin === newPin && w.id !== _resetWorker.id
-                );
-                if (existingPinWorker) {
-                    errEl.textContent = 'This PIN is already in use. Choose a different one.';
-                    errEl.style.display = 'block';
-                    return;
-                }
-
-                // Set new PIN
-                _resetWorker.pin = newPin;
-                AppData.saveWorker(_resetWorker);
-                AppData.addAuditLog(_resetWorker.name, 'PIN Reset', 'Self-service PIN reset via email');
-                Utils.showToast('PIN reset successfully! Please log in.');
-                this.showWorkerLogin();
             };
         },
 

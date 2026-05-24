@@ -266,6 +266,57 @@ async function apiLoginWorkerByNameAndPin(companyName, workerName, pin, persiste
     if (data.worker && data.worker.company_id) setCompanyId(data.worker.company_id);
     return data; // { token, worker } OR { twoFARequired: true, workerId, workerName }
 }
+
+// ─── Email-based worker login (new primary path) ───────────────────────────
+async function apiLoginWorkerByEmail(email, pin, persistent) {
+    const data = await _apiFetch('/api/auth/worker', {
+        method: 'POST',
+        body: JSON.stringify({ email: email, pin: pin, persistent: !!persistent })
+    });
+    if (data.token) setJwt(data.token);
+    if (data.worker && data.worker.company_id) setCompanyId(data.worker.company_id);
+    // Returns: { token, worker }
+    //       or { twoFARequired: true, workerId, workerName }
+    //       or { verificationRequired: true, workerId, companyId }
+    return data;
+}
+
+async function apiSendWorkerVerification(workerId, companyId) {
+    return _apiFetch('/api/auth/worker/send-verification', {
+        method: 'POST',
+        body: JSON.stringify({ workerId: workerId, companyId: companyId })
+    });
+}
+
+async function apiVerifyWorkerLogin(workerId, companyId, code, trustDevice) {
+    const data = await _apiFetch('/api/auth/worker/verify-login', {
+        method: 'POST',
+        body: JSON.stringify({
+            workerId: workerId,
+            companyId: companyId,
+            code: code,
+            trustDevice: !!trustDevice
+        })
+    });
+    if (data.token) setJwt(data.token);
+    if (data.worker && data.worker.company_id) setCompanyId(data.worker.company_id);
+    return data;
+}
+
+async function apiWorkerPinResetRequest(email) {
+    return _apiFetch('/api/auth/worker/pin-reset-request', {
+        method: 'POST',
+        body: JSON.stringify({ email: email })
+    });
+}
+
+async function apiWorkerPinResetConfirm(email, code, newPin) {
+    return _apiFetch('/api/auth/worker/pin-reset-confirm', {
+        method: 'POST',
+        body: JSON.stringify({ email: email, code: code, newPin: newPin })
+    });
+}
+
 async function apiVerify2FA(workerId, totpCode) {
     const companyId = getCompanyId();
     const data = await _apiFetch('/api/auth/worker/verify2fa', {
@@ -1212,7 +1263,10 @@ window.AppData = {
     getJwt, setJwt, getCompanyId, setCompanyId, isApiMode,
     isTokenExpired, clearAuthState, clearEntityCache,
     getPersistentLogin, savePersistentLogin, clearPersistentLogin,
-    apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin, apiVerify2FA,
+    apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin,
+    apiLoginWorkerByEmail, apiSendWorkerVerification, apiVerifyWorkerLogin,
+    apiWorkerPinResetRequest, apiWorkerPinResetConfirm,
+    apiVerify2FA,
     apiCreateInvite, apiGetInvite, apiUseInvite,
     syncFromServer, isCacheLoaded,
     // Photos (IndexedDB)
