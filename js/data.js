@@ -983,6 +983,9 @@ async function savePhoto(photoData) {
                 });
             } catch(e) {
                 console.warn('[API] photo upload failed:', e.message);
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('Photo sync failed: ' + e.message, 'error');
+                }
             }
         })();
     }
@@ -1031,10 +1034,20 @@ async function deletePhoto(id) {
     if (isApiMode() && getJwt()) {
         if (id === 'company_logo') {
             _apiFetch('/api/logo', { method: 'DELETE' })
-                .catch(function(e) { console.warn('[API] deleteLogo:', e.message); });
+                .catch(function(e) {
+                    console.warn('[API] deleteLogo:', e.message);
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Logo delete sync failed: ' + e.message, 'error');
+                    }
+                });
         } else {
             _apiFetch('/api/photos/' + id, { method: 'DELETE' })
-                .catch(function(e) { console.warn('[API] deletePhoto:', e.message); });
+                .catch(function(e) {
+                    console.warn('[API] deletePhoto:', e.message);
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Photo delete sync failed: ' + e.message, 'error');
+                    }
+                });
         }
     }
 }
