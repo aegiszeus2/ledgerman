@@ -617,6 +617,255 @@ window.AdminInvoices = {
         return html;
     },
 
+    // ============ SHARED INVOICE DOCUMENT RENDERER ============
+    // Produces the professional inv-doc HTML used by both the
+    // wizard preview and the saved-invoice detail view.
+    // inv must contain all invoice fields; settings is the
+    // current company settings object.
+
+    _buildInvoiceDocument(inv, settings) {
+        var esc = Utils.escapeHtml;
+        if (!settings) settings = AppData.getSettings();
+
+        // Company details (prefer saved values on invoice, fall back to settings)
+        var companyName  = inv.companyName  || settings.companyName  || '';
+        var companyAddr  = inv.companyAddress || [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ');
+        var companyPhone = inv.companyPhone  || settings.phone  || '';
+        var companyEmail = inv.companyEmail  || settings.email  || '';
+        var hstNum       = inv.hstNumber     || settings.hstNumber || '';
+
+        // Invoice metadata
+        var invNum       = inv.invoiceNumber  || '';
+        var invDate      = inv.invoiceDate || inv.date || '';
+        var billingStart = inv.billingPeriodStart || inv.billingStart || '';
+        var billingEnd   = inv.billingPeriodEnd   || inv.billingEnd   || '';
+
+        // Client info
+        var clientName   = inv.clientName || inv.client || '';
+        var clientParts  = [];
+        if (inv.clientAddress) clientParts.push(esc(inv.clientAddress));
+        var cityLine = [inv.clientCity, inv.clientProvince ? (inv.clientProvince + (inv.clientPostalCode ? ' ' + inv.clientPostalCode : '')) : inv.clientPostalCode].filter(Boolean).join(', ');
+        if (cityLine) clientParts.push(esc(cityLine));
+        if (inv.clientPhone) clientParts.push(esc(inv.clientPhone));
+        if (inv.clientEmail) clientParts.push(esc(inv.clientEmail));
+        var clientAddrHtml = clientParts.join('<br>');
+
+        // Project
+        var projectName = inv.projectName   || '';
+        var jobSiteAddr = inv.jobSiteAddress || '';
+
+        // Contract reference
+        var contractRef = inv.contractReference || inv.contractNumber || '';
+
+        // ── Line items grouped by category ──────────────────
+        var lineItems = inv.lineItems || inv.items || [];
+        var groups = { Labor: [], Equipment: [], Material: [] };
+        lineItems.forEach(function(item) {
+            var cat = item.category || 'Material';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(item);
+        });
+
+        var linesHtml = '';
+        ['Labor', 'Equipment', 'Material'].forEach(function(cat) {
+            var items = groups[cat];
+            if (!items || items.length === 0) return;
+            linesHtml += '<tr class="inv-cat-row"><td colspan="5">' + cat + '</td></tr>';
+            items.forEach(function(item) {
+                var co = (item.isChangeOrder || item.changeOrder)
+                    ? ' <span class="inv-co-badge">CO</span>' : '';
+                var desc = esc(item.description || '');
+                var qtyCell  = '';
+                var rateCell = '';
+                if (item.rateType !== 'flat' && item.hours) {
+                    qtyCell  = esc(String(item.hours)) + ' hrs';
+                    rateCell = Utils.formatCurrency(item.rate || 0) + '/hr';
+                } else if (item.quantity && item.quantity !== 1 && item.rate) {
+                    qtyCell  = esc(String(item.quantity));
+                    rateCell = Utils.formatCurrency(item.rate);
+                }
+                linesHtml +=
+                    '<tr class="inv-line-row">' +
+                        '<td class="inv-td-desc">' + desc + co + '</td>' +
+                        '<td class="inv-td-cat"><span class="inv-cat-tag inv-cat-' + cat.toLowerCase() + '">' + cat + '</span></td>' +
+                        '<td class="inv-td-qty">'  + qtyCell  + '</td>' +
+                        '<td class="inv-td-rate">' + rateCell + '</td>' +
+                        '<td class="inv-td-amt">'  + Utils.formatCurrency(item.amount) + '</td>' +
+                    '</tr>';
+            });
+        });
+
+        // ── Totals ───────────────────────────────────────────
+        var subtotal   = parseFloat(inv.subtotal) || 0;
+        var hstEnabled = inv.hstEnabled;
+        var hstRate    = parseFloat(inv.hstRate) || 13;
+        var hstAmt     = parseFloat(inv.hstAmount || inv.hst) || 0;
+        var hbEnabled  = inv.holdbackEnabled;
+        var hbRate     = parseFloat(inv.holdbackRate) || 10;
+        var hbAmt      = parseFloat(inv.holdbackAmount || inv.holdback) || 0;
+        var total      = parseFloat(inv.total) || 0;
+        var netPayable = parseFloat(inv.netPayable) || total;
+
+        var totalsHtml =
+            '<tr>' +
+                '<td class="inv-totals-lbl">Subtotal</td>' +
+                '<td class="inv-totals-val">' + Utils.formatCurrency(subtotal) + '</td>' +
+            '</tr>';
+        if (hstEnabled) {
+            totalsHtml +=
+                '<tr>' +
+                    '<td class="inv-totals-lbl">HST (' + hstRate + '%)</td>' +
+                    '<td class="inv-totals-val">' + Utils.formatCurrency(hstAmt) + '</td>' +
+                '</tr>';
+        }
+        totalsHtml +=
+            '<tr class="inv-totals-total-row">' +
+                '<td class="inv-totals-lbl">Total</td>' +
+                '<td class="inv-totals-val">' + Utils.formatCurrency(total) + '</td>' +
+            '</tr>';
+        if (hbEnabled) {
+            totalsHtml +=
+                '<tr>' +
+                    '<td class="inv-totals-lbl">Statutory Holdback (' + hbRate + '%)</td>' +
+                    '<td class="inv-totals-val">&minus;' + Utils.formatCurrency(hbAmt) + '</td>' +
+                '</tr>' +
+                '<tr class="inv-totals-due-row">' +
+                    '<td class="inv-totals-lbl">Net Payable</td>' +
+                    '<td class="inv-totals-val">' + Utils.formatCurrency(netPayable) + '</td>' +
+                '</tr>';
+        } else {
+            totalsHtml +=
+                '<tr class="inv-totals-due-row">' +
+                    '<td class="inv-totals-lbl">Total Due</td>' +
+                    '<td class="inv-totals-val">' + Utils.formatCurrency(total) + '</td>' +
+                '</tr>';
+        }
+
+        // Payment contact
+        var contactName  = settings.contactName  || companyName;
+        var contactTitle = settings.contactTitle  || '';
+        var contactPhone = companyPhone;
+        var contactEmail = companyEmail;
+
+        // ── Build document HTML ──────────────────────────────
+        return '<div class="inv-doc">' +
+
+            // Header
+            '<div class="inv-header">' +
+                '<div class="inv-company-block">' +
+                    '<div id="invLogoArea"></div>' +
+                    '<div class="inv-company-name">' + esc(companyName) + '</div>' +
+                    '<div class="inv-company-meta">' +
+                        (companyAddr  ? '<div>' + esc(companyAddr)  + '</div>' : '') +
+                        (companyPhone ? '<div>' + esc(companyPhone) + '</div>' : '') +
+                        (companyEmail ? '<div>' + esc(companyEmail) + '</div>' : '') +
+                        (hstNum       ? '<div>HST: ' + esc(hstNum) + '</div>' : '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="inv-title-block">' +
+                    '<div class="inv-title-text">INVOICE</div>' +
+                    '<div class="inv-number">' + esc(invNum) + '</div>' +
+                    '<div class="inv-title-meta">' +
+                        '<div class="inv-title-meta-row"><span>Date</span><span>' + Utils.formatDate(invDate) + '</span></div>' +
+                        (billingStart && billingEnd
+                            ? '<div class="inv-title-meta-row"><span>Period</span><span>' + Utils.formatDate(billingStart) + ' &ndash; ' + Utils.formatDate(billingEnd) + '</span></div>'
+                            : '') +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="inv-header-rule"></div>' +
+
+            // Bill To / Project
+            '<div class="inv-parties-row">' +
+                '<div class="inv-party">' +
+                    '<div class="inv-party-label">Bill To</div>' +
+                    '<div class="inv-party-name">' + esc(clientName) + '</div>' +
+                    '<div class="inv-party-details">' + clientAddrHtml + '</div>' +
+                '</div>' +
+                '<div class="inv-party">' +
+                    '<div class="inv-party-label">Project</div>' +
+                    '<div class="inv-party-name">' + esc(projectName) + '</div>' +
+                    (jobSiteAddr ? '<div class="inv-party-details">' + esc(jobSiteAddr) + '</div>' : '') +
+                '</div>' +
+            '</div>' +
+
+            (contractRef
+                ? '<div class="inv-contract-ref"><strong>Contract / Authority Reference:</strong> ' + esc(contractRef) + '</div>'
+                : '') +
+
+            // Line items table
+            '<table class="inv-table">' +
+                '<colgroup>' +
+                    '<col style="width:36%">' +
+                    '<col style="width:13%">' +
+                    '<col style="width:12%">' +
+                    '<col style="width:16%">' +
+                    '<col style="width:16%">' +
+                '</colgroup>' +
+                '<thead><tr>' +
+                    '<th class="inv-th-desc">Description</th>' +
+                    '<th class="inv-th-cat">Category</th>' +
+                    '<th class="inv-th-qty">Qty / Hours</th>' +
+                    '<th class="inv-th-rate">Rate</th>' +
+                    '<th class="inv-th-amt">Amount</th>' +
+                '</tr></thead>' +
+                '<tbody>' + linesHtml + '</tbody>' +
+            '</table>' +
+
+            // Totals — uses a real table for guaranteed alignment
+            '<div class="inv-totals-section">' +
+                '<table class="inv-totals-table">' + totalsHtml + '</table>' +
+            '</div>' +
+
+            // Payment terms
+            (inv.paymentTerms
+                ? '<div class="inv-terms">' +
+                    '<div class="inv-terms-line"><strong>Payment Terms:</strong> ' + esc(inv.paymentTerms) +
+                        (inv.dueDate ? ' &nbsp;&bull;&nbsp; <strong>Due:</strong> ' + Utils.formatDate(inv.dueDate) : '') +
+                    '</div>' +
+                    '<div class="inv-terms-note">Under the Ontario Construction Act, the statutory payment period is 28 days from receipt of a proper invoice.</div>' +
+                  '</div>'
+                : '') +
+
+            // Notes
+            (inv.notes
+                ? '<div class="inv-notes-section">' +
+                    '<strong class="inv-notes-title">Notes</strong>' +
+                    '<div class="inv-notes-text">' + esc(inv.notes) + '</div>' +
+                  '</div>'
+                : '') +
+
+            // Payment contact
+            ((contactName || contactPhone || contactEmail)
+                ? '<div class="inv-contact-box">' +
+                    '<div class="inv-contact-title">Payment Contact</div>' +
+                    '<div class="inv-contact-body">' +
+                        esc(contactName) + (contactTitle ? ', ' + esc(contactTitle) : '') + '<br>' +
+                        (contactPhone ? 'Phone: ' + esc(contactPhone) + '<br>' : '') +
+                        (contactEmail ? 'Email: ' + esc(contactEmail) + '<br>' : '') +
+                        (companyAddr  ? 'Mail: '  + esc(companyAddr)  : '') +
+                    '</div>' +
+                  '</div>'
+                : '') +
+
+            // Holdback notice
+            (hbEnabled
+                ? '<div class="inv-holdback-notice">' +
+                    '<strong>Statutory Holdback Notice:</strong> In accordance with the Ontario Construction Act, ' +
+                    hbRate + '% of the contract price is held back. The holdback amount of ' +
+                    Utils.formatCurrency(hbAmt) + ' will be released as required by the Act.' +
+                  '</div>'
+                : '') +
+
+            // Footer / compliance
+            '<div class="inv-footer">' +
+                'This invoice constitutes a proper invoice under Section 6.1 of the Ontario Construction Act, 2017.' +
+            '</div>' +
+
+        '</div>';
+    },
+
     _renderWizardStep3(stepEl, navEl, wd, settings) {
         var self = this;
         var preview = self._buildInvoicePreview(wd, settings);
@@ -635,18 +884,11 @@ window.AdminInvoices = {
     },
 
     _buildInvoicePreview(wd, settings) {
+        var self = this;
         if (!settings) settings = AppData.getSettings();
-        var project = AppData.getProject(wd.projectId);
+        var project = AppData.getProject(wd.projectId) || {};
         var allExpenses = AppData.getExpenses(wd.projectId);
         var selectedExpenses = allExpenses.filter(function(e) { return wd.selectedExpenseIds.indexOf(e.id) !== -1; });
-        var esc = Utils.escapeHtml;
-
-        var groups = { Labor: [], Equipment: [], Material: [] };
-        selectedExpenses.forEach(function(e) {
-            var cat = e.category || 'Material';
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push(e);
-        });
 
         var subtotal = selectedExpenses.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
         var hstAmount = wd.enableHst ? subtotal * (wd.hstRate / 100) : 0;
@@ -663,119 +905,67 @@ window.AdminInvoices = {
             dueDate = d.toISOString().split('T')[0];
         }
 
-        // Build line items with proper descriptions
-        var linesHtml = '';
-        ['Labor', 'Equipment', 'Material'].forEach(function(cat) {
-            var items = groups[cat];
-            if (!items || items.length === 0) return;
-            linesHtml += '<tr><td colspan="5" style="font-weight:700;padding-top:16px;border-bottom:none;color:#1a1a2e">' + cat + '</td></tr>';
-            items.forEach(function(item) {
-                var co = item.changeOrder ? ' <span style="color:#e74c3c;font-size:.75rem">[Change Order]</span>' : '';
-                var desc = '';
-                if (cat === 'Labor') {
-                    var worker = item.workerId ? AppData.getWorker(item.workerId) : null;
-                    desc = (worker ? esc(worker.name) + ' - ' : '') + esc(item.description);
-                } else {
-                    var vd2 = item.vendorName || item.vendor || '';
-                    desc = (vd2 ? esc(vd2) + ' - ' : '') + esc(item.description);
-                }
-                var qtyRate = '';
-                if (item.rateType !== 'flat' && item.hours) {
-                    qtyRate = '<td style="text-align:center">' + item.hours + ' hrs</td><td class="amount">' + Utils.formatCurrency(item.rate || 0) + '/hr</td>';
-                } else {
-                    qtyRate = '<td></td><td></td>';
-                }
-                linesHtml += '<tr><td style="padding-left:20px">' + desc + co + '</td>' +
-                    '<td>' + cat + '</td>' +
-                    qtyRate +
-                    '<td class="amount">' + Utils.formatCurrency(item.amount) + '</td></tr>';
-            });
+        // Build normalized line items for the shared renderer
+        var lineItems = selectedExpenses.map(function(e) {
+            var worker = e.workerId ? AppData.getWorker(e.workerId) : null;
+            var desc = '';
+            if (e.category === 'Labor') {
+                desc = (worker ? worker.name + ' - ' : '') + (e.description || '');
+            } else {
+                var vd = e.vendorName || e.vendor || '';
+                desc = (vd ? vd + ' - ' : '') + (e.description || '');
+            }
+            return {
+                description: desc,
+                category: e.category || 'Material',
+                quantity: e.hours || 1,
+                rate: e.rate || 0,
+                amount: parseFloat(e.amount) || 0,
+                isChangeOrder: e.changeOrder || false,
+                hours: e.hours,
+                rateType: e.rateType
+            };
         });
 
-        return '<div class="invoice-preview">' +
-            // Header: Company info + Invoice title
-            '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">' +
-                '<div>' +
-                    '<div class="company">' + esc(settings.companyName) + '</div>' +
-                    '<div style="color:#888;font-size:.85rem;margin-top:4px">' +
-                        [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ') +
-                    '</div>' +
-                    (settings.phone ? '<div style="color:#888;font-size:.85rem">' + esc(settings.phone) + '</div>' : '') +
-                    (settings.email ? '<div style="color:#888;font-size:.85rem">' + esc(settings.email) + '</div>' : '') +
-                    (settings.hstNumber ? '<div style="color:#888;font-size:.85rem">HST: ' + esc(settings.hstNumber) + '</div>' : '') +
-                '</div>' +
-                '<div style="text-align:right">' +
-                    '<h2>INVOICE</h2>' +
-                    '<div style="font-size:1.1rem;color:var(--amber-hover);font-weight:700">' + esc(wd.invoiceNumber || '') + '</div>' +
-                    '<div style="font-size:.9rem;color:#555;margin-top:4px">Date: ' + Utils.formatDate(wd.invoiceDate) + '</div>' +
-                    (wd.billingStart && wd.billingEnd ? '<div style="font-size:.85rem;color:#555">Period: ' + Utils.formatDate(wd.billingStart) + ' - ' + Utils.formatDate(wd.billingEnd) + '</div>' : '') +
-                '</div>' +
-            '</div>' +
+        // Build a normalized invoice object and delegate to shared renderer
+        var tempInv = {
+            companyName:      settings.companyName || '',
+            companyAddress:   [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', '),
+            companyPhone:     settings.phone || '',
+            companyEmail:     settings.email || '',
+            hstNumber:        settings.hstNumber || '',
+            invoiceNumber:    wd.invoiceNumber || '',
+            invoiceDate:      wd.invoiceDate || '',
+            billingPeriodStart: wd.billingStart || '',
+            billingPeriodEnd:   wd.billingEnd   || '',
+            clientName:       project.clientName || project.client || '',
+            clientAddress:    project.clientAddress  || '',
+            clientCity:       project.clientCity     || '',
+            clientProvince:   project.clientProvince || '',
+            clientPostalCode: project.clientPostalCode || '',
+            clientPhone:      project.clientPhone || '',
+            clientEmail:      project.clientEmail || '',
+            projectName:      project.name || '',
+            jobSiteAddress:   project.jobSiteAddress || '',
+            contractReference: project.contractNumber || '',
+            lineItems:        lineItems,
+            subtotal:         subtotal,
+            hstEnabled:       wd.enableHst,
+            hstRate:          wd.hstRate,
+            hstAmount:        hstAmount,
+            hst:              hstAmount,
+            holdbackEnabled:  wd.enableHoldback,
+            holdbackRate:     wd.holdbackRate,
+            holdbackAmount:   holdbackAmount,
+            holdback:         holdbackAmount,
+            total:            total,
+            netPayable:       netPayable,
+            paymentTerms:     wd.paymentTerms || '',
+            dueDate:          dueDate,
+            notes:            wd.notes || ''
+        };
 
-            // Bill To / Project / Contract meta
-            '<div class="invoice-meta">' +
-                '<div><strong>Bill To</strong>' + esc(project.clientName || project.client || '') +
-                    (project.clientAddress ? '<br>' + esc(project.clientAddress) : '') +
-                    (project.clientCity ? '<br>' + esc(project.clientCity) + (project.clientProvince ? ', ' + esc(project.clientProvince) : '') + (project.clientPostalCode ? ' ' + esc(project.clientPostalCode) : '') : '') +
-                    (project.clientPhone ? '<br>' + esc(project.clientPhone) : '') +
-                    (project.clientEmail ? '<br>' + esc(project.clientEmail) : '') +
-                '</div>' +
-                '<div><strong>Project</strong>' + esc(project.name) +
-                    (project.jobSiteAddress ? '<br>' + esc(project.jobSiteAddress) : '') +
-                '</div>' +
-                (project.contractNumber ? '<div><strong>Contract/PO</strong>' + esc(project.contractNumber) + '</div>' : '') +
-            '</div>' +
-
-            // Line items
-            '<table><thead><tr><th>Description</th><th>Category</th><th style="text-align:center">Qty/Hours</th><th class="amount">Rate</th><th class="amount">Amount</th></tr></thead><tbody>' +
-            linesHtml + '</tbody></table>' +
-
-            // Totals
-            '<div class="invoice-totals">' +
-                '<div class="total-line"><span>Subtotal</span><span>' + Utils.formatCurrency(subtotal) + '</span></div>' +
-                (wd.enableHst ? '<div class="total-line"><span>HST (' + wd.hstRate + '%)</span><span>' + Utils.formatCurrency(hstAmount) + '</span></div>' : '') +
-                '<div class="total-line" style="font-weight:700"><span>Total</span><span>' + Utils.formatCurrency(total) + '</span></div>' +
-                (wd.enableHoldback
-                    ? '<div class="total-line"><span>Statutory Holdback (' + wd.holdbackRate + '%)</span><span>-' + Utils.formatCurrency(holdbackAmount) + '</span></div>' +
-                      '<div class="total-line grand-total"><span>Net Payable</span><span>' + Utils.formatCurrency(netPayable) + '</span></div>'
-                    : '<div class="total-line grand-total"><span>Total Due</span><span>' + Utils.formatCurrency(total) + '</span></div>'
-                ) +
-            '</div>' +
-
-            // Payment terms
-            (wd.paymentTerms ? '<div style="margin-top:20px;font-size:.9rem;color:#555"><strong>Payment Terms:</strong> ' + esc(wd.paymentTerms) +
-                (dueDate ? ' (Due: ' + Utils.formatDate(dueDate) + ')' : '') +
-                '<br><span style="font-size:.8rem;color:#888">Note: Under the Ontario Construction Act, the statutory payment period is 28 days from receipt of a proper invoice.</span>' +
-            '</div>' : '') +
-
-            // Notes
-            (wd.notes ? '<div style="margin-top:8px;font-size:.9rem;color:#555"><strong>Notes:</strong> ' + esc(wd.notes) + '</div>' : '') +
-
-            // Payment contact
-            (settings.contactName || settings.phone || settings.email
-                ? '<div style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:4px;font-size:.85rem;color:#555">' +
-                    '<strong>Payment Contact:</strong><br>' +
-                    (settings.contactName ? esc(settings.contactName) + (settings.contactTitle ? ', ' + esc(settings.contactTitle) : '') + '<br>' : esc(settings.companyName) + '<br>') +
-                    (settings.phone ? 'Phone: ' + esc(settings.phone) + '<br>' : '') +
-                    (settings.email ? 'Email: ' + esc(settings.email) + '<br>' : '') +
-                    (settings.address ? 'Mail: ' + [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ') : '') +
-                '</div>'
-                : '') +
-
-            // Holdback notice
-            (wd.enableHoldback
-                ? '<div style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:4px;font-size:.85rem;color:#856404">' +
-                    '<strong>Statutory Holdback Notice:</strong> In accordance with the Ontario Construction Act, ' +
-                    wd.holdbackRate + '% of the contract price is held back. The holdback amount of ' +
-                    Utils.formatCurrency(holdbackAmount) + ' will be released as required by the Act.' +
-                '</div>'
-                : '') +
-
-            // Compliance footer
-            '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #dee2e6;font-size:.8rem;color:#aaa;text-align:center">' +
-                'This invoice constitutes a proper invoice under Section 6.1 of the Ontario Construction Act, 2017.' +
-            '</div>' +
-        '</div>';
+        return self._buildInvoiceDocument(tempInv, settings);
     },
 
     async _saveInvoice() {
@@ -987,6 +1177,14 @@ window.AdminInvoices = {
         );
         var clientEmail = inv.clientEmail || project.clientEmail || '';
 
+        // Pre-compute invoice document HTML using shared professional renderer
+        var invoiceDocHtml = self._buildInvoiceDocument(
+            Object.assign({}, inv, {
+                jobSiteAddress: (project && project.jobSiteAddress) || inv.jobSiteAddress || ''
+            }),
+            settings
+        );
+
         container.innerHTML =
             // Action buttons (hidden on print)
             '<div class="no-print-actions">' +
@@ -1003,106 +1201,8 @@ window.AdminInvoices = {
                 '<span style="font-size:.9rem;color:var(--text2)">Balance: <strong style="color:var(--text)">' + Utils.formatCurrency(balance) + '</strong></span>' +
             '</div>' +
 
-            // Invoice card
-            '<div class="card">' +
-                '<div class="invoice-preview">' +
-                    // Company header
-                    '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">' +
-                        '<div>' +
-                            '<div id="invoiceLogoArea"></div>' +
-                            '<div class="company">' + esc(inv.companyName || settings.companyName) + '</div>' +
-                            '<div style="color:#444444;font-size:.85rem;margin-top:4px">' +
-                                (inv.companyAddress || [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ')) +
-                            '</div>' +
-                            (function() {
-                                var phone = inv.companyPhone || settings.phone;
-                                var email = inv.companyEmail || settings.email;
-                                var hst = inv.hstNumber || settings.hstNumber;
-                                return (phone ? '<div style="color:#444444;font-size:.85rem">' + esc(phone) + '</div>' : '') +
-                                    (email ? '<div style="color:#444444;font-size:.85rem">' + esc(email) + '</div>' : '') +
-                                    (hst ? '<div style="color:#444444;font-size:.85rem">HST: ' + esc(hst) + '</div>' : '');
-                            })() +
-                        '</div>' +
-                        '<div style="text-align:right">' +
-                            '<h2 style="color:#1a1a2e;font-weight:800;margin:0 0 4px">INVOICE</h2>' +
-                            '<div style="font-size:1.1rem;color:var(--amber-hover);font-weight:700">' + esc(inv.invoiceNumber) + '</div>' +
-                            '<div style="font-size:.9rem;color:#555;margin-top:4px">Date: ' + Utils.formatDate(invoiceDate) + '</div>' +
-                            (billingStart && billingEnd ? '<div style="font-size:.85rem;color:#555">Period: ' + Utils.formatDate(billingStart) + ' - ' + Utils.formatDate(billingEnd) + '</div>' : '') +
-                        '</div>' +
-                    '</div>' +
-
-                    // Contract/Authority reference
-                    (contractRef ? '<div style="margin-top:12px;font-size:.9rem;color:#555"><strong>Contract/Authority Reference:</strong> ' + esc(contractRef) + '</div>' : '') +
-
-                    // Bill To / Project
-                    '<div class="invoice-meta">' +
-                        '<div><strong>Bill To</strong>' +
-                            esc(inv.clientName || inv.client || '') +
-                            (inv.clientAddress ? '<br>' + esc(inv.clientAddress) : '') +
-                            ((inv.clientCity || project.clientCity) ? '<br>' + esc(inv.clientCity || project.clientCity) +
-                                ((inv.clientProvince || project.clientProvince) ? ', ' + esc(inv.clientProvince || project.clientProvince) : '') +
-                                ((inv.clientPostalCode || project.clientPostalCode) ? ' ' + esc(inv.clientPostalCode || project.clientPostalCode) : '')
-                            : '') +
-                            ((inv.clientPhone || project.clientPhone) ? '<br>' + esc(inv.clientPhone || project.clientPhone) : '') +
-                            ((inv.clientEmail || project.clientEmail) ? '<br>' + esc(inv.clientEmail || project.clientEmail) : '') +
-                        '</div>' +
-                        '<div><strong>Project</strong>' + esc(inv.projectName || '') +
-                            (project.jobSiteAddress ? '<br>' + esc(project.jobSiteAddress) : '') +
-                        '</div>' +
-                    '</div>' +
-
-                    // Line items table
-                    '<table>' +
-                        '<thead><tr><th>Description</th><th>Category</th><th style="text-align:center">Qty/Hours</th><th class="amount">Rate</th><th class="amount">Amount</th></tr></thead>' +
-                        '<tbody>' + linesHtml + '</tbody>' +
-                    '</table>' +
-
-                    // Totals
-                    '<div class="invoice-totals">' +
-                        '<div class="total-line"><span>Subtotal</span><span>' + Utils.formatCurrency(inv.subtotal) + '</span></div>' +
-                        (inv.hstEnabled ? '<div class="total-line"><span>HST (' + inv.hstRate + '%)</span><span>' + Utils.formatCurrency(inv.hstAmount || inv.hst) + '</span></div>' : '') +
-                        '<div class="total-line" style="font-weight:700"><span>Total</span><span>' + Utils.formatCurrency(inv.total) + '</span></div>' +
-                        (inv.holdbackEnabled
-                            ? '<div class="total-line"><span>Statutory Holdback (' + inv.holdbackRate + '%)</span><span>-' + Utils.formatCurrency(inv.holdbackAmount || inv.holdback) + '</span></div>' +
-                              '<div class="total-line grand-total"><span>Net Payable</span><span>' + Utils.formatCurrency(inv.netPayable) + '</span></div>'
-                            : '<div class="total-line grand-total"><span>Total Due</span><span>' + Utils.formatCurrency(inv.total) + '</span></div>'
-                        ) +
-                    '</div>' +
-
-                    // Payment terms
-                    (inv.paymentTerms ? '<div style="margin-top:20px;font-size:.9rem;color:#555"><strong>Payment Terms:</strong> ' + esc(inv.paymentTerms) +
-                        (inv.dueDate ? ' (Due: ' + Utils.formatDate(inv.dueDate) + ')' : '') +
-                        '<br><span style="font-size:.8rem;color:#888">Note: Under the Ontario Construction Act, the statutory payment period is 28 days from receipt of a proper invoice.</span>' +
-                    '</div>' : '') +
-
-                    // Notes
-                    (inv.notes ? '<div style="margin-top:8px;font-size:.9rem;color:#555"><strong>Notes:</strong> ' + esc(inv.notes) + '</div>' : '') +
-
-                    // Payment contact info
-                    '<div style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:4px;font-size:.85rem;color:#555">' +
-                        '<strong>Payment Contact:</strong><br>' +
-                        (settings.contactName ? esc(settings.contactName) + (settings.contactTitle ? ', ' + esc(settings.contactTitle) : '') + '<br>' : esc(settings.companyName || inv.companyName || '') + '<br>') +
-                        ((settings.phone || inv.companyPhone) ? 'Phone: ' + esc(settings.phone || inv.companyPhone) + '<br>' : '') +
-                        ((settings.email || inv.companyEmail) ? 'Email: ' + esc(settings.email || inv.companyEmail) + '<br>' : '') +
-                        (settings.address ? 'Mail: ' + [settings.address, settings.city, settings.province, settings.postalCode].filter(Boolean).join(', ') : '') +
-                    '</div>' +
-
-                    // Holdback notice
-                    (inv.holdbackEnabled
-                        ? '<div style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:4px;font-size:.85rem;color:#856404">' +
-                            '<strong>Statutory Holdback Notice:</strong> In accordance with the Ontario Construction Act, ' +
-                            inv.holdbackRate + '% of the contract price is held back. The holdback amount of ' +
-                            Utils.formatCurrency(inv.holdbackAmount || inv.holdback) + ' will be released as required by the Act.' +
-                        '</div>'
-                        : '') +
-
-                    // Compliance footer
-                    '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #dee2e6;font-size:.8rem;color:#aaa;text-align:center">' +
-                        'This invoice constitutes a proper invoice under Section 6.1 of the Ontario Construction Act, 2017.' +
-                    '</div>' +
-
-                '</div>' +
-            '</div>' +
+            // Invoice card — professional redesigned layout
+            '<div class="card">' + invoiceDocHtml + '</div>' +
 
             // Payment History section
             (payments.length > 0
@@ -1131,13 +1231,13 @@ window.AdminInvoices = {
                 '</div>'
                 : '');
 
-        // Load company logo into invoice
+        // Load company logo into invoice (targets #invLogoArea from _buildInvoiceDocument)
         AppData.getLogo().then(function(logo) {
             if (logo && logo.blob) {
-                var logoArea = container.querySelector('#invoiceLogoArea');
+                var logoArea = container.querySelector('#invLogoArea');
                 if (logoArea) {
                     var url = URL.createObjectURL(logo.blob);
-                    logoArea.innerHTML = '<img src="' + url + '" alt="Logo" style="max-height:60px;margin-bottom:8px">';
+                    logoArea.innerHTML = '<img src="' + url + '" alt="Logo" style="max-height:56px;max-width:200px;object-fit:contain;margin-bottom:8px;display:block">';
                 }
             }
         }).catch(function() {});
