@@ -13,7 +13,6 @@ window.AdminSpecSearch = (function () {
             headers: { 'Authorization': 'Bearer ' + jwt },
         };
         if (isForm) {
-            // body is FormData — let browser set Content-Type w/ boundary
             opts.body = body;
         } else if (body !== undefined && body !== null) {
             opts.headers['Content-Type'] = 'application/json';
@@ -66,6 +65,36 @@ window.AdminSpecSearch = (function () {
         document.head.appendChild(s);
     }
 
+    // ── Citations renderer (shared between ask + history) ─────────────────────
+    function renderCitations(citations) {
+        if (!citations || !citations.length) return '';
+        return `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-color)">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
+            ${citations.map((c, i) => {
+                const refLine = [
+                    c.section_number ? `§ ${esc(c.section_number)}` : '',
+                    c.section_title  ? esc(c.section_title) : '',
+                    c.page_number    ? `p. ${c.page_number}` : '',
+                    (!c.section_number && c.chunk_index != null) ? `Chunk ${c.chunk_index}` : '',
+                ].filter(Boolean).join(' · ');
+                const metaLine = [
+                    c.document_type ? esc(c.document_type) : '',
+                    c.revision      ? `Rev. ${esc(c.revision)}` : '',
+                ].filter(Boolean).join(' · ');
+                return `
+            <div style="background:var(--bg-surface,#1c2746);border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:0.82rem;border-left:3px solid var(--border-color-strong,#34467a)">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">
+                    <div style="font-weight:600;color:var(--text-primary)">${esc(c.document_name || 'Unknown document')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0">Source ${i + 1}</div>
+                </div>
+                ${refLine ? `<div style="color:var(--text-muted);margin-bottom:3px">${refLine}</div>` : ''}
+                ${metaLine ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">${metaLine}</div>` : ''}
+                ${c.quoted_text ? `<div style="margin-top:6px;color:var(--text-secondary,#b9c4dc);font-style:italic;border-top:1px solid var(--border-color-soft,#1a2340);padding-top:6px">"${esc(c.quoted_text.slice(0, 300))}${c.quoted_text.length > 300 ? '…' : ''}"</div>` : ''}
+            </div>`;
+            }).join('')}
+        </div>`;
+    }
+
     // ── Module state ──────────────────────────────────────────────────────────
     let _container = null;
     let _currentProject = null;
@@ -78,11 +107,17 @@ window.AdminSpecSearch = (function () {
         _container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
                 <h2 style="margin:0">Spec Search</h2>
-                <button class="btn btn-primary" id="ss-new-project">+ New Project</button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-secondary" id="ss-help-btn" title="How to use Spec Search">? Help</button>
+                    <button class="btn btn-secondary" id="ss-compare-btn">⇄ Compare Projects</button>
+                    <button class="btn btn-primary" id="ss-new-project">+ New Project</button>
+                </div>
             </div>
             <div id="ss-projects-body">${spinner('Loading projects…')}</div>`;
 
         _container.querySelector('#ss-new-project').addEventListener('click', showNewProjectModal);
+        _container.querySelector('#ss-compare-btn').addEventListener('click', () => renderCompare());
+        _container.querySelector('#ss-help-btn').addEventListener('click', () => renderHelp());
 
         let projects;
         try {
@@ -193,16 +228,316 @@ window.AdminSpecSearch = (function () {
         setTimeout(() => nameEl.focus(), 50);
     }
 
+    // ── Edit-project modal ────────────────────────────────────────────────────
+    function showEditProjectModal(project) {
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center';
+        modal.innerHTML = `
+            <div class="card" style="width:460px;max-width:95vw;padding:24px">
+                <h3 style="margin:0 0 16px">Edit Project</h3>
+                <div class="form-group">
+                    <label>Project Name <span style="color:#ef4444">*</span></label>
+                    <input class="form-control" id="ss-edit-name" value="${esc(project.name)}">
+                </div>
+                <div class="form-group">
+                    <label>Project Number</label>
+                    <input class="form-control" id="ss-edit-num" value="${esc(project.project_number || '')}">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="form-control" id="ss-edit-desc" rows="2">${esc(project.description || '')}</textarea>
+                </div>
+                <div id="ss-edit-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+                    <button class="btn btn-secondary" id="ss-edit-cancel">Cancel</button>
+                    <button class="btn btn-primary" id="ss-edit-save">Save Changes</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+
+        const errEl = modal.querySelector('#ss-edit-err');
+        modal.querySelector('#ss-edit-cancel').addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+        modal.querySelector('#ss-edit-save').addEventListener('click', async () => {
+            const name = modal.querySelector('#ss-edit-name').value.trim();
+            if (!name) { errEl.textContent = 'Project name is required.'; errEl.style.display = ''; return; }
+            errEl.style.display = 'none';
+            const btn = modal.querySelector('#ss-edit-save');
+            btn.disabled = true; btn.textContent = 'Saving…';
+            try {
+                const updated = await api('PATCH', `/projects/${encodeURIComponent(project.id)}`, {
+                    name,
+                    project_number: modal.querySelector('#ss-edit-num').value.trim() || null,
+                    description:    modal.querySelector('#ss-edit-desc').value.trim() || null,
+                });
+                modal.remove();
+                // Update cached project and re-render detail
+                _currentProject = { ..._currentProject, ...updated };
+                renderProjectDetail(_currentProject);
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = '';
+                btn.disabled = false; btn.textContent = 'Save Changes';
+            }
+        });
+
+        setTimeout(() => modal.querySelector('#ss-edit-name').focus(), 50);
+    }
+
+    // ── Delete-project modal ──────────────────────────────────────────────────
+    function showDeleteProjectModal(project) {
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center';
+        modal.innerHTML = `
+            <div class="card" style="width:480px;max-width:95vw;padding:24px;border-top:4px solid #ef4444">
+                <h3 style="margin:0 0 12px;color:#ef4444">⚠ Delete Project</h3>
+                <p style="margin:0 0 8px;font-size:0.9rem">This will permanently delete <strong>${esc(project.name)}</strong> including all uploaded documents, indexed chunks, and search history.</p>
+                <p style="margin:0 0 16px;font-size:0.9rem;color:var(--text-muted)">This action cannot be undone.</p>
+                <div class="form-group">
+                    <label style="font-size:0.85rem">Type <strong style="font-family:monospace;color:#ef4444">DELETE</strong> to confirm:</label>
+                    <input class="form-control" id="ss-del-confirm" placeholder="DELETE" style="border-color:#ef4444;margin-top:6px">
+                </div>
+                <div id="ss-del-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+                    <button class="btn btn-secondary" id="ss-del-cancel">Cancel</button>
+                    <button class="btn" id="ss-del-confirm-btn" style="background:#ef4444;color:#fff;border-color:#ef4444">Delete Project</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+
+        const errEl = modal.querySelector('#ss-del-err');
+        const confirmInput = modal.querySelector('#ss-del-confirm');
+        modal.querySelector('#ss-del-cancel').addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+        modal.querySelector('#ss-del-confirm-btn').addEventListener('click', async () => {
+            if (confirmInput.value.trim() !== 'DELETE') {
+                errEl.textContent = 'Type DELETE (all caps) to confirm.';
+                errEl.style.display = '';
+                confirmInput.focus();
+                return;
+            }
+            errEl.style.display = 'none';
+            const btn = modal.querySelector('#ss-del-confirm-btn');
+            btn.disabled = true; btn.textContent = 'Deleting…';
+            try {
+                await api('DELETE', `/projects/${encodeURIComponent(project.id)}`);
+                modal.remove();
+                _currentProject = null;
+                renderProjects();
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = '';
+                btn.disabled = false; btn.textContent = 'Delete Project';
+            }
+        });
+
+        setTimeout(() => confirmInput.focus(), 50);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // COMPARE VIEW
+    // ══════════════════════════════════════════════════════════════════════════
+    async function renderCompare() {
+        ensureSpinStyle();
+        _container.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+                <button class="btn btn-secondary btn-sm" id="ss-compare-back">← Projects</button>
+                <h2 style="margin:0">Compare Projects</h2>
+            </div>
+            <div id="ss-compare-body">${spinner('Loading projects…')}</div>`;
+
+        _container.querySelector('#ss-compare-back').addEventListener('click', () => renderProjects());
+
+        let projects;
+        try {
+            projects = await api('GET', '/projects');
+        } catch (e) {
+            _container.querySelector('#ss-compare-body').innerHTML =
+                `<div style="color:#ef4444;padding:24px">⚠ ${esc(e.message)}</div>`;
+            return;
+        }
+
+        if (projects.length < 2) {
+            _container.querySelector('#ss-compare-body').innerHTML = `
+                <div class="card" style="text-align:center;padding:48px">
+                    <div style="font-size:2rem;margin-bottom:12px">📊</div>
+                    <h3>Not Enough Projects</h3>
+                    <p style="color:var(--text-muted)">You need at least two projects to compare. Create another project and upload its specifications first.</p>
+                </div>`;
+            return;
+        }
+
+        const opts = projects.map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.project_number ? ' (#' + esc(p.project_number) + ')' : ''}</option>`).join('');
+
+        _container.querySelector('#ss-compare-body').innerHTML = `
+            <div class="card" style="padding:20px;margin-bottom:16px">
+                <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:end">
+                    <div class="form-group" style="margin:0">
+                        <label style="font-weight:600">Project A</label>
+                        <select class="form-control" id="ss-proj-a" style="margin-top:6px">${opts}</select>
+                    </div>
+                    <div style="font-size:1.4rem;padding-bottom:4px;color:var(--text-muted)">⇄</div>
+                    <div class="form-group" style="margin:0">
+                        <label style="font-weight:600">Project B</label>
+                        <select class="form-control" id="ss-proj-b" style="margin-top:6px">${opts}</select>
+                    </div>
+                </div>
+                <div id="ss-compare-err" style="color:#ef4444;font-size:0.85rem;margin-top:10px;display:none"></div>
+                <div style="text-align:center;margin-top:16px">
+                    <button class="btn btn-primary" id="ss-run-compare" style="min-width:160px">Compare Specs</button>
+                </div>
+            </div>
+            <div id="ss-compare-result"></div>`;
+
+        // Default second selector to second project
+        if (projects.length >= 2) {
+            _container.querySelector('#ss-proj-b').selectedIndex = 1;
+        }
+
+        _container.querySelector('#ss-run-compare').addEventListener('click', async () => {
+            const projAId = _container.querySelector('#ss-proj-a').value;
+            const projBId = _container.querySelector('#ss-proj-b').value;
+            const errEl   = _container.querySelector('#ss-compare-err');
+            const resultEl = _container.querySelector('#ss-compare-result');
+
+            if (projAId === projBId) {
+                errEl.textContent = 'Select two different projects.';
+                errEl.style.display = '';
+                return;
+            }
+            errEl.style.display = 'none';
+
+            const btn = _container.querySelector('#ss-run-compare');
+            btn.disabled = true; btn.textContent = 'Comparing…';
+            resultEl.innerHTML = spinner('Analyzing specifications — this may take 30–60 seconds…');
+
+            try {
+                const result = await api('POST', '/compare', {
+                    project_a_id: projAId,
+                    project_b_id: projBId,
+                });
+
+                const projAName = result.project_a_name || projAId;
+                const projBName = result.project_b_name || projBId;
+                const docsAHtml = (result.docs_a || []).map(d => `<li>${esc(d.name)} (${d.chunk_count} chunks)</li>`).join('');
+                const docsBHtml = (result.docs_b || []).map(d => `<li>${esc(d.name)} (${d.chunk_count} chunks)</li>`).join('');
+
+                resultEl.innerHTML = `
+                    <div class="card" style="padding:20px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+                            <h3 style="margin:0">Comparison Result</h3>
+                            <div style="display:flex;gap:8px">
+                                <button class="btn btn-secondary btn-sm" id="ss-copy-compare">Copy</button>
+                                <button class="btn btn-secondary btn-sm" id="ss-export-compare">Export .txt</button>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;font-size:0.82rem;color:var(--text-muted)">
+                            <div><strong style="color:var(--text-primary)">${esc(projAName)}</strong><ul style="margin:4px 0 0 16px;padding:0">${docsAHtml}</ul></div>
+                            <div><strong style="color:var(--text-primary)">${esc(projBName)}</strong><ul style="margin:4px 0 0 16px;padding:0">${docsBHtml}</ul></div>
+                        </div>
+                        <div id="ss-compare-text" style="white-space:pre-wrap;line-height:1.7;color:var(--text-primary);background:var(--bg-surface,#1c2746);border-radius:8px;padding:16px;font-size:0.9rem">${esc(result.result || '')}</div>
+                    </div>`;
+
+                const rawText = `SPEC SEARCH COMPARISON\n${projAName} vs ${projBName}\n${'─'.repeat(60)}\n\n${result.result || ''}`;
+
+                resultEl.querySelector('#ss-copy-compare').addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText(rawText);
+                        const b = resultEl.querySelector('#ss-copy-compare');
+                        b.textContent = 'Copied!';
+                        setTimeout(() => { b.textContent = 'Copy'; }, 1800);
+                    } catch (_) { alert('Copy failed — please select the text manually.'); }
+                });
+
+                resultEl.querySelector('#ss-export-compare').addEventListener('click', () => {
+                    const blob = new Blob([rawText], { type: 'text/plain' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `spec-compare-${projAName.replace(/\s+/g,'-')}-vs-${projBName.replace(/\s+/g,'-')}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                });
+
+            } catch (e) {
+                resultEl.innerHTML = `<div class="card" style="padding:20px;color:#ef4444">⚠ ${esc(e.message)}</div>`;
+            } finally {
+                btn.disabled = false; btn.textContent = 'Compare Specs';
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // HELP VIEW
+    // ══════════════════════════════════════════════════════════════════════════
+    function renderHelp() {
+        _container.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+                <button class="btn btn-secondary btn-sm" id="ss-help-back">← Projects</button>
+                <h2 style="margin:0">How to Use Spec Search</h2>
+            </div>
+            <div style="max-width:720px">
+                <div class="card" style="padding:20px;margin-bottom:16px">
+                    <h3 style="margin:0 0 12px">What is Spec Search?</h3>
+                    <p style="margin:0;line-height:1.6;color:var(--text-secondary,#555)">
+                        Spec Search lets you upload construction specification PDFs and ask plain-English questions about them.
+                        The AI reads your documents, finds the relevant sections, and gives you direct answers with source citations.
+                    </p>
+                </div>
+
+                <div class="card" style="padding:20px;margin-bottom:16px">
+                    <h3 style="margin:0 0 16px">Getting Started</h3>
+                    <ol style="margin:0;padding-left:20px;line-height:2;color:var(--text-secondary,#555)">
+                        <li><strong>Create a project</strong> — Click <em>+ New Project</em> and give it the job name and number.</li>
+                        <li><strong>Upload specs</strong> — Open the project and click <em>+ Upload PDF</em>. Each PDF is indexed separately. Indexing takes 30–90 seconds per document.</li>
+                        <li><strong>Wait for Ready</strong> — Documents show a status badge. Wait for <span style="color:#22c55e;font-weight:600">ready</span> before asking questions.</li>
+                        <li><strong>Ask a question</strong> — Type a plain-English question in the Ask box and press <em>Ask</em> or Ctrl+Enter.</li>
+                        <li><strong>Review sources</strong> — Each answer shows the document sections it drew from, including page numbers and quoted text.</li>
+                        <li><strong>Check history</strong> — All previous Q&A for the project is saved. Click any history entry to expand the full answer and sources.</li>
+                        <li><strong>Compare projects</strong> — Use <em>⇄ Compare Projects</em> to run an AI comparison of specs between two projects.</li>
+                        <li><strong>Export</strong> — Comparison results can be copied to clipboard or exported as a .txt file.</li>
+                    </ol>
+                </div>
+
+                <div class="card" style="padding:20px;margin-bottom:16px">
+                    <h3 style="margin:0 0 16px">FAQ</h3>
+                    <div style="display:grid;gap:14px">
+                        ${[
+                            ['What file types are supported?', 'PDF only. For best results, use text-based PDFs rather than scanned images.'],
+                            ['How long does indexing take?', 'Typically 30–90 seconds per document depending on page count. The status badge changes to "ready" when done.'],
+                            ['How many documents can I upload?', 'No hard limit. More documents give more thorough answers but may increase response time.'],
+                            ['What if the answer is wrong or low confidence?', 'Check the cited sections in your PDF. Low confidence means the AI did not find strong matches. Try rephrasing your question or ensure the relevant spec section is in an uploaded document.'],
+                            ['Can I delete a document?', 'Yes — click the ✕ button next to any document. This removes it and all its indexed content. The project and other documents are unaffected.'],
+                            ['Can I delete a project?', 'Yes — open the project, click Delete Project, and type DELETE to confirm. This permanently removes all documents, indexed data, and history for that project.'],
+                            ['Does Spec Search work offline?', 'No. It requires a connection to the LedgerMan server and an active AI relay.'],
+                            ['Is my spec data stored securely?', 'Documents are stored on the LedgerMan server and only accessible to users with valid LedgerMan credentials for your company.'],
+                            ['Can I compare more than two projects?', 'Currently two projects at a time. Run multiple comparisons to compare more.'],
+                            ['Where is search history stored?', 'History is stored in the Spec Search database on the LedgerMan server. It persists across sessions.'],
+                        ].map(([q, a]) => `
+                        <div style="border-bottom:1px solid var(--border-color);padding-bottom:14px">
+                            <div style="font-weight:600;margin-bottom:4px">${esc(q)}</div>
+                            <div style="color:var(--text-secondary,#555);font-size:0.9rem;line-height:1.5">${esc(a)}</div>
+                        </div>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+
+        _container.querySelector('#ss-help-back').addEventListener('click', () => renderProjects());
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // PROJECT DETAIL
     // ══════════════════════════════════════════════════════════════════════════
     async function renderProjectDetail(project) {
         _currentProject = project;
         _container.innerHTML = `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">
                 <button class="btn btn-secondary btn-sm" id="ss-back">← Projects</button>
                 <h2 style="margin:0;flex:1">${esc(project.name)}</h2>
                 ${project.project_number ? `<span style="font-size:0.85rem;color:var(--text-muted)">#${esc(project.project_number)}</span>` : ''}
+                <button class="btn btn-secondary btn-sm" id="ss-edit-btn">✎ Edit</button>
+                <button class="btn btn-sm" id="ss-delete-btn" style="background:transparent;color:#ef4444;border-color:#ef4444">🗑 Delete</button>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:20px;align-items:start" id="ss-detail-grid">
@@ -262,6 +597,9 @@ window.AdminSpecSearch = (function () {
             _currentProject = null;
             renderProjects();
         });
+
+        _container.querySelector('#ss-edit-btn').addEventListener('click', () => showEditProjectModal(_currentProject));
+        _container.querySelector('#ss-delete-btn').addEventListener('click', () => showDeleteProjectModal(_currentProject));
 
         _container.querySelector('#ss-file-input').addEventListener('change', e => {
             const file = e.target.files[0];
@@ -328,7 +666,7 @@ window.AdminSpecSearch = (function () {
 
         el.querySelectorAll('.ss-del-doc').forEach(btn => {
             btn.addEventListener('click', async () => {
-                if (!confirm('Delete this document and all its indexed chunks?')) return;
+                if (!confirm('Delete this document and all its indexed chunks? This cannot be undone.')) return;
                 btn.disabled = true;
                 try {
                     await api('DELETE', `/documents/${encodeURIComponent(btn.dataset.id)}`);
@@ -388,15 +726,12 @@ window.AdminSpecSearch = (function () {
         try {
             const result = await api('POST', '/ask', { project_id: projectId, question });
 
-            // Confidence colour
             const confColor = result.confidence_level === 'high' ? '#22c55e'
                            : result.confidence_level === 'medium' ? '#f59e0b' : '#94a3b8';
 
             answerArea.innerHTML = `
                 <div style="background:var(--bg-surface,#1c2746);border:1px solid var(--border-color);border-radius:8px;padding:16px;margin-bottom:12px">
-                    <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:8px">
-                        <span>Your question</span>
-                    </div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">Your question</div>
                     <div style="font-weight:500">${esc(question)}</div>
                 </div>
                 <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:16px">
@@ -406,32 +741,7 @@ window.AdminSpecSearch = (function () {
                         </span>
                     </div>
                     <div style="line-height:1.6;white-space:pre-wrap;color:var(--text-primary)">${esc(result.answer)}</div>
-                    ${result.citations && result.citations.length ? `
-                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-color)">
-                        <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
-                        ${result.citations.map((c, i) => {
-                            const refLine = [
-                                c.section_number ? `§ ${esc(c.section_number)}` : '',
-                                c.section_title  ? esc(c.section_title) : '',
-                                c.page_number    ? `p. ${c.page_number}` : '',
-                                (!c.section_number && c.chunk_index != null) ? `Chunk ${c.chunk_index}` : '',
-                            ].filter(Boolean).join(' · ');
-                            const metaLine = [
-                                c.document_type ? esc(c.document_type) : '',
-                                c.revision      ? `Rev. ${esc(c.revision)}` : '',
-                            ].filter(Boolean).join(' · ');
-                            return `
-                        <div style="background:var(--bg-surface,#1c2746);border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:0.82rem;border-left:3px solid var(--border-color-strong,#34467a)">
-                            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">
-                                <div style="font-weight:600;color:var(--text-primary)">${esc(c.document_name || 'Unknown document')}</div>
-                                <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0">Source ${i + 1}</div>
-                            </div>
-                            ${refLine ? `<div style="color:var(--text-muted);margin-bottom:3px">${refLine}</div>` : ''}
-                            ${metaLine ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">${metaLine}</div>` : ''}
-                            ${c.quoted_text ? `<div style="margin-top:6px;color:var(--text-secondary,#b9c4dc);font-style:italic;border-top:1px solid var(--border-color-soft,#1a2340);padding-top:6px">"${esc(c.quoted_text.slice(0, 300))}${c.quoted_text.length > 300 ? '…' : ''}"</div>` : ''}
-                        </div>`;
-                        }).join('')}
-                    </div>` : ''}
+                    ${renderCitations(result.citations)}
                 </div>`;
 
             _container.querySelector('#ss-question-input').value = '';
@@ -446,7 +756,7 @@ window.AdminSpecSearch = (function () {
         }
     }
 
-    // ── History ───────────────────────────────────────────────────────────────
+    // ── History (expandable with full citations) ──────────────────────────────
     async function loadHistory(projectId) {
         const el = _container.querySelector('#ss-history-list');
         if (!el) return;
@@ -462,12 +772,42 @@ window.AdminSpecSearch = (function () {
             el.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.85rem">No questions asked yet.</div>`;
             return;
         }
-        el.innerHTML = rows.map(r => `
-            <div style="padding:12px 16px;border-bottom:1px solid var(--border-color)">
-                <div style="font-size:0.82rem;font-weight:600;margin-bottom:4px">${esc(r.question)}</div>
-                <div style="font-size:0.8rem;color:var(--text-secondary,#555);line-height:1.5;max-height:60px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(r.answer)}</div>
-                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${new Date(r.created_at).toLocaleString('en-CA', {dateStyle:'medium',timeStyle:'short'})}</div>
-            </div>`).join('');
+
+        el.innerHTML = rows.map((r, idx) => {
+            const confColor = r.confidence_level === 'high' ? '#22c55e'
+                            : r.confidence_level === 'medium' ? '#f59e0b' : '#94a3b8';
+            return `
+            <div class="ss-history-item" data-idx="${idx}" style="border-bottom:1px solid var(--border-color)">
+                <div class="ss-history-header" style="padding:12px 16px;cursor:pointer;display:flex;align-items:flex-start;gap:8px" title="Click to expand">
+                    <div style="flex:1;min-width:0">
+                        <div style="font-size:0.82rem;font-weight:600;margin-bottom:3px">${esc(r.question)}</div>
+                        <div style="font-size:0.79rem;color:var(--text-secondary,#555);line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical" id="ss-hist-preview-${idx}">${esc(r.answer)}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">${new Date(r.created_at).toLocaleString('en-CA', {dateStyle:'medium',timeStyle:'short'})}</div>
+                    </div>
+                    <span class="ss-hist-toggle" style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;padding-top:2px;flex-shrink:0">▼ Details</span>
+                </div>
+                <div class="ss-history-detail" id="ss-hist-detail-${idx}" style="display:none;padding:0 16px 16px">
+                    <div style="background:var(--bg-surface,#1c2746);border-radius:8px;padding:14px;font-size:0.88rem">
+                        ${r.confidence_level ? `<span style="font-size:0.72rem;font-weight:600;color:${confColor};background:${confColor}22;padding:2px 7px;border-radius:999px;text-transform:uppercase;display:inline-block;margin-bottom:10px">${esc(r.confidence_level)} confidence</span>` : ''}
+                        <div style="line-height:1.6;white-space:pre-wrap;color:var(--text-primary)">${esc(r.answer)}</div>
+                        ${renderCitations(r.citations)}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Bind expand/collapse
+        el.querySelectorAll('.ss-history-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const item  = header.closest('.ss-history-item');
+                const idx   = item.dataset.idx;
+                const detail = document.getElementById(`ss-hist-detail-${idx}`);
+                const toggle = header.querySelector('.ss-hist-toggle');
+                const expanded = detail.style.display !== 'none';
+                detail.style.display = expanded ? 'none' : '';
+                toggle.textContent   = expanded ? '▼ Details' : '▲ Hide';
+            });
+        });
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -478,5 +818,4 @@ window.AdminSpecSearch = (function () {
             renderProjects();
         }
     };
-
-})();
+}());
