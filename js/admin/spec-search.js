@@ -173,55 +173,46 @@ window.AdminSpecSearch = (function () {
 
     // ── New-project modal ─────────────────────────────────────────────────────
     function showNewProjectModal() {
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center';
-        modal.innerHTML = `
-            <div class="card" style="width:460px;max-width:95vw;padding:24px">
-                <h3 style="margin:0 0 16px">New Spec Search Project</h3>
-                <div class="form-group">
-                    <label>Project Name <span style="color:#ef4444">*</span></label>
-                    <input class="form-control" id="ss-modal-name" placeholder="e.g. Office Building A" autofocus>
-                </div>
-                <div class="form-group">
-                    <label>Project Number</label>
-                    <input class="form-control" id="ss-modal-num" placeholder="e.g. 2024-001">
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea class="form-control" id="ss-modal-desc" rows="2" placeholder="Optional notes…"></textarea>
-                </div>
-                <div id="ss-modal-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-                    <button class="btn btn-secondary" id="ss-modal-cancel">Cancel</button>
-                    <button class="btn btn-primary" id="ss-modal-save">Create Project</button>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
+        const bodyHtml = `
+            <div class="form-group">
+                <label>Project Name <span style="color:#ef4444">*</span></label>
+                <input class="form-control" id="ss-modal-name" placeholder="e.g. Office Building A" autofocus>
+            </div>
+            <div class="form-group">
+                <label>Project Number</label>
+                <input class="form-control" id="ss-modal-num" placeholder="e.g. 2024-001">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea class="form-control" id="ss-modal-desc" rows="2" placeholder="Optional notes…"></textarea>
+            </div>
+            <div id="ss-modal-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
+        `;
+        const uiModal = UI.modal('New Spec Search Project', bodyHtml, {
+            width: '460px',
+            submitLabel: 'Create Project',
+        });
+        const q = s => uiModal.q(s);
+        const nameEl = q('#ss-modal-name');
+        const errEl  = q('#ss-modal-err');
 
-        const nameEl = modal.querySelector('#ss-modal-name');
-        const errEl  = modal.querySelector('#ss-modal-err');
-
-        modal.querySelector('#ss-modal-cancel').addEventListener('click', () => modal.remove());
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-
-        modal.querySelector('#ss-modal-save').addEventListener('click', async () => {
+        uiModal.submitBtn.addEventListener('click', async () => {
             const name = nameEl.value.trim();
             if (!name) { errEl.textContent = 'Project name is required.'; errEl.style.display = ''; return; }
             errEl.style.display = 'none';
-            const btn = modal.querySelector('#ss-modal-save');
-            btn.disabled = true; btn.textContent = 'Creating…';
+            const restore = UI.btnLoading(uiModal.submitBtn, 'Creating…');
             try {
                 await api('POST', '/projects', {
                     name,
-                    project_number: modal.querySelector('#ss-modal-num').value.trim() || null,
-                    description:    modal.querySelector('#ss-modal-desc').value.trim() || null,
+                    project_number: q('#ss-modal-num').value.trim() || null,
+                    description:    q('#ss-modal-desc').value.trim() || null,
                 });
-                modal.remove();
+                uiModal.close();
                 renderProjects();
             } catch (e) {
                 errEl.textContent = e.message;
                 errEl.style.display = '';
-                btn.disabled = false; btn.textContent = 'Create Project';
+                restore();
             }
         });
 
@@ -230,88 +221,74 @@ window.AdminSpecSearch = (function () {
 
     // ── Edit-project modal ────────────────────────────────────────────────────
     function showEditProjectModal(project) {
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center';
-        modal.innerHTML = `
-            <div class="card" style="width:460px;max-width:95vw;padding:24px">
-                <h3 style="margin:0 0 16px">Edit Project</h3>
-                <div class="form-group">
-                    <label>Project Name <span style="color:#ef4444">*</span></label>
-                    <input class="form-control" id="ss-edit-name" value="${esc(project.name)}">
-                </div>
-                <div class="form-group">
-                    <label>Project Number</label>
-                    <input class="form-control" id="ss-edit-num" value="${esc(project.project_number || '')}">
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea class="form-control" id="ss-edit-desc" rows="2">${esc(project.description || '')}</textarea>
-                </div>
-                <div id="ss-edit-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-                    <button class="btn btn-secondary" id="ss-edit-cancel">Cancel</button>
-                    <button class="btn btn-primary" id="ss-edit-save">Save Changes</button>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
+        const bodyHtml = `
+            <div class="form-group">
+                <label>Project Name <span style="color:#ef4444">*</span></label>
+                <input class="form-control" id="ss-edit-name" value="${esc(project.name)}">
+            </div>
+            <div class="form-group">
+                <label>Project Number</label>
+                <input class="form-control" id="ss-edit-num" value="${esc(project.project_number || '')}">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea class="form-control" id="ss-edit-desc" rows="2">${esc(project.description || '')}</textarea>
+            </div>
+            <div id="ss-edit-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
+        `;
+        const uiModal = UI.modal('Edit Project', bodyHtml, {
+            width: '460px',
+            submitLabel: 'Save Changes',
+        });
+        const q = s => uiModal.q(s);
+        const errEl = q('#ss-edit-err');
 
-        const errEl = modal.querySelector('#ss-edit-err');
-        modal.querySelector('#ss-edit-cancel').addEventListener('click', () => modal.remove());
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-
-        modal.querySelector('#ss-edit-save').addEventListener('click', async () => {
-            const name = modal.querySelector('#ss-edit-name').value.trim();
+        uiModal.submitBtn.addEventListener('click', async () => {
+            const name = q('#ss-edit-name').value.trim();
             if (!name) { errEl.textContent = 'Project name is required.'; errEl.style.display = ''; return; }
             errEl.style.display = 'none';
-            const btn = modal.querySelector('#ss-edit-save');
-            btn.disabled = true; btn.textContent = 'Saving…';
+            const restore = UI.btnLoading(uiModal.submitBtn, 'Saving…');
             try {
                 const updated = await api('PATCH', `/projects/${encodeURIComponent(project.id)}`, {
                     name,
-                    project_number: modal.querySelector('#ss-edit-num').value.trim() || null,
-                    description:    modal.querySelector('#ss-edit-desc').value.trim() || null,
+                    project_number: q('#ss-edit-num').value.trim() || null,
+                    description:    q('#ss-edit-desc').value.trim() || null,
                 });
-                modal.remove();
+                uiModal.close();
                 // Update cached project and re-render detail
                 _currentProject = { ..._currentProject, ...updated };
                 renderProjectDetail(_currentProject);
             } catch (e) {
                 errEl.textContent = e.message;
                 errEl.style.display = '';
-                btn.disabled = false; btn.textContent = 'Save Changes';
+                restore();
             }
         });
 
-        setTimeout(() => modal.querySelector('#ss-edit-name').focus(), 50);
+        setTimeout(() => q('#ss-edit-name').focus(), 50);
     }
 
     // ── Delete-project modal ──────────────────────────────────────────────────
     function showDeleteProjectModal(project) {
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center';
-        modal.innerHTML = `
-            <div class="card" style="width:480px;max-width:95vw;padding:24px;border-top:4px solid #ef4444">
-                <h3 style="margin:0 0 12px;color:#ef4444">⚠ Delete Project</h3>
-                <p style="margin:0 0 8px;font-size:0.9rem">This will permanently delete <strong>${esc(project.name)}</strong> including all uploaded documents, indexed chunks, and search history.</p>
-                <p style="margin:0 0 16px;font-size:0.9rem;color:var(--text-muted)">This action cannot be undone.</p>
-                <div class="form-group">
-                    <label style="font-size:0.85rem">Type <strong style="font-family:monospace;color:#ef4444">DELETE</strong> to confirm:</label>
-                    <input class="form-control" id="ss-del-confirm" placeholder="DELETE" style="border-color:#ef4444;margin-top:6px">
-                </div>
-                <div id="ss-del-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-                    <button class="btn btn-secondary" id="ss-del-cancel">Cancel</button>
-                    <button class="btn" id="ss-del-confirm-btn" style="background:#ef4444;color:#fff;border-color:#ef4444">Delete Project</button>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
+        const bodyHtml = `
+            <p style="margin:0 0 8px;font-size:0.9rem">This will permanently delete <strong>${esc(project.name)}</strong> including all uploaded documents, indexed chunks, and search history.</p>
+            <p style="margin:0 0 16px;font-size:0.9rem;color:var(--text-muted)">This action cannot be undone.</p>
+            <div class="form-group">
+                <label style="font-size:0.85rem">Type <strong style="font-family:monospace;color:#ef4444">DELETE</strong> to confirm:</label>
+                <input class="form-control" id="ss-del-confirm" placeholder="DELETE" style="border-color:#ef4444;margin-top:6px">
+            </div>
+            <div id="ss-del-err" style="color:#ef4444;font-size:0.85rem;margin-bottom:8px;display:none"></div>
+        `;
+        const uiModal = UI.modal('Delete Project', bodyHtml, {
+            width: '480px',
+            submitLabel: 'Delete Project',
+            danger: true,
+        });
+        const q = s => uiModal.q(s);
+        const errEl = q('#ss-del-err');
+        const confirmInput = q('#ss-del-confirm');
 
-        const errEl = modal.querySelector('#ss-del-err');
-        const confirmInput = modal.querySelector('#ss-del-confirm');
-        modal.querySelector('#ss-del-cancel').addEventListener('click', () => modal.remove());
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-
-        modal.querySelector('#ss-del-confirm-btn').addEventListener('click', async () => {
+        uiModal.submitBtn.addEventListener('click', async () => {
             if (confirmInput.value.trim() !== 'DELETE') {
                 errEl.textContent = 'Type DELETE (all caps) to confirm.';
                 errEl.style.display = '';
@@ -319,17 +296,16 @@ window.AdminSpecSearch = (function () {
                 return;
             }
             errEl.style.display = 'none';
-            const btn = modal.querySelector('#ss-del-confirm-btn');
-            btn.disabled = true; btn.textContent = 'Deleting…';
+            const restore = UI.btnLoading(uiModal.submitBtn, 'Deleting…');
             try {
                 await api('DELETE', `/projects/${encodeURIComponent(project.id)}`);
-                modal.remove();
+                uiModal.close();
                 _currentProject = null;
                 renderProjects();
             } catch (e) {
                 errEl.textContent = e.message;
                 errEl.style.display = '';
-                btn.disabled = false; btn.textContent = 'Delete Project';
+                restore();
             }
         });
 

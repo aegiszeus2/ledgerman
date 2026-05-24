@@ -90,6 +90,7 @@ window.AdminUsers = {
                                     '<td class="amount">' + (payRate ? Utils.formatCurrency(payRate) + '/hr' : '—') + '</td>' +
                                     '<td class="amount">' + (costRate ? Utils.formatCurrency(costRate) + '/hr' : '—') + '</td>' +
                                     '<td style="white-space:nowrap">' +
+                                        '<button class="btn-ghost btn-sm view-worker" data-id="' + w.id + '" style="color:var(--info,#3b82f6)">View</button>' +
                                         '<button class="btn-ghost btn-sm edit-worker" data-id="' + w.id + '">Edit</button>' +
                                         '<button class="btn-ghost btn-sm invite-worker" data-id="' + w.id + '" style="color:var(--success)">Invite</button>' +
                                         '<button class="btn-ghost btn-sm reset-pin-worker" data-id="' + w.id + '" style="color:var(--warn)">Reset PIN</button>' +
@@ -162,21 +163,68 @@ window.AdminUsers = {
         }, 250));
 
         // Reveal/hide PIN buttons
+        // The worker list endpoint strips PINs for security. On first "Show" click
+        // we fetch the full worker detail (GET /api/workers/<id>) which returns
+        // pin_display. After the first fetch the value is cached in the DOM.
         container.querySelectorAll('.reveal-pin').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var id = btn.dataset.id;
                 var masked = container.querySelector('.pin-masked[data-id="' + id + '"]');
                 var revealed = container.querySelector('.pin-revealed[data-id="' + id + '"]');
                 if (!masked || !revealed) return;
-                if (revealed.style.display === 'none') {
+
+                // Already fetched — just toggle
+                if (btn.dataset.pinLoaded === 'true') {
+                    if (revealed.style.display === 'none') {
+                        masked.style.display = 'none';
+                        revealed.style.display = 'inline';
+                        btn.textContent = 'Hide';
+                    } else {
+                        masked.style.display = 'inline';
+                        revealed.style.display = 'none';
+                        btn.textContent = 'Show';
+                    }
+                    return;
+                }
+
+                // First reveal — fetch from server
+                btn.textContent = '…';
+                btn.disabled = true;
+                AppData.getWorkerDetail(id).then(function(detail) {
+                    var pin = detail.pin_display || '';
+                    var isHashed = detail.pin_is_hashed;
+                    if (isHashed || pin === '[hashed — reset required]') {
+                        // Replace the entire cell content with a reset-required notice
+                        var td = btn.closest('td');
+                        if (td) {
+                            td.innerHTML = '<span style="color:var(--text2);font-size:.8rem">Reset required</span>' +
+                                ' <button class="btn-ghost btn-sm reset-pin-worker" data-id="' + id + '" style="font-size:.75rem;padding:2px 6px;color:var(--warn)">Reset</button>';
+                            // Re-wire the reset button
+                            var resetBtn = td.querySelector('.reset-pin-worker');
+                            if (resetBtn) resetBtn.addEventListener('click', function() {
+                                var w = AppData.getWorker(id);
+                                if (w) self._showSetPinModal(w);
+                            });
+                        }
+                        return;
+                    }
+                    revealed.textContent = pin || '(no PIN set)';
+                    btn.dataset.pinLoaded = 'true';
                     masked.style.display = 'none';
                     revealed.style.display = 'inline';
                     btn.textContent = 'Hide';
-                } else {
-                    masked.style.display = 'inline';
-                    revealed.style.display = 'none';
+                    btn.disabled = false;
+                }).catch(function(err) {
                     btn.textContent = 'Show';
-                }
+                    btn.disabled = false;
+                    Utils.showToast('Could not load PIN: ' + (err.message || 'server error'), 'error');
+                });
+            });
+        });
+
+        container.querySelectorAll('.view-worker').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self._showDetailModal(btn.dataset.id);
             });
         });
 
@@ -215,6 +263,272 @@ window.AdminUsers = {
         });
     },
 
+    _showDetailModal(workerId) {
+        const self = this;
+        const esc = Utils.escapeHtml;
+
+        // ── Build the overlay immediately with a loading state ────────────────
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.display = 'flex';
+        overlay.innerHTML =
+            '<div class="modal" style="max-width:720px;width:100%">' +
+                '<div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">' +
+                    '<h3 style="margin:0">Worker Profile</h3>' +
+                    '<button class="btn-ghost btn-sm modal-close" style="font-size:1.2rem;line-height:1;padding:4px 10px">&times;</button>' +
+                '</div>' +
+                '<div class="modal-body" id="workerDetailBody" style="min-height:200px;display:flex;align-items:center;justify-content:center">' +
+                    '<p style="color:var(--text2)">Loading…</p>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+        // ── Fetch worker detail + timecards in parallel ───────────────────────
+        const detailPromise  = AppData.getWorkerDetail(workerId);
+        const tcPromise      = AppData.getWorkerTimecards(workerId);
+
+        Promise.all([detailPromise, tcPromise])
+            .then(function(results) {
+                const worker    = results[0];
+                const timecards = Array.isArray(results[1]) ? results[1] : [];
+                self._renderDetailContent(overlay, worker, timecards);
+            })
+            .catch(function(err) {
+                const body = overlay.querySelector('#workerDetailBody');
+                if (body) {
+                    body.style.display = 'block';
+                    body.innerHTML =
+                        '<div class="empty" style="padding:32px 0">' +
+                            '<h3 style="color:var(--accent)">Could not load worker</h3>' +
+                            '<p>' + esc(err.message || 'Unknown error') + '</p>' +
+                        '</div>';
+                }
+            });
+    },
+
+    _renderDetailContent(overlay, worker, timecards) {
+        const self = this;
+        const esc  = Utils.escapeHtml;
+
+        // ── Hours summary from timecards ──────────────────────────────────────
+        var totalReg = 0, totalOT = 0, totalDT = 0, totalAll = 0;
+        var projectMap = {};   // projectId → { name, reg, ot, dt }
+        var projects   = AppData.getProjects();
+        var projectLookup = {};
+        projects.forEach(function(p) { projectLookup[p.id] = p.name || p.id; });
+
+        timecards.forEach(function(tc) {
+            var reg = parseFloat(tc.regular_hours || tc.regularHours || 0);
+            var ot  = parseFloat(tc.ot_hours      || tc.otHours      || 0);
+            var dt  = parseFloat(tc.dt_hours      || tc.dtHours      || 0);
+            totalReg += reg; totalOT += ot; totalDT += dt;
+            var pid  = tc.project_id || tc.projectId || '';
+            var pname = projectLookup[pid] || pid || 'Unassigned';
+            if (!projectMap[pid]) projectMap[pid] = { name: pname, reg: 0, ot: 0, dt: 0 };
+            projectMap[pid].reg += reg;
+            projectMap[pid].ot  += ot;
+            projectMap[pid].dt  += dt;
+        });
+        totalAll = totalReg + totalOT + totalDT;
+
+        // ── Derive field values ───────────────────────────────────────────────
+        var payRate   = worker.default_rate  || worker.defaultRate  || 0;
+        var costRate  = worker.cost_rate     || worker.costRate      || 0;
+        var phone     = worker.phone || '';
+        var email     = worker.email || '';
+        var statusClass = (worker.status || 'Active') === 'Active' ? 'active-s' : 'completed-s';
+
+        // ── PIN section HTML ──────────────────────────────────────────────────
+        var pinSectionHtml;
+        if (worker.pin_is_hashed) {
+            pinSectionHtml =
+                '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+                    '<span style="background:var(--warn,#f59e0b);color:#fff;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:4px">HASHED</span>' +
+                    '<span style="color:var(--text2);font-size:.9rem">PIN has been migrated to secure storage. The original PIN is not recoverable.</span>' +
+                    '<button class="btn-secondary btn-sm detail-reset-pin" style="margin-left:auto;color:var(--warn)">Reset PIN</button>' +
+                '</div>';
+        } else {
+            var pinVal = esc(worker.pin_display || '');
+            pinSectionHtml =
+                '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+                    '<span id="detailPinMasked" style="font-size:1.1rem;letter-spacing:4px">' +
+                        '•'.repeat((worker.pin_display || '').length || 4) +
+                    '</span>' +
+                    '<span id="detailPinRevealed" style="display:none;font-family:monospace;font-size:1.1rem;letter-spacing:2px;background:var(--bg2);padding:3px 10px;border-radius:4px">' +
+                        pinVal +
+                    '</span>' +
+                    '<button class="btn-ghost btn-sm" id="detailPinToggle" style="font-size:.8rem">Show</button>' +
+                    '<button class="btn-secondary btn-sm detail-reset-pin" style="color:var(--warn)">Reset PIN</button>' +
+                '</div>';
+        }
+
+        // ── Project hours table ───────────────────────────────────────────────
+        var projectRows = Object.values(projectMap);
+        var hoursBreakdownHtml = '';
+        if (projectRows.length > 0) {
+            hoursBreakdownHtml =
+                '<table style="width:100%;font-size:.88rem;margin-top:8px">' +
+                    '<thead><tr>' +
+                        '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Project</th>' +
+                        '<th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">Reg</th>' +
+                        '<th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">OT</th>' +
+                        '<th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">DT</th>' +
+                        '<th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">Total</th>' +
+                    '</tr></thead>' +
+                    '<tbody>' +
+                        projectRows.map(function(p) {
+                            var pTotal = p.reg + p.ot + p.dt;
+                            return '<tr>' +
+                                '<td style="padding:4px 8px">' + esc(p.name) + '</td>' +
+                                '<td style="text-align:right;padding:4px 8px">' + p.reg.toFixed(1) + '</td>' +
+                                '<td style="text-align:right;padding:4px 8px">' + p.ot.toFixed(1) + '</td>' +
+                                '<td style="text-align:right;padding:4px 8px">' + p.dt.toFixed(1) + '</td>' +
+                                '<td style="text-align:right;padding:4px 8px;font-weight:600">' + pTotal.toFixed(1) + '</td>' +
+                            '</tr>';
+                        }).join('') +
+                    '</tbody>' +
+                    '<tfoot><tr style="border-top:2px solid var(--border)">' +
+                        '<td style="padding:4px 8px;font-weight:700">All Projects</td>' +
+                        '<td style="text-align:right;padding:4px 8px;font-weight:700">' + totalReg.toFixed(1) + '</td>' +
+                        '<td style="text-align:right;padding:4px 8px;font-weight:700">' + totalOT.toFixed(1) + '</td>' +
+                        '<td style="text-align:right;padding:4px 8px;font-weight:700">' + totalDT.toFixed(1) + '</td>' +
+                        '<td style="text-align:right;padding:4px 8px;font-weight:700">' + totalAll.toFixed(1) + ' h</td>' +
+                    '</tr></tfoot>' +
+                '</table>';
+        } else {
+            hoursBreakdownHtml = '<p style="color:var(--text2);margin:8px 0 0">No timecard records found for this worker.</p>';
+        }
+
+        // ── Full modal body HTML ──────────────────────────────────────────────
+        function section(title, content) {
+            return '<div style="margin-bottom:20px">' +
+                '<div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">' +
+                    title +
+                '</div>' +
+                content +
+            '</div>';
+        }
+        function row2(label, value) {
+            return '<div style="display:flex;gap:8px;margin-bottom:6px;font-size:.92rem">' +
+                '<span style="color:var(--text2);min-width:110px;flex-shrink:0">' + label + '</span>' +
+                '<span style="font-weight:500">' + (value || '<span style="color:var(--border)">—</span>') + '</span>' +
+            '</div>';
+        }
+
+        var bodyHtml =
+            // ── Profile ──────────────────────────────────────────────────────
+            section('Profile',
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">' +
+                    row2('Name', '<strong style="font-size:1rem">' + esc(worker.name || '') + '</strong>') +
+                    row2('Role', esc(worker.role || 'Worker')) +
+                    row2('Status', '<span class="pstatus ' + statusClass + '">' + esc(worker.status || 'Active') + '</span>') +
+                    row2('Member since', worker.created_at ? esc(worker.created_at.slice(0,10)) : '') +
+                '</div>'
+            ) +
+
+            // ── Contact ───────────────────────────────────────────────────────
+            section('Contact Information',
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">' +
+                    row2('Phone', phone ? ('<a href="tel:' + esc(phone) + '" style="color:var(--accent)">' + esc(phone) + '</a>') : '') +
+                    row2('Email', email ? ('<a href="mailto:' + esc(email) + '" style="color:var(--accent)">' + esc(email) + '</a>') : '') +
+                '</div>'
+            ) +
+
+            // ── Access / PIN ──────────────────────────────────────────────────
+            section('Access &amp; PIN',
+                '<div style="margin-bottom:10px">' + row2('2FA Enabled', worker.twoFAEnabled || worker.two_fa_enabled ? '<span style="color:var(--success)">✓ Active</span>' : 'Disabled') + '</div>' +
+                '<div style="background:var(--bg2,#f8f9fa);border:1px solid var(--border);border-radius:var(--radius,6px);padding:12px 14px">' +
+                    '<div style="font-size:.8rem;color:var(--text2);margin-bottom:8px;font-weight:600">Worker Access PIN</div>' +
+                    pinSectionHtml +
+                '</div>'
+            ) +
+
+            // ── Rates ─────────────────────────────────────────────────────────
+            section('Pay &amp; Bill Rates',
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">' +
+                    row2('Pay Rate', payRate ? (Utils.formatCurrency(payRate) + '/hr') : '') +
+                    row2('Cost Rate', costRate ? (Utils.formatCurrency(costRate) + '/hr') : '') +
+                '</div>' +
+                '<p style="font-size:.75rem;color:var(--text2);margin:4px 0 0"><strong>Pay Rate</strong> = worker\'s hourly pay &nbsp;·&nbsp; <strong>Cost Rate</strong> = billable rate to client</p>'
+            ) +
+
+            // ── Hours Summary ─────────────────────────────────────────────────
+            section('Hours Summary (' + timecards.length + ' timecard' + (timecards.length !== 1 ? 's' : '') + ')',
+                '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">' +
+                    '<div style="background:var(--bg2,#f8f9fa);border-radius:var(--radius,6px);padding:12px;text-align:center">' +
+                        '<div style="font-size:1.4rem;font-weight:700;color:var(--accent)">' + totalReg.toFixed(1) + '</div>' +
+                        '<div style="font-size:.75rem;color:var(--text2);margin-top:2px">Regular Hours</div>' +
+                    '</div>' +
+                    '<div style="background:var(--bg2,#f8f9fa);border-radius:var(--radius,6px);padding:12px;text-align:center">' +
+                        '<div style="font-size:1.4rem;font-weight:700;color:var(--warn,#f59e0b)">' + totalOT.toFixed(1) + '</div>' +
+                        '<div style="font-size:.75rem;color:var(--text2);margin-top:2px">Overtime Hours</div>' +
+                    '</div>' +
+                    '<div style="background:var(--bg2,#f8f9fa);border-radius:var(--radius,6px);padding:12px;text-align:center">' +
+                        '<div style="font-size:1.4rem;font-weight:700;color:var(--accent)">' + totalAll.toFixed(1) + '</div>' +
+                        '<div style="font-size:.75rem;color:var(--text2);margin-top:2px">Total Hours</div>' +
+                    '</div>' +
+                '</div>' +
+                hoursBreakdownHtml
+            );
+
+        // ── Footer actions ────────────────────────────────────────────────────
+        var footerHtml =
+            '<div class="modal-footer">' +
+                '<button class="btn btn-primary detail-edit-btn">Edit Worker</button>' +
+                '<button class="btn btn-secondary modal-close">Close</button>' +
+            '</div>';
+
+        // ── Render into the overlay ───────────────────────────────────────────
+        var modal = overlay.querySelector('.modal');
+        var body  = overlay.querySelector('#workerDetailBody');
+        body.style.cssText = 'display:block;min-height:unset';
+        body.innerHTML     = bodyHtml;
+        // Insert footer after body
+        if (!modal.querySelector('.modal-footer')) {
+            modal.insertAdjacentHTML('beforeend', footerHtml);
+        }
+
+        // Re-bind close buttons (footer close)
+        modal.querySelectorAll('.modal-close').forEach(function(btn) {
+            btn.addEventListener('click', function() { overlay.remove(); });
+        });
+
+        // Edit button opens the standard edit modal (without closing detail first)
+        modal.querySelector('.detail-edit-btn').addEventListener('click', function() {
+            overlay.remove();
+            self._showModal(worker.id);
+        });
+
+        // Reset PIN from detail view
+        modal.querySelectorAll('.detail-reset-pin').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                overlay.remove();
+                self._showSetPinModal(worker);
+            });
+        });
+
+        // PIN show/hide toggle (only present for plain-text PINs)
+        var pinToggle = modal.querySelector('#detailPinToggle');
+        if (pinToggle) {
+            pinToggle.addEventListener('click', function() {
+                var masked   = modal.querySelector('#detailPinMasked');
+                var revealed = modal.querySelector('#detailPinRevealed');
+                if (revealed.style.display === 'none') {
+                    masked.style.display   = 'none';
+                    revealed.style.display = 'inline';
+                    pinToggle.textContent  = 'Hide';
+                } else {
+                    masked.style.display   = 'inline';
+                    revealed.style.display = 'none';
+                    pinToggle.textContent  = 'Show';
+                }
+            });
+        }
+    },
+
     _showModal(editId) {
         const self = this;
         const worker = editId ? AppData.getWorker(editId) : null;
@@ -230,131 +544,123 @@ window.AdminUsers = {
             });
         }
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:640px">
-                <div class="modal-header">
-                    <h3 style="margin:0">${isEdit ? 'Edit Worker' : 'Add Worker'}</h3>
+        const bodyHtml = `
+            <form id="workerModalForm" novalidate>
+
+                <!-- Personal Information -->
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Personal Information</div>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group">
+                        <label>Worker Name *</label>
+                        <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input class="form-control" type="tel" name="phone" value="${esc(worker ? worker.phone || '' : '')}" placeholder="e.g. 905-555-0100">
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form id="workerModalForm" novalidate>
-
-                        <!-- Personal Information -->
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Personal Information</div>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group">
-                                <label>Worker Name *</label>
-                                <input class="form-control" name="name" value="${esc(worker ? worker.name : '')}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Phone Number</label>
-                                <input class="form-control" type="tel" name="phone" value="${esc(worker ? worker.phone || '' : '')}" placeholder="e.g. 905-555-0100">
-                            </div>
-                        </div>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group">
-                                <label>Date of Birth</label>
-                                <input class="form-control" type="date" name="dob" value="${esc(worker ? worker.dob || '' : '')}">
-                            </div>
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select class="form-control" name="status">
-                                    <option value="Active" ${(!worker || worker.status === 'Active') ? 'selected' : ''}>Active</option>
-                                    <option value="Inactive" ${worker && worker.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Home Address</label>
-                            <input class="form-control" name="address" value="${esc(worker ? worker.address || '' : '')}" placeholder="Street, City, Province, Postal Code">
-                        </div>
-                        <div class="form-group" style="margin-bottom:16px">
-                            <label>Social Insurance Number (SIN)</label>
-                            <div style="position:relative">
-                                <input class="form-control" name="sin" id="workerSinInput" type="password" value="${esc(worker ? worker.sin || '' : '')}" placeholder="9-digit SIN" maxlength="9" inputmode="numeric" style="padding-right:50px">
-                                <button type="button" id="toggleSinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
-                            </div>
-                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Stored securely. Visible only to admins. Never shared with workers.</p>
-                        </div>
-
-                        <!-- Account & Access -->
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Account &amp; Access</div>
-                        <div class="form-row" style="margin-bottom:12px">
-                            <div class="form-group">
-                                <label>Role *</label>
-                                <select class="form-control" name="role">
-                                    <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
-                                    <option value="Supervisor" ${worker && worker.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
-                                    <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Email Address</label>
-                                <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
-                            </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-                                <input type="checkbox" name="email2FA" ${worker && worker.email2FAEnabled ? 'checked' : ''}>
-                                Enable Email 2FA
-                            </label>
-                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
-                        </div>
-                        <div class="form-group" style="margin-bottom:16px">
-                            <label>PIN (6+ digits)${isEdit ? ' — leave blank to keep current' : ' *'}</label>
-                            <div style="position:relative;max-width:200px">
-                                <input class="form-control" name="pin" id="workerPinInput" type="password" maxlength="12" inputmode="numeric" value="" placeholder="${isEdit ? 'Leave blank to keep current' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
-                                <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
-                            </div>
-                        </div>
-
-                        <!-- Rates -->
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Rates</div>
-                        <div class="form-row" style="margin-bottom:4px">
-                            <div class="form-group">
-                                <label>Pay Rate ($/hr)</label>
-                                <input class="form-control" type="number" name="payRate" step="0.01" min="0" value="${worker ? (worker.payRate || worker.defaultRate || '') : ''}" placeholder="0.00">
-                            </div>
-                            <div class="form-group">
-                                <label>Cost Rate ($/hr)</label>
-                                <input class="form-control" type="number" name="costRate" step="0.01" min="0" value="${worker ? worker.costRate || '' : ''}" placeholder="0.00">
-                            </div>
-                        </div>
-                        <p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">
-                            <strong>Pay Rate</strong> — what the worker earns; applied to project labour cost tracking.<br>
-                            <strong>Cost Rate</strong> — billable rate charged to the client on invoices.
-                        </p>
-
-                        <!-- Project Assignment -->
-                        ${projects.length > 0 ? `
-                        <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Project Assignment</div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-                                ${projects.map(function(p) {
-                                    const checked = assignedProjects.includes(p.id) ? ' checked' : '';
-                                    return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
-                                        '<input type="checkbox" class="project-checkbox" value="' + p.id + '"' + checked + '> ' +
-                                        esc(p.name) +
-                                    '</label>';
-                                }).join('')}
-                            </div>
-                        </div>` : ''}
-
-                    </form>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input class="form-control" type="date" name="dob" value="${esc(worker ? worker.dob || '' : '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select class="form-control" name="status">
+                            <option value="Active" ${(!worker || worker.status === 'Active') ? 'selected' : ''}>Active</option>
+                            <option value="Inactive" ${worker && worker.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" form="workerModalForm" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Worker</button>
-                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Home Address</label>
+                    <input class="form-control" name="address" value="${esc(worker ? worker.address || '' : '')}" placeholder="Street, City, Province, Postal Code">
                 </div>
-            </div>
+                <div class="form-group" style="margin-bottom:16px">
+                    <label>Social Insurance Number (SIN)</label>
+                    <div style="position:relative">
+                        <input class="form-control" name="sin" id="workerSinInput" type="password" value="${esc(worker ? worker.sin || '' : '')}" placeholder="9-digit SIN" maxlength="9" inputmode="numeric" style="padding-right:50px">
+                        <button type="button" id="toggleSinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                    </div>
+                    <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Stored securely. Visible only to admins. Never shared with workers.</p>
+                </div>
+
+                <!-- Account & Access -->
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Account &amp; Access</div>
+                <div class="form-row" style="margin-bottom:12px">
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select class="form-control" name="role">
+                            <option value="Worker" ${(!worker || worker.role === 'Worker') ? 'selected' : ''}>Worker</option>
+                            <option value="Supervisor" ${worker && worker.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
+                            <option value="Approver" ${worker && worker.role === 'Approver' ? 'selected' : ''}>Approver</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input class="form-control" type="email" name="email" value="${esc(worker ? worker.email || '' : '')}" placeholder="worker@email.com">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" name="email2FA" ${worker && worker.email2FAEnabled ? 'checked' : ''}>
+                        Enable Email 2FA
+                    </label>
+                    <p style="font-size:.75rem;color:var(--text2);margin-top:4px">Sends a verification code to the worker's email on every login. Requires email address above.</p>
+                </div>
+                <div class="form-group" style="margin-bottom:16px">
+                    <label>PIN (6+ digits)${isEdit ? ' — leave blank to keep current' : ' *'}</label>
+                    <div style="position:relative;max-width:200px">
+                        <input class="form-control" name="pin" id="workerPinInput" type="password" maxlength="12" inputmode="numeric" value="" placeholder="${isEdit ? 'Leave blank to keep current' : 'Enter 6+ digit PIN'}" style="padding-right:50px">
+                        <button type="button" id="togglePinVisibility" class="btn-ghost btn-sm" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:.75rem">Show</button>
+                    </div>
+                </div>
+
+                <!-- Rates -->
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Rates</div>
+                <div class="form-row" style="margin-bottom:4px">
+                    <div class="form-group">
+                        <label>Pay Rate ($/hr)</label>
+                        <input class="form-control" type="number" name="payRate" step="0.01" min="0" value="${worker ? (worker.payRate || worker.defaultRate || '') : ''}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Cost Rate ($/hr)</label>
+                        <input class="form-control" type="number" name="costRate" step="0.01" min="0" value="${worker ? worker.costRate || '' : ''}" placeholder="0.00">
+                    </div>
+                </div>
+                <p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">
+                    <strong>Pay Rate</strong> — what the worker earns; applied to project labour cost tracking.<br>
+                    <strong>Cost Rate</strong> — billable rate charged to the client on invoices.
+                </p>
+
+                <!-- Project Assignment -->
+                ${projects.length > 0 ? `
+                <div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Project Assignment</div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+                        ${projects.map(function(p) {
+                            const checked = assignedProjects.includes(p.id) ? ' checked' : '';
+                            return '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.9rem">' +
+                                '<input type="checkbox" class="project-checkbox" value="' + p.id + '"' + checked + '> ' +
+                                esc(p.name) +
+                            '</label>';
+                        }).join('')}
+                    </div>
+                </div>` : ''}
+
+            </form>
         `;
-        document.body.appendChild(overlay);
+
+        const modal = UI.modal(
+            isEdit ? 'Edit Worker' : 'Add Worker',
+            bodyHtml,
+            { width: '640px', submitLabel: (isEdit ? 'Update' : 'Add') + ' Worker' }
+        );
+        const q = s => modal.q(s);
 
         // Toggle PIN visibility
-        overlay.querySelector('#togglePinVisibility').addEventListener('click', function() {
-            const pinInput = overlay.querySelector('#workerPinInput');
+        q('#togglePinVisibility').addEventListener('click', function() {
+            const pinInput = q('#workerPinInput');
             if (pinInput.type === 'password') {
                 pinInput.type = 'text';
                 this.textContent = 'Hide';
@@ -365,8 +671,8 @@ window.AdminUsers = {
         });
 
         // Toggle SIN visibility
-        overlay.querySelector('#toggleSinVisibility').addEventListener('click', function() {
-            const sinInput = overlay.querySelector('#workerSinInput');
+        q('#toggleSinVisibility').addEventListener('click', function() {
+            const sinInput = q('#workerSinInput');
             if (sinInput.type === 'password') {
                 sinInput.type = 'text';
                 this.textContent = 'Hide';
@@ -376,14 +682,7 @@ window.AdminUsers = {
             }
         });
 
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) overlay.remove();
-        });
-        overlay.querySelector('.modal-close').addEventListener('click', function() {
-            overlay.remove();
-        });
-
-        overlay.querySelector('#workerModalForm').addEventListener('submit', async function(e) {
+        q('#workerModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
             const fd = Utils.getFormData(this);
@@ -421,14 +720,13 @@ window.AdminUsers = {
                 email2FAEnabled: fd.email2FA === 'on' && !!((fd.email || '').trim() || (isEdit ? worker.email || '' : ''))
             };
             // Workers use dedicated endpoint — saveWorkerAsync handles POST vs PUT
-            const submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveWorkerAsync(workerData);
                 // Also persist project assignment changes (fire-and-forget is acceptable here
                 // since project data was already confirmed by prior loads — just updating an array field)
                 const selectedProjects = [];
-                overlay.querySelectorAll('.project-checkbox:checked').forEach(function(cb) {
+                modal.overlay.querySelectorAll('.project-checkbox:checked').forEach(function(cb) {
                     selectedProjects.push(cb.value);
                 });
                 const allProjects = AppData.getProjects();
@@ -445,16 +743,18 @@ window.AdminUsers = {
                     }
                 }
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Worker' : 'Add Worker'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Worker Updated' : 'Worker Added', workerData.name + ' (' + workerData.role + ')');
             Utils.showToast(isEdit ? 'Worker updated' : 'Worker added');
-            overlay.remove();
+            modal.close();
             self._renderList();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#workerModalForm').requestSubmit());
     },
 
     _showSetPinModal(worker) {

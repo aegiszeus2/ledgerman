@@ -3,6 +3,500 @@
    Used for @media print and dedicated print views
    ============================================================ */
 
+/* ============================================================
+   REDESIGNED INVOICE DOCUMENT — inv-* class system
+   Professional layout for browser view + print/PDF export
+   ============================================================ */
+
+/* ─── Document container ─────────────────────────────────── */
+.inv-doc {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #1e293b;
+  background: #ffffff;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+/* ─── Header row (company left, INVOICE title right) ────── */
+.inv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.inv-company-block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inv-company-name {
+  font-size: 16pt;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+.inv-company-meta {
+  font-size: 8.5pt;
+  color: #64748b;
+  line-height: 1.65;
+}
+
+.inv-company-meta div {
+  margin: 0;
+}
+
+.inv-title-block {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.inv-title-text {
+  font-size: 26pt;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.inv-number {
+  font-size: 12pt;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 8px;
+}
+
+.inv-title-meta {
+  font-size: 8.5pt;
+}
+
+.inv-title-meta-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.inv-title-meta-row span:first-child {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.inv-title-meta-row span:last-child {
+  color: #334155;
+  font-weight: 600;
+}
+
+/* ─── Header rule ─────────────────────────────────────────── */
+.inv-header-rule {
+  border: none;
+  border-top: 3px solid #1e293b;
+  margin: 16px 0 22px;
+}
+
+/* ─── Bill To / Project row ──────────────────────────────── */
+.inv-parties-row {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 22px;
+}
+
+.inv-party {
+  flex: 1;
+}
+
+.inv-party-label {
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.inv-party-name {
+  font-size: 11pt;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+
+.inv-party-details {
+  font-size: 8.5pt;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+/* ─── Contract reference bar ──────────────────────────────── */
+.inv-contract-ref {
+  font-size: 8.5pt;
+  color: #475569;
+  margin-bottom: 18px;
+  padding: 6px 12px;
+  background: #f8fafc;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 2px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ─── Line items table ───────────────────────────────────── */
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 6px;
+}
+
+.inv-table thead tr {
+  background-color: #1e293b;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-table thead th {
+  padding: 9px 10px;
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #ffffff;
+  text-align: left;
+  border: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-th-qty,
+.inv-th-rate,
+.inv-th-amt {
+  text-align: right !important;
+}
+
+/* Category section header row */
+.inv-cat-row td {
+  padding: 10px 10px 3px 10px;
+  font-size: 8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+}
+
+/* Data rows */
+.inv-line-row td {
+  padding: 8px 10px;
+  font-size: 9pt;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.inv-line-row:last-child td {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.inv-line-row:nth-child(even) {
+  background-color: #f8fafc;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-td-desc {
+  font-weight: 500;
+  color: #1e293b;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.inv-td-cat {
+  text-align: center;
+}
+
+.inv-td-qty,
+.inv-td-rate,
+.inv-td-amt {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Category tags */
+.inv-cat-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-cat-labor    { background: #dbeafe; color: #1d4ed8; }
+.inv-cat-equipment { background: #fef9c3; color: #a16207; }
+.inv-cat-material { background: #dcfce7; color: #15803d; }
+
+/* Change order badge */
+.inv-co-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #fee2e2;
+  color: #b91c1c;
+  vertical-align: middle;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ─── Totals section ─────────────────────────────────────── */
+.inv-totals-section {
+  display: flex;
+  justify-content: flex-end;
+  margin: 16px 0 22px;
+}
+
+.inv-totals-table {
+  border-collapse: collapse;
+  min-width: 280px;
+}
+
+.inv-totals-table td {
+  padding: 5px 0;
+  font-size: 9.5pt;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.inv-totals-lbl {
+  padding-right: 28px !important;
+  font-weight: 500;
+}
+
+.inv-totals-val {
+  text-align: right !important;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* "Total" row — separator above */
+.inv-totals-total-row td {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  border-top: 1px solid #cbd5e1;
+  color: #1e293b;
+  font-size: 10pt;
+  font-weight: 700;
+}
+
+/* "Total Due / Net Payable" row — emphasized */
+.inv-totals-due-row td {
+  padding: 10px 0 !important;
+  border-top: 2px solid #1e293b;
+  font-size: 12pt;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.inv-totals-due-row .inv-totals-lbl,
+.inv-totals-due-row .inv-totals-val {
+  color: #1e293b;
+}
+
+/* ─── Payment terms bar ──────────────────────────────────── */
+.inv-terms {
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  background: #f8fafc;
+  border-radius: 4px;
+  border-left: 3px solid #cbd5e1;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-terms-line {
+  font-size: 9.5pt;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+.inv-terms-note {
+  font-size: 7.5pt;
+  color: #64748b;
+}
+
+/* ─── Notes block ────────────────────────────────────────── */
+.inv-notes-section {
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  background: #f8fafc;
+  border-radius: 4px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-notes-title {
+  display: block;
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+
+.inv-notes-text {
+  font-size: 9pt;
+  color: #475569;
+  line-height: 1.5;
+}
+
+/* ─── Payment contact box ────────────────────────────────── */
+.inv-contact-box {
+  display: inline-block;
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  min-width: 220px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.inv-contact-title {
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-bottom: 5px;
+}
+
+.inv-contact-body {
+  font-size: 8.5pt;
+  color: #334155;
+  line-height: 1.65;
+}
+
+/* ─── Holdback notice ────────────────────────────────────── */
+.inv-holdback-notice {
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+  font-size: 8.5pt;
+  color: #92400e;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ─── Footer ─────────────────────────────────────────────── */
+.inv-footer {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 7.5pt;
+  color: #94a3b8;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ─── Print/PDF overrides for inv-* classes ──────────────── */
+@media print {
+  .inv-doc {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .inv-table thead tr {
+    background-color: #1e293b !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-table thead th {
+    color: #ffffff !important;
+    background-color: #1e293b !important;
+  }
+
+  .inv-line-row:nth-child(even) {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-terms,
+  .inv-notes-section {
+    background: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-contact-box {
+    background: #f0f0f0 !important;
+    border-color: #ccc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-contract-ref {
+    background: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-holdback-notice {
+    background: #fefce8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-cat-tag,
+  .inv-co-badge {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-table {
+    page-break-inside: auto;
+  }
+
+  .inv-line-row,
+  .inv-cat-row {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .inv-totals-section,
+  .inv-terms,
+  .inv-contact-box {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* END REDESIGNED INVOICE DOCUMENT — inv-* class system */
+
 /* --- Print-specific resets --- */
 @media print {
   *,

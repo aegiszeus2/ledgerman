@@ -208,90 +208,79 @@ window.AdminTaskAssignment = {
         const workers = AppData.getWorkers().filter(w => w.status === 'Active') || [];
         const esc = Utils.escapeHtml;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:600px">
-                <div class="modal-header">
-                    <h3 style="margin:0">${isEdit ? 'Edit Task' : 'New Task'}</h3>
+        const workItemsHtml = (() => {
+            const pid = task ? task.projectId : '';
+            if (!pid || !AppData.getSubtasks) return '';
+            return AppData.getSubtasks(pid).map(wi => `<option value="${wi.id}" ${task && task.workItemId === wi.id ? 'selected' : ''}>${esc(wi.name)}</option>`).join('');
+        })();
+
+        const bodyHtml = `
+            <form id="taskModalForm" novalidate>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Task Title *</label>
+                    <input name="title" value="${esc(task ? task.title : '')}" placeholder="e.g., Foundation inspection" required>
                 </div>
-                <div class="modal-body">
-                    <form id="taskModalForm" novalidate>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Task Title *</label>
-                            <input name="title" value="${esc(task ? task.title : '')}" placeholder="e.g., Foundation inspection" required>
-                        </div>
 
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label>Description</label>
-                            <textarea name="description" style="min-height:80px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);width:100%;font-family:inherit" placeholder="Task details...">${esc(task ? task.description : '')}</textarea>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Project</label>
-                                <select name="projectId">
-                                    <option value="">-- Select Project --</option>
-                                    ${projects.map(p => `<option value="${p.id}" ${task && task.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Assign To Worker</label>
-                                <select name="assigned_to_worker_id">
-                                    <option value="">-- Unassigned --</option>
-                                    ${workers.map(w => `<option value="${w.id}" ${task && task.assigned_to_worker_id === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Start Date</label>
-                                <input type="date" name="startDate" value="${task && task.startDate ? task.startDate : ''}">
-                            </div>
-                            <div class="form-group">
-                                <label>Due Date</label>
-                                <input type="date" name="due_date" value="${task && task.due_date ? task.due_date : ''}">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select name="status">
-                                    <option ${!task || task.status === 'To Do' ? 'selected' : ''}>To Do</option>
-                                    <option ${task && task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                                    <option ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Linked Work Item <span style="font-size:.75rem;color:var(--text2)">(optional)</span></label>
-                                <select name="workItemId">
-                                    <option value="">-- Not linked --</option>
-                                    ${(() => {
-                                        const pid = task ? task.projectId : '';
-                                        if (!pid || !AppData.getSubtasks) return '';
-                                        return AppData.getSubtasks(pid).map(wi => `<option value="${wi.id}" ${task && task.workItemId === wi.id ? 'selected' : ''}>${esc(wi.name)}</option>`).join('');
-                                    })()}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display:flex;gap:8px;margin-top:20px">
-                            <button type="submit" class="btn-primary">Save Task</button>
-                            <button type="button" class="btn-secondary" id="cancelTaskBtn">Cancel</button>
-                        </div>
-                    </form>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Description</label>
+                    <textarea name="description" style="min-height:80px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);width:100%;font-family:inherit" placeholder="Task details...">${esc(task ? task.description : '')}</textarea>
                 </div>
-            </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Project</label>
+                        <select name="projectId">
+                            <option value="">-- Select Project --</option>
+                            ${projects.map(p => `<option value="${p.id}" ${task && task.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Assign To Worker</label>
+                        <select name="assigned_to_worker_id">
+                            <option value="">-- Unassigned --</option>
+                            ${workers.map(w => `<option value="${w.id}" ${task && task.assigned_to_worker_id === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" name="startDate" value="${task && task.startDate ? task.startDate : ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Due Date</label>
+                        <input type="date" name="due_date" value="${task && task.due_date ? task.due_date : ''}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select name="status">
+                            <option ${!task || task.status === 'To Do' ? 'selected' : ''}>To Do</option>
+                            <option ${task && task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option ${task && task.status === 'Done' ? 'selected' : ''}>Done</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Linked Work Item <span style="font-size:.75rem;color:var(--text2)">(optional)</span></label>
+                        <select name="workItemId">
+                            <option value="">-- Not linked --</option>
+                            ${workItemsHtml}
+                        </select>
+                    </div>
+                </div>
+            </form>
         `;
 
-        document.body.appendChild(overlay);
+        const modal = UI.modal(isEdit ? 'Edit Task' : 'New Task', bodyHtml, {
+            width: '600px',
+            submitLabel: isEdit ? 'Update Task' : 'Save Task',
+        });
+        const q = s => modal.q(s);
 
-        const form = overlay.querySelector('#taskModalForm');
-        const cancelBtn = overlay.querySelector('#cancelTaskBtn');
-
+        const form = q('#taskModalForm');
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             const formData = new FormData(form);
@@ -302,26 +291,19 @@ window.AdminTaskAssignment = {
                 : { id: 'task_' + Date.now(), entity_type: 'tasks', ...data,
                     created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
 
-            const submitBtn = form.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('tasks', taskData);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Task' : 'Create Task'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             Utils.showToast(isEdit ? 'Task updated' : 'Task created');
-            overlay.remove();
+            modal.close();
             self._renderList();
         });
 
-        cancelBtn.addEventListener('click', function() {
-            overlay.remove();
-        });
-
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) overlay.remove();
-        });
+        modal.submitBtn.addEventListener('click', () => q('#taskModalForm').requestSubmit());
     }
 };

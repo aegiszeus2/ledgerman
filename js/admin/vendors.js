@@ -242,33 +242,24 @@ window.AdminVendors = {
             Utils.showToast('Create a project first.', 'error');
             return;
         }
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.innerHTML = '<div class="modal" style="max-width:400px">' +
-            '<div class="modal-header"><h3>Select Project & Type</h3></div>' +
-            '<div class="modal-body">' +
+        var projectOpts = projects.map(function(p) {
+            return '<option value="' + p.id + '">' + esc(p.name) + '</option>';
+        }).join('');
+        var body =
             '<div class="form-group"><label class="form-label">Project</label>' +
-            '<select class="form-control" id="vapProject">' +
-            projects.map(function(p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('') +
-            '</select></div>' +
+            '<select class="form-control" id="vapProject">' + projectOpts + '</select></div>' +
             '<div class="form-group"><label class="form-label">Type</label>' +
             '<select class="form-control" id="vapType">' +
             '<option value="Labor">Labor</option>' +
             '<option value="Equipment">Equipment</option>' +
             '<option value="Material" selected>Material</option>' +
-            '</select></div>' +
-            '</div>' +
-            '<div class="modal-footer">' +
-            '<button class="btn btn-secondary vap-cancel">Cancel</button>' +
-            '<button class="btn btn-primary" id="vapProceed">Continue</button>' +
-            '</div></div>';
-        document.body.appendChild(overlay);
-        overlay.querySelector('.vap-cancel').onclick = function() { overlay.remove(); };
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('#vapProceed').onclick = function() {
-            var projectId = overlay.querySelector('#vapProject').value;
-            var type = overlay.querySelector('#vapType').value;
-            overlay.remove();
+            '</select></div>';
+
+        var modal = UI.modal('Select Project & Type', body, { width: '400px', submitLabel: 'Continue' });
+        modal.submitBtn.onclick = function() {
+            var projectId = modal.q('#vapProject').value;
+            var type      = modal.q('#vapType').value;
+            modal.close();
             if (window.AdminExpenses) {
                 AdminExpenses._projectId = projectId;
                 AdminExpenses._container = self._container;
@@ -428,68 +419,51 @@ window.AdminVendors = {
         var esc = Utils.escapeHtml;
         var isEdit = !!existing;
 
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.innerHTML = '<div class="modal" style="max-width:500px">' +
-            '<div class="modal-header"><h3>' + (isEdit ? 'Edit Vendor' : 'Add Vendor') + '</h3></div>' +
-            '<div class="modal-body">' +
+        var catOptions = ['Materials', 'Equipment', 'Subcontractor', 'Other'].map(function(c) {
+            return '<option value="' + c + '"' + (existing && existing.category === c ? ' selected' : '') + '>' + c + '</option>';
+        }).join('');
+
+        var body =
             '<form id="vendorForm" novalidate>' +
             '<div class="form-group"><label class="form-label">Name *</label>' +
             '<input class="form-control" name="name" value="' + esc(existing ? existing.name : '') + '" required placeholder="Vendor name"></div>' +
-
             '<div class="form-group"><label class="form-label">Category</label>' +
-            '<select class="form-control" name="category">' +
-            ['Materials', 'Equipment', 'Subcontractor', 'Other'].map(function(c) {
-                return '<option value="' + c + '"' + (existing && existing.category === c ? ' selected' : '') + '>' + c + '</option>';
-            }).join('') +
-            '</select></div>' +
-
+            '<select class="form-control" name="category">' + catOptions + '</select></div>' +
             '<div class="form-row">' +
             '<div class="form-group"><label class="form-label">Phone</label>' +
             '<input class="form-control" name="phone" type="tel" value="' + esc(existing ? existing.phone || '' : '') + '" placeholder="(416) 555-0100"></div>' +
             '<div class="form-group"><label class="form-label">Email</label>' +
             '<input class="form-control" name="email" type="email" value="' + esc(existing ? existing.email || '' : '') + '" placeholder="vendor@example.com"></div>' +
             '</div>' +
-
             '<div class="form-group"><label class="form-label">Notes</label>' +
             '<textarea class="form-control" name="notes" rows="2" placeholder="Internal notes">' + esc(existing ? existing.notes || '' : '') + '</textarea></div>' +
-            '</form>' +
-            '</div>' +
-            '<div class="modal-footer">' +
-            '<button class="btn btn-secondary vendor-form-cancel">Cancel</button>' +
-            '<button class="btn btn-primary" id="vendorFormSave">' + (isEdit ? 'Update' : 'Add') + ' Vendor</button>' +
-            '</div></div>';
+            '</form>';
 
-        document.body.appendChild(overlay);
-        overlay.querySelector('.vendor-form-cancel').onclick = function() { overlay.remove(); };
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        var modal = UI.modal(
+            isEdit ? 'Edit Vendor' : 'Add Vendor',
+            body,
+            { width: '500px', submitLabel: isEdit ? 'Update Vendor' : 'Add Vendor' }
+        );
 
-        overlay.querySelector('#vendorFormSave').onclick = function() {
-            var form = overlay.querySelector('#vendorForm');
-            var fd = Utils.getFormData(form);
-            if (!fd.name || !fd.name.trim()) {
-                Utils.showToast('Vendor name is required.', 'error');
-                return;
-            }
+        modal.submitBtn.onclick = function() {
+            var fd = Utils.getFormData(modal.q('#vendorForm'));
+            if (!fd.name || !fd.name.trim()) { Utils.showToast('Vendor name is required.', 'error'); return; }
             var vendor = {
-                id: isEdit ? existing.id : AppData.generateId(),
-                name: fd.name.trim(),
-                category: fd.category || 'Other',
-                phone: (fd.phone || '').trim(),
-                email: (fd.email || '').trim(),
-                notes: (fd.notes || '').trim(),
-                createdAt: isEdit ? (existing.createdAt || new Date().toISOString()) : new Date().toISOString()
+                id:        isEdit ? existing.id : AppData.generateId(),
+                name:      fd.name.trim(),
+                category:  fd.category || 'Other',
+                phone:     (fd.phone  || '').trim(),
+                email:     (fd.email  || '').trim(),
+                notes:     (fd.notes  || '').trim(),
+                createdAt: isEdit ? (existing.createdAt || new Date().toISOString()) : new Date().toISOString(),
             };
             self._saveVendor(vendor);
             var username = (window.App && window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Vendor Updated' : 'Vendor Added', vendor.name);
             Utils.showToast(isEdit ? 'Vendor updated' : 'Vendor added');
-            overlay.remove();
-            if (typeof onSave === 'function') {
-                onSave(vendor);
-            } else {
-                self._renderList();
-            }
+            modal.close();
+            if (typeof onSave === 'function') onSave(vendor);
+            else self._renderList();
         };
     },
 

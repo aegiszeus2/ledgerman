@@ -216,104 +216,92 @@ window.AdminEquipment = {
             return '<option value="' + esc(val) + '"' + (selected ? ' selected' : '') + '>' + esc(label) + '</option>';
         }
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:560px">' +
-                '<div class="modal-header">' +
-                    '<h3 style="margin:0">' + (isEdit ? 'Edit Equipment' : 'Add Equipment') + '</h3>' +
+        const bodyHtml =
+            '<form id="equipmentModalForm" novalidate>' +
+
+                '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Equipment Details</div>' +
+                '<div class="form-row" style="margin-bottom:12px">' +
+                    '<div class="form-group">' +
+                        '<label>Equipment Name *</label>' +
+                        '<input class="form-control" name="name" value="' + esc(item ? item.name : '') + '" placeholder="e.g. CAT 320 Excavator" required>' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>Type</label>' +
+                        '<select class="form-control" name="type">' +
+                            '<option value="">— Select type —</option>' +
+                            TYPES.map(function(t) { return opt(t, t, item && item.type === t); }).join('') +
+                        '</select>' +
+                    '</div>' +
                 '</div>' +
-                '<div class="modal-body">' +
-                    '<form id="equipmentModalForm" novalidate>' +
-
-                        '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px">Equipment Details</div>' +
-                        '<div class="form-row" style="margin-bottom:12px">' +
-                            '<div class="form-group">' +
-                                '<label>Equipment Name *</label>' +
-                                '<input class="form-control" name="name" value="' + esc(item ? item.name : '') + '" placeholder="e.g. CAT 320 Excavator" required>' +
-                            '</div>' +
-                            '<div class="form-group">' +
-                                '<label>Type</label>' +
-                                '<select class="form-control" name="type">' +
-                                    '<option value="">— Select type —</option>' +
-                                    TYPES.map(function(t) { return opt(t, t, item && item.type === t); }).join('') +
-                                '</select>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="form-row" style="margin-bottom:12px">' +
-                            '<div class="form-group">' +
-                                '<label>Status</label>' +
-                                '<select class="form-control" name="status">' +
-                                    opt('Active',   'Active',   !item || item.status === 'Active') +
-                                    opt('Inactive', 'Inactive', item && item.status === 'Inactive') +
-                                '</select>' +
-                            '</div>' +
-                            '<div class="form-group">' +
-                                '<label>Unit</label>' +
-                                '<select class="form-control" name="unit">' +
-                                    opt('hr',  'Hourly ($/hr)', !item || item.unit === 'hr' || !item.unit) +
-                                    opt('day', 'Daily ($/day)', item && item.unit === 'day') +
-                                '</select>' +
-                            '</div>' +
-                        '</div>' +
-
-                        '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;border-top:1px solid var(--border);padding-top:12px">Rates</div>' +
-                        '<div class="form-row" style="margin-bottom:4px">' +
-                            '<div class="form-group">' +
-                                '<label>Cost Rate *</label>' +
-                                '<input class="form-control" type="number" name="costRate" step="0.01" min="0" value="' + (item ? item.costRate || '' : '') + '" placeholder="0.00" required>' +
-                            '</div>' +
-                            '<div class="form-group">' +
-                                '<label>Charge-Out Rate *</label>' +
-                                '<input class="form-control" type="number" name="chargeOutRate" step="0.01" min="0" value="' + (item ? item.chargeOutRate || '' : '') + '" placeholder="0.00" required>' +
-                            '</div>' +
-                        '</div>' +
-                        '<p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">' +
-                            '<strong>Cost Rate</strong> — what operating this equipment costs you internally.<br>' +
-                            '<strong>Charge-Out Rate</strong> — what you bill the client per unit of use.' +
-                        '</p>' +
-
-                        '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;border-top:1px solid var(--border);padding-top:12px">Service Interval</div>' +
-                        '<div class="form-row" style="margin-bottom:4px">' +
-                            '<div class="form-group">' +
-                                '<label>Service Interval (hours)</label>' +
-                                '<input class="form-control" type="number" name="serviceIntervalHours" step="1" min="0" value="' + (item && item.serviceIntervalHours ? item.serviceIntervalHours : '') + '" placeholder="e.g. 250">' +
-                            '</div>' +
-                            '<div class="form-group">' +
-                                '<label>Assigned Supervisor</label>' +
-                                '<select class="form-control" name="supervisorId">' +
-                                    '<option value="">— None —</option>' +
-                                    AppData.getWorkers().filter(function(w) { return w.role === 'Supervisor' || w.role === 'Approver'; }).map(function(w) {
-                                        return opt(w.id, w.name + ' (' + w.role + ')', item && item.supervisorId === w.id);
-                                    }).join('') +
-                                '</select>' +
-                            '</div>' +
-                        '</div>' +
-                        '<p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">' +
-                            '<strong>Service Interval</strong> — total hours before a service alert is sent to the admin and assigned supervisor via email.<br>' +
-                            'Leave blank to disable automatic service alerts.' +
-                        '</p>' +
-
-                        '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Notes</div>' +
-                        '<div class="form-group" style="margin-bottom:0">' +
-                            '<textarea class="form-control" name="notes" rows="2" placeholder="Serial number, license plate, maintenance notes…">' + esc(item ? item.notes || '' : '') + '</textarea>' +
-                        '</div>' +
-
-                    '</form>' +
+                '<div class="form-row" style="margin-bottom:12px">' +
+                    '<div class="form-group">' +
+                        '<label>Status</label>' +
+                        '<select class="form-control" name="status">' +
+                            opt('Active',   'Active',   !item || item.status === 'Active') +
+                            opt('Inactive', 'Inactive', item && item.status === 'Inactive') +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>Unit</label>' +
+                        '<select class="form-control" name="unit">' +
+                            opt('hr',  'Hourly ($/hr)', !item || item.unit === 'hr' || !item.unit) +
+                            opt('day', 'Daily ($/day)', item && item.unit === 'day') +
+                        '</select>' +
+                    '</div>' +
                 '</div>' +
-                '<div class="modal-footer">' +
-                    '<button type="submit" form="equipmentModalForm" class="btn btn-primary">' + (isEdit ? 'Update' : 'Add') + ' Equipment</button>' +
-                    '<button type="button" class="btn btn-secondary modal-close">Cancel</button>' +
+
+                '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;border-top:1px solid var(--border);padding-top:12px">Rates</div>' +
+                '<div class="form-row" style="margin-bottom:4px">' +
+                    '<div class="form-group">' +
+                        '<label>Cost Rate *</label>' +
+                        '<input class="form-control" type="number" name="costRate" step="0.01" min="0" value="' + (item ? item.costRate || '' : '') + '" placeholder="0.00" required>' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>Charge-Out Rate *</label>' +
+                        '<input class="form-control" type="number" name="chargeOutRate" step="0.01" min="0" value="' + (item ? item.chargeOutRate || '' : '') + '" placeholder="0.00" required>' +
+                    '</div>' +
                 '</div>' +
-            '</div>';
+                '<p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">' +
+                    '<strong>Cost Rate</strong> — what operating this equipment costs you internally.<br>' +
+                    '<strong>Charge-Out Rate</strong> — what you bill the client per unit of use.' +
+                '</p>' +
 
-        document.body.appendChild(overlay);
+                '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;border-top:1px solid var(--border);padding-top:12px">Service Interval</div>' +
+                '<div class="form-row" style="margin-bottom:4px">' +
+                    '<div class="form-group">' +
+                        '<label>Service Interval (hours)</label>' +
+                        '<input class="form-control" type="number" name="serviceIntervalHours" step="1" min="0" value="' + (item && item.serviceIntervalHours ? item.serviceIntervalHours : '') + '" placeholder="e.g. 250">' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>Assigned Supervisor</label>' +
+                        '<select class="form-control" name="supervisorId">' +
+                            '<option value="">— None —</option>' +
+                            AppData.getWorkers().filter(function(w) { return w.role === 'Supervisor' || w.role === 'Approver'; }).map(function(w) {
+                                return opt(w.id, w.name + ' (' + w.role + ')', item && item.supervisorId === w.id);
+                            }).join('') +
+                        '</select>' +
+                    '</div>' +
+                '</div>' +
+                '<p style="font-size:.75rem;color:var(--text2);margin:0 0 16px">' +
+                    '<strong>Service Interval</strong> — total hours before a service alert is sent to the admin and assigned supervisor via email.<br>' +
+                    'Leave blank to disable automatic service alerts.' +
+                '</p>' +
 
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+                '<div style="font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;border-top:1px solid var(--border);padding-top:12px">Notes</div>' +
+                '<div class="form-group" style="margin-bottom:0">' +
+                    '<textarea class="form-control" name="notes" rows="2" placeholder="Serial number, license plate, maintenance notes…">' + esc(item ? item.notes || '' : '') + '</textarea>' +
+                '</div>' +
 
-        overlay.querySelector('#equipmentModalForm').addEventListener('submit', async function(e) {
+            '</form>';
+
+        const modal = UI.modal(
+            isEdit ? 'Edit Equipment' : 'Add Equipment',
+            bodyHtml,
+            { width: '560px', submitLabel: (isEdit ? 'Update' : 'Add') + ' Equipment' }
+        );
+        const q = s => modal.q(s);
+
+        q('#equipmentModalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             var fd = Utils.getFormData(this);
 
@@ -343,20 +331,21 @@ window.AdminEquipment = {
                 createdAt:            isEdit ? (item.createdAt || new Date().toISOString()) : new Date().toISOString()
             };
 
-            var submitBtn = this.querySelector('[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('equipment', equipmentData);
             } catch(err) {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isEdit ? 'Update Equipment' : 'Add Equipment'; }
+                restore();
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
             var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Equipment Updated' : 'Equipment Added', equipmentData.name);
             Utils.showToast(isEdit ? 'Equipment updated' : 'Equipment added');
-            overlay.remove();
+            modal.close();
             self._renderList();
         });
+
+        if (modal.submitBtn) modal.submitBtn.addEventListener('click', () => q('#equipmentModalForm').requestSubmit());
     }
 };

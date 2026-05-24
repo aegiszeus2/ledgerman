@@ -448,84 +448,77 @@ window.AdminEstimates = (function () {
         const clients = AppData.getClients ? AppData.getClients() : [];
         const projects = AppData.getProjects ? AppData.getProjects() : [];
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:580px">
-                <div class="modal-header"><h3 style="margin:0">${isEdit ? 'Edit Estimate' : 'New Estimate'}</h3></div>
-                <div class="modal-body">
-                    <form id="estForm">
-                        <div class="form-group">
-                            <label>Title *</label>
-                            <input name="title" value="${esc(est ? est.title : '')}" placeholder="e.g. Office Renovation — Phase 1" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Estimate Number</label>
-                                <input name="estimateNumber" value="${esc(est ? est.estimateNumber : '')}" placeholder="EST-001">
-                            </div>
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select name="status">
-                                    ${['draft','sent','approved'].map(s =>
-                                        `<option value="${s}" ${(est && est.status === s) || (!est && s === 'draft') ? 'selected' : ''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`
-                                    ).join('')}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Description / Scope</label>
-                            <textarea name="description" style="resize:vertical;height:70px">${esc(est ? est.description : '')}</textarea>
-                        </div>
-                        ${clients.length > 0 ? `
-                        <div class="form-group">
-                            <label>Client</label>
-                            <select name="clientId">
-                                <option value="">— None —</option>
-                                ${clients.map(c => `<option value="${c.id}" ${est && est.clientId === c.id ? 'selected' : ''}>${esc(c.name || c.id)}</option>`).join('')}
-                            </select>
-                        </div>` : ''}
-                        ${projects.length > 0 ? `
-                        <div class="form-group">
-                            <label>Linked Project</label>
-                            <select name="projectId">
-                                <option value="">— None —</option>
-                                ${projects.map(p => `<option value="${p.id}" ${est && est.projectId === p.id ? 'selected' : ''}>${esc(p.name || p.id)}</option>`).join('')}
-                            </select>
-                        </div>` : ''}
-                        <h4 style="margin:12px 0 8px 0">Markup Defaults (applied to all tasks unless overridden)</h4>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Overhead %</label>
-                                <input type="number" name="overheadPct" min="0" max="100" step="0.1" value="${est ? (est.overheadPct || 0) : 10}">
-                            </div>
-                            <div class="form-group">
-                                <label>Profit %</label>
-                                <input type="number" name="profitPct" min="0" max="100" step="0.1" value="${est ? (est.profitPct || 0) : 10}">
-                            </div>
-                            <div class="form-group">
-                                <label>Contingency %</label>
-                                <input type="number" name="contingencyPct" min="0" max="100" step="0.1" value="${est ? (est.contingencyPct || 0) : 0}">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Internal Notes</label>
-                            <textarea name="notes" style="resize:vertical;height:60px">${esc(est ? est.notes : '')}</textarea>
-                        </div>
-                    </form>
+        const bodyHtml = `
+            <form id="estForm">
+                <div class="form-group">
+                    <label>Title *</label>
+                    <input name="title" value="${esc(est ? est.title : '')}" placeholder="e.g. Office Renovation — Phase 1" required>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="saveBtn">${isEdit ? 'Update' : 'Create'}</button>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Estimate Number</label>
+                        <input name="estimateNumber" value="${esc(est ? est.estimateNumber : '')}" placeholder="EST-001">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select name="status">
+                            ${['draft','sent','approved'].map(s =>
+                                `<option value="${s}" ${(est && est.status === s) || (!est && s === 'draft') ? 'selected' : ''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
                 </div>
-            </div>
+                <div class="form-group">
+                    <label>Description / Scope</label>
+                    <textarea name="description" style="resize:vertical;height:70px">${esc(est ? est.description : '')}</textarea>
+                </div>
+                ${clients.length > 0 ? `
+                <div class="form-group">
+                    <label>Client</label>
+                    <select name="clientId">
+                        <option value="">— None —</option>
+                        ${clients.map(c => `<option value="${c.id}" ${est && est.clientId === c.id ? 'selected' : ''}>${esc(c.name || c.id)}</option>`).join('')}
+                    </select>
+                </div>` : ''}
+                ${projects.length > 0 ? `
+                <div class="form-group">
+                    <label>Linked Project</label>
+                    <select name="projectId">
+                        <option value="">— None —</option>
+                        ${projects.map(p => `<option value="${p.id}" ${est && est.projectId === p.id ? 'selected' : ''}>${esc(p.name || p.id)}</option>`).join('')}
+                    </select>
+                </div>` : ''}
+                <h4 style="margin:12px 0 8px 0">Markup Defaults (applied to all tasks unless overridden)</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Overhead %</label>
+                        <input type="number" name="overheadPct" min="0" max="100" step="0.1" value="${est ? (est.overheadPct || 0) : 10}">
+                    </div>
+                    <div class="form-group">
+                        <label>Profit %</label>
+                        <input type="number" name="profitPct" min="0" max="100" step="0.1" value="${est ? (est.profitPct || 0) : 10}">
+                    </div>
+                    <div class="form-group">
+                        <label>Contingency %</label>
+                        <input type="number" name="contingencyPct" min="0" max="100" step="0.1" value="${est ? (est.contingencyPct || 0) : 0}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Internal Notes</label>
+                    <textarea name="notes" style="resize:vertical;height:60px">${esc(est ? est.notes : '')}</textarea>
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
-            const fd = new FormData(overlay.querySelector('#estForm'));
+        const modal = UI.modal(isEdit ? 'Edit Estimate' : 'New Estimate', bodyHtml, {
+            width: '580px',
+            submitLabel: isEdit ? 'Update' : 'Create',
+        });
+        const q = s => modal.q(s);
+
+        q('#estForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData(q('#estForm'));
             const title = fd.get('title').trim();
             if (!title) { Utils.showToast('Title is required', 'error'); return; }
 
@@ -542,10 +535,7 @@ window.AdminEstimates = (function () {
                 notes: fd.get('notes').trim(),
             };
 
-            const saveBtn = overlay.querySelector('#saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 let saved;
                 if (isEdit) {
@@ -557,15 +547,16 @@ window.AdminEstimates = (function () {
                         method: 'POST', body: JSON.stringify(payload)
                     });
                 }
-                overlay.remove();
+                modal.close();
                 Utils.showToast(isEdit ? 'Estimate updated' : 'Estimate created');
                 await _loadAndShowDetail(saved.id);
             } catch (err) {
                 Utils.showToast('Error: ' + err.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isEdit ? 'Update' : 'Create';
+                restore();
             }
         });
+
+        modal.submitBtn.addEventListener('click', () => q('#estForm').requestSubmit());
     }
 
     // ── Task form ─────────────────────────────────────────────────────────────
@@ -574,14 +565,8 @@ window.AdminEstimates = (function () {
         const task = taskId ? (est.tasks || []).find(t => t.id === taskId) : null;
         const isEdit = !!task;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:620px">
-                <div class="modal-header"><h3 style="margin:0">${isEdit ? 'Edit Task' : 'New Task'}</h3></div>
-                <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-                    <form id="taskForm">
+        const bodyHtml = `
+            <form id="taskForm">
                         <div class="form-group">
                             <label>Description *</label>
                             <input name="description" value="${esc(task ? task.description : '')}" placeholder="e.g. Concrete formwork — north wall" required>
@@ -678,18 +663,18 @@ window.AdminEstimates = (function () {
                             <textarea name="notes" style="resize:vertical;height:60px">${esc(task ? task.notes : '')}</textarea>
                         </div>
                     </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="saveBtn">${isEdit ? 'Update' : 'Add Task'}</button>
-                </div>
-            </div>
         `;
-        document.body.appendChild(overlay);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
-            const fd = new FormData(overlay.querySelector('#taskForm'));
+        const modal = UI.modal(isEdit ? 'Edit Task' : 'New Task', bodyHtml, {
+            width: '620px',
+            submitLabel: isEdit ? 'Update' : 'Add Task',
+            scrollBody: true,
+        });
+        const q = s => modal.q(s);
+
+        q('#taskForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData(q('#taskForm'));
             const description = fd.get('description').trim();
             if (!description) { Utils.showToast('Description is required', 'error'); return; }
 
@@ -719,10 +704,7 @@ window.AdminEstimates = (function () {
                 sortOrder: isEdit ? (task.sortOrder || 0) : (est.tasks || []).length,
             };
 
-            const saveBtn = overlay.querySelector('#saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isEdit) {
                     await _api(`/api/estimates/${est.id}/tasks/${task.id}`, {
@@ -733,15 +715,16 @@ window.AdminEstimates = (function () {
                         method: 'POST', body: JSON.stringify(payload)
                     });
                 }
-                overlay.remove();
+                modal.close();
                 Utils.showToast(isEdit ? 'Task updated' : 'Task added');
                 await _loadAndShowDetail(est.id);
             } catch (err) {
                 Utils.showToast('Error: ' + err.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isEdit ? 'Update' : 'Add Task';
+                restore();
             }
         });
+
+        modal.submitBtn.addEventListener('click', () => q('#taskForm').requestSubmit());
     }
 
     // ── Cost line form ────────────────────────────────────────────────────────
@@ -753,80 +736,71 @@ window.AdminEstimates = (function () {
 
         const lineTypes = ['labour', 'equipment', 'material', 'subcontract', 'other'];
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:500px">
-                <div class="modal-header">
-                    <h3 style="margin:0">${isEdit ? 'Edit Cost Line' : 'Add Cost Line'}</h3>
-                    <p style="margin:4px 0 0 0;font-size:0.85rem;color:var(--text-muted)">${esc(task ? task.description : '')}</p>
+        const bodyHtml = `
+            <p style="margin:-8px 0 12px;font-size:0.85rem;color:var(--text-muted)">${esc(task ? task.description : '')}</p>
+            <form id="lineForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Type *</label>
+                        <select name="type" id="lineType" required>
+                            ${lineTypes.map(t => `<option value="${t}" ${line && line.type === t ? 'selected' : ''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" id="labourRoleGroup" style="${(!line || line.type === 'labour') ? '' : 'display:none'}">
+                        <label>Role / Trade</label>
+                        <input name="labourRole" value="${esc(line ? line.labourRole : '')}" placeholder="Carpenter, Labourer, etc.">
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form id="lineForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Type *</label>
-                                <select name="type" id="lineType" required>
-                                    ${lineTypes.map(t => `<option value="${t}" ${line && line.type === t ? 'selected' : ''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="form-group" id="labourRoleGroup" style="${(!line || line.type === 'labour') ? '' : 'display:none'}">
-                                <label>Role / Trade</label>
-                                <input name="labourRole" value="${esc(line ? line.labourRole : '')}" placeholder="Carpenter, Labourer, etc.">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Description *</label>
-                            <input name="description" value="${esc(line ? line.description : '')}" placeholder="e.g. Formwork labour — carpenter" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Quantity *</label>
-                                <input type="number" name="quantity" min="0" step="any" value="${line ? line.quantity : 1}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Unit *</label>
-                                <input name="unit" value="${esc(line ? line.unit : '')}" placeholder="hrs, days, m², units" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Rate ($/unit) *</label>
-                                <input type="number" name="rate" min="0" step="0.01" value="${line ? line.rate : 0}" required>
-                            </div>
-                        </div>
-                        <div style="background:var(--bg-light);border-radius:4px;padding:10px;margin-top:4px">
-                            <p style="margin:0;font-size:0.875rem">Total: <strong id="lineTotal">${fmt(line ? line.total : 0)}</strong></p>
-                        </div>
-                    </form>
+                <div class="form-group">
+                    <label>Description *</label>
+                    <input name="description" value="${esc(line ? line.description : '')}" placeholder="e.g. Formwork labour — carpenter" required>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="saveBtn">${isEdit ? 'Update' : 'Add Line'}</button>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Quantity *</label>
+                        <input type="number" name="quantity" min="0" step="any" value="${line ? line.quantity : 1}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Unit *</label>
+                        <input name="unit" value="${esc(line ? line.unit : '')}" placeholder="hrs, days, m², units" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Rate ($/unit) *</label>
+                        <input type="number" name="rate" min="0" step="0.01" value="${line ? line.rate : 0}" required>
+                    </div>
                 </div>
-            </div>
+                <div style="background:var(--bg-light);border-radius:4px;padding:10px;margin-top:4px">
+                    <p style="margin:0;font-size:0.875rem">Total: <strong id="lineTotal">${fmt(line ? line.total : 0)}</strong></p>
+                </div>
+            </form>
         `;
-        document.body.appendChild(overlay);
+
+        const modal = UI.modal(isEdit ? 'Edit Cost Line' : 'Add Cost Line', bodyHtml, {
+            width: '500px',
+            submitLabel: isEdit ? 'Update' : 'Add Line',
+        });
+        const q = s => modal.q(s);
 
         // Show/hide labour role based on type
-        overlay.querySelector('#lineType').addEventListener('change', function() {
-            overlay.querySelector('#labourRoleGroup').style.display = this.value === 'labour' ? '' : 'none';
+        q('#lineType').addEventListener('change', function() {
+            q('#labourRoleGroup').style.display = this.value === 'labour' ? '' : 'none';
         });
 
         // Live total calculation
-        const qtyInput = overlay.querySelector('input[name="quantity"]');
-        const rateInput = overlay.querySelector('input[name="rate"]');
-        const totalEl = overlay.querySelector('#lineTotal');
+        const qtyInput = q('input[name="quantity"]');
+        const rateInput = q('input[name="rate"]');
+        const totalEl = q('#lineTotal');
         function recalc() {
-            const q = parseFloat(qtyInput.value) || 0;
+            const qty = parseFloat(qtyInput.value) || 0;
             const r = parseFloat(rateInput.value) || 0;
-            totalEl.textContent = fmt(q * r);
+            totalEl.textContent = fmt(qty * r);
         }
         qtyInput.addEventListener('input', recalc);
         rateInput.addEventListener('input', recalc);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#saveBtn').addEventListener('click', async () => {
-            const fd = new FormData(overlay.querySelector('#lineForm'));
+        q('#lineForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData(q('#lineForm'));
             const description = fd.get('description').trim();
             const unit = fd.get('unit').trim();
             if (!description || !unit) { Utils.showToast('Description and unit are required', 'error'); return; }
@@ -841,10 +815,7 @@ window.AdminEstimates = (function () {
                 sortOrder: isEdit ? (line.sortOrder || 0) : (task.costLines || []).length,
             };
 
-            const saveBtn = overlay.querySelector('#saveBtn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
-
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isEdit) {
                     await _api(`/api/estimates/${est.id}/tasks/${taskId}/cost-lines/${lineId}`, {
@@ -855,15 +826,16 @@ window.AdminEstimates = (function () {
                         method: 'POST', body: JSON.stringify(payload)
                     });
                 }
-                overlay.remove();
+                modal.close();
                 Utils.showToast(isEdit ? 'Cost line updated' : 'Cost line added');
                 await _loadAndShowDetail(est.id);
             } catch (err) {
                 Utils.showToast('Error: ' + err.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isEdit ? 'Update' : 'Add Line';
+                restore();
             }
         });
+
+        modal.submitBtn.addEventListener('click', () => q('#lineForm').requestSubmit());
     }
 
     // ── Resource group helpers ────────────────────────────────────────────────
@@ -888,66 +860,60 @@ window.AdminEstimates = (function () {
         const activeGroups = groups.filter(g => g.active !== false);
 
         const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:540px">
-                <div class="modal-header">
-                    <h3 style="margin:0">Import Crew into Task</h3>
-                    <p style="margin:4px 0 0 0;font-size:0.85rem;color:var(--text-muted)">${esc(task ? task.description : '')}</p>
+        const bodyHtml = `
+            <p style="margin:-8px 0 12px;font-size:0.85rem;color:var(--text-muted)">${esc(task ? task.description : '')}</p>
+            <div class="form-group">
+                <label>Select Crew *</label>
+                <select id="rgSelect">
+                    <option value="">— Choose a crew —</option>
+                    ${activeGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div id="rgSummary" style="background:var(--bg-light);border-radius:4px;padding:10px;margin-bottom:12px;display:none">
+                <p style="margin:0;font-weight:600" id="rgSummaryName"></p>
+                <div id="rgSummaryBody" style="font-size:0.85rem;margin-top:4px;color:var(--text-muted)"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantity (task scope)</label>
+                    <input type="number" id="rgQty" min="0" step="any" value="${task ? (task.quantity || '') : ''}">
                 </div>
-                <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-                    <div class="form-group">
-                        <label>Select Crew *</label>
-                        <select id="rgSelect">
-                            <option value="">— Choose a crew —</option>
-                            ${activeGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div id="rgSummary" style="background:var(--bg-light);border-radius:4px;padding:10px;margin-bottom:12px;display:none">
-                        <p style="margin:0;font-weight:600" id="rgSummaryName"></p>
-                        <div id="rgSummaryBody" style="font-size:0.85rem;margin-top:4px;color:var(--text-muted)"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Quantity (task scope)</label>
-                            <input type="number" id="rgQty" min="0" step="any" value="${task ? (task.quantity || '') : ''}">
-                        </div>
-                        <div class="form-group">
-                            <label>Production Rate (units/hr)</label>
-                            <input type="number" id="rgProdRate" min="0" step="any" placeholder="0 = direct hours">
-                        </div>
-                        <div class="form-group">
-                            <label>Unit</label>
-                            <input id="rgProdUnit" value="${esc(task ? (task.unit || '') : '')}" placeholder="m3, m2, lf…">
-                        </div>
-                    </div>
-                    <div id="rgCalcPreview" style="background:var(--bg-light);border-radius:4px;padding:10px;display:none">
-                        <p style="margin:0;font-size:0.875rem">
-                            Duration: <strong id="rgDuration">—</strong> hrs
-                        </p>
-                    </div>
+                <div class="form-group">
+                    <label>Production Rate (units/hr)</label>
+                    <input type="number" id="rgProdRate" min="0" step="any" placeholder="0 = direct hours">
                 </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button class="btn-primary" id="importBtn" disabled>Import</button>
+                <div class="form-group">
+                    <label>Unit</label>
+                    <input id="rgProdUnit" value="${esc(task ? (task.unit || '') : '')}" placeholder="m3, m2, lf…">
                 </div>
             </div>
+            <div id="rgCalcPreview" style="background:var(--bg-light);border-radius:4px;padding:10px;display:none">
+                <p style="margin:0;font-size:0.875rem">
+                    Duration: <strong id="rgDuration">—</strong> hrs
+                </p>
+            </div>
         `;
-        document.body.appendChild(overlay);
 
-        const rgSelect   = overlay.querySelector('#rgSelect');
-        const summaryBox = overlay.querySelector('#rgSummary');
-        const summaryName = overlay.querySelector('#rgSummaryName');
-        const summaryBody = overlay.querySelector('#rgSummaryBody');
-        const qtyInput   = overlay.querySelector('#rgQty');
-        const rateInput  = overlay.querySelector('#rgProdRate');
-        const calcPreview = overlay.querySelector('#rgCalcPreview');
-        const durationEl = overlay.querySelector('#rgDuration');
-        const importBtn  = overlay.querySelector('#importBtn');
+        const modal = UI.modal('Import Crew into Task', bodyHtml, {
+            width: '540px',
+            submitLabel: 'Import',
+            scrollBody: true,
+        });
+        const q = s => modal.q(s);
+
+        const rgSelect   = q('#rgSelect');
+        const summaryBox = q('#rgSummary');
+        const summaryName = q('#rgSummaryName');
+        const summaryBody = q('#rgSummaryBody');
+        const qtyInput   = q('#rgQty');
+        const rateInput  = q('#rgProdRate');
+        const calcPreview = q('#rgCalcPreview');
+        const durationEl = q('#rgDuration');
+
+        modal.submitBtn.disabled = true;
 
         async function loadGroupSummary(gid) {
-            if (!gid) { summaryBox.style.display = 'none'; importBtn.disabled = true; return; }
+            if (!gid) { summaryBox.style.display = 'none'; modal.submitBtn.disabled = true; return; }
             try {
                 const [groupDetail, costData] = await Promise.all([
                     _api('/api/resource-groups/' + gid),
@@ -964,7 +930,7 @@ window.AdminEstimates = (function () {
                 if (!rateInput.value && groupDetail.defaultProductionRate) {
                     rateInput.value = groupDetail.defaultProductionRate;
                 }
-                importBtn.disabled = false;
+                modal.submitBtn.disabled = false;
                 recalcDuration();
             } catch (e) {
                 summaryBox.style.display = 'none';
@@ -987,19 +953,17 @@ window.AdminEstimates = (function () {
         qtyInput.addEventListener('input', recalcDuration);
         rateInput.addEventListener('input', recalcDuration);
 
-        overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
-        importBtn.addEventListener('click', async () => {
+        modal.submitBtn.addEventListener('click', async () => {
             const gid  = rgSelect.value;
             if (!gid) { Utils.showToast('Please select a crew', 'error'); return; }
 
-            importBtn.disabled = true;
-            importBtn.textContent = 'Importing…';
+            const restore = UI.btnLoading(modal.submitBtn, 'Importing…');
 
             const payload = {
                 resourceGroupId: gid,
                 quantity:        parseFloat(qtyInput.value) || 0,
                 productionRate:  parseFloat(rateInput.value) || 0,
-                productionUnit:  overlay.querySelector('#rgProdUnit').value.trim(),
+                productionUnit:  q('#rgProdUnit').value.trim(),
             };
 
             try {
@@ -1007,14 +971,13 @@ window.AdminEstimates = (function () {
                     `/api/estimates/${est.id}/tasks/${taskId}/import-resource-group`,
                     { method: 'POST', body: JSON.stringify(payload) }
                 );
-                overlay.remove();
+                modal.close();
                 const dur = result.duration ? ` (${result.duration.toFixed(1)} hrs)` : '';
                 Utils.showToast(`Imported ${result.lines.length} lines${dur} — total $${(result.taskTotal || 0).toFixed(2)}`);
                 await _loadAndShowDetail(est.id);
             } catch (err) {
                 Utils.showToast('Import failed: ' + err.message, 'error');
-                importBtn.disabled = false;
-                importBtn.textContent = 'Import';
+                restore();
             }
         });
     }
@@ -1058,21 +1021,11 @@ window.AdminEstimates = (function () {
     // ── Resource Group Manager (full CRUD panel) ──────────────────────────────
     function _showResourceGroupManager() {
         if (window.ResourceGroups) {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay active';
-            overlay.style.display = 'flex';
-            overlay.innerHTML = `
-                <div class="modal" style="max-width:900px;width:95vw;max-height:90vh;display:flex;flex-direction:column">
-                    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
-                        <h3 style="margin:0">Manage Crews</h3>
-                        <button class="btn-ghost btn-sm" id="closeCrewMgrBtn">✕</button>
-                    </div>
-                    <div id="crewMgrBody" style="flex:1;overflow-y:auto;padding:0"></div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-            overlay.querySelector('#closeCrewMgrBtn').addEventListener('click', () => overlay.remove());
-            window.ResourceGroups.render(overlay.querySelector('#crewMgrBody'));
+            const modal = UI.modal('Manage Crews', '<div id="crewMgrBody"></div>', {
+                width: '900px',
+                noFooter: true,
+            });
+            window.ResourceGroups.render(modal.q('#crewMgrBody'));
         } else {
             Utils.showToast('Resource Groups module not loaded', 'error');
         }

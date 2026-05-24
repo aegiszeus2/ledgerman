@@ -497,37 +497,30 @@ window.AdminContracts = {
     _showNewCertForm(contract, tabContent) {
         var self = this;
         var today = new Date().toISOString().slice(0, 10);
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:480px">' +
-            '<h3>Generate Progress Certificate</h3>' +
+        var certBodyHtml =
             '<div class="form-group"><label>Period From</label><input type="date" id="certFrom" value="' + today + '"></div>' +
             '<div class="form-group"><label>Period To</label><input type="date" id="certTo" value="' + today + '"></div>' +
             '<div class="form-group"><label>Holdback % (default: ' + contract.holdbackPct + '%)</label><input type="number" id="certHoldback" value="' + contract.holdbackPct + '" min="0" max="100" step="0.01"></div>' +
-            '<div class="form-group"><label>Notes</label><textarea id="certNotes" rows="2"></textarea></div>' +
-            '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
-            '<button class="btn-secondary" id="cancelCertBtn">Cancel</button>' +
-            '<button class="btn-primary" id="createCertBtn">Generate</button>' +
-            '</div>' +
-            '</div>';
-        overlay.querySelector('#cancelCertBtn').addEventListener('click', function() { overlay.remove(); });
-        overlay.querySelector('#createCertBtn').addEventListener('click', async function() {
+            '<div class="form-group"><label>Notes</label><textarea id="certNotes" rows="2"></textarea></div>';
+
+        var modal = UI.modal('Generate Progress Certificate', certBodyHtml, { width: '480px', submitLabel: 'Generate' });
+        var q = function(s) { return modal.q(s); };
+
+        modal.submitBtn.addEventListener('click', async function() {
+            var restore = UI.btnLoading(modal.submitBtn, 'Generating…');
             try {
                 var cert = await AppData.apiCreateCertificate(contract.id, {
-                    periodFrom: overlay.querySelector('#certFrom').value,
-                    periodTo: overlay.querySelector('#certTo').value,
-                    holdbackPct: parseFloat(overlay.querySelector('#certHoldback').value) || contract.holdbackPct,
-                    notes: overlay.querySelector('#certNotes').value,
+                    periodFrom: q('#certFrom').value,
+                    periodTo: q('#certTo').value,
+                    holdbackPct: parseFloat(q('#certHoldback').value) || contract.holdbackPct,
+                    notes: q('#certNotes').value,
                 });
                 Utils.showToast('Certificate PC-' + cert.certificateNumber + ' generated');
-                overlay.remove();
+                modal.close();
                 self._viewingCertId = cert.id;
                 self._renderCertDetail(contract);
-            } catch (e) { Utils.showToast('Failed: ' + e.message, 'error'); }
+            } catch (e) { restore(); Utils.showToast('Failed: ' + e.message, 'error'); }
         });
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        document.body.appendChild(overlay);
     },
 
     // ── CONTRACT FORM ─────────────────────────────────────────────────────────
@@ -536,11 +529,8 @@ window.AdminContracts = {
         var isNew = !contract || !contract.id;
         var projects = AppData.getProjects();
         var esc = Utils.escapeHtml;
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:560px">' +
-            '<h3>' + (isNew ? 'New Contract' : 'Edit Contract') + '</h3>' +
+
+        var contractBodyHtml =
             '<div class="form-group"><label>Title *</label><input type="text" id="cTitle" value="' + esc(contract ? contract.title || '' : '') + '" placeholder="e.g. Main Construction Contract"></div>' +
             '<div class="form-group"><label>Contract Number</label><input type="text" id="cNumber" value="' + esc(contract ? (contract.contractNumber || '') : '') + '" placeholder="e.g. C-2026-001"></div>' +
             '<div class="form-group"><label>Project</label>' +
@@ -571,47 +561,48 @@ window.AdminContracts = {
             '<option value="draft"' + (contract && contract.status === 'draft' ? ' selected' : '') + '>Draft</option>' +
             '<option value="closed"' + (contract && contract.status === 'closed' ? ' selected' : '') + '>Closed</option>' +
             '</select></div>' +
-            '<div class="form-group"><label>Notes</label><textarea id="cNotes" rows="2">' + esc(contract ? (contract.notes || '') : '') + '</textarea></div>' +
-            '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
-            '<button class="btn-secondary" id="cancelContractBtn">Cancel</button>' +
-            '<button class="btn-primary" id="saveContractBtn">' + (isNew ? 'Create Contract' : 'Save Changes') + '</button>' +
-            '</div>' +
-            '</div>';
-        overlay.querySelector('#cancelContractBtn').addEventListener('click', function() { overlay.remove(); });
-        overlay.querySelector('#saveContractBtn').addEventListener('click', async function() {
-            var title = overlay.querySelector('#cTitle').value.trim();
+            '<div class="form-group"><label>Notes</label><textarea id="cNotes" rows="2">' + esc(contract ? (contract.notes || '') : '') + '</textarea></div>';
+
+        var modal = UI.modal(
+            isNew ? 'New Contract' : 'Edit Contract',
+            contractBodyHtml,
+            { width: '560px', submitLabel: isNew ? 'Create Contract' : 'Save Changes' }
+        );
+        var q = function(s) { return modal.q(s); };
+
+        modal.submitBtn.addEventListener('click', async function() {
+            var title = q('#cTitle').value.trim();
             if (!title) { Utils.showToast('Title is required', 'error'); return; }
             var data = {
                 title: title,
-                contractNumber: overlay.querySelector('#cNumber').value.trim(),
-                projectId: overlay.querySelector('#cProject').value,
-                contractType: overlay.querySelector('#cType').value,
-                originalValue: parseFloat(overlay.querySelector('#cValue').value) || 0,
-                approvedChanges: parseFloat(overlay.querySelector('#cChanges').value) || 0,
-                holdbackPct: parseFloat(overlay.querySelector('#cHoldback').value) || 10,
-                contractDate: overlay.querySelector('#cDate').value,
-                ownerName: overlay.querySelector('#cOwner').value.trim(),
-                status: overlay.querySelector('#cStatus').value,
-                notes: overlay.querySelector('#cNotes').value.trim(),
+                contractNumber: q('#cNumber').value.trim(),
+                projectId: q('#cProject').value,
+                contractType: q('#cType').value,
+                originalValue: parseFloat(q('#cValue').value) || 0,
+                approvedChanges: parseFloat(q('#cChanges').value) || 0,
+                holdbackPct: parseFloat(q('#cHoldback').value) || 10,
+                contractDate: q('#cDate').value,
+                ownerName: q('#cOwner').value.trim(),
+                status: q('#cStatus').value,
+                notes: q('#cNotes').value.trim(),
             };
+            var restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isNew) {
                     var created = await AppData.apiCreateContract(data);
                     Utils.showToast('Contract created');
-                    overlay.remove();
+                    modal.close();
                     self._viewingContractId = created.id;
                     self._activeTab = 'items';
                     self._renderContractDetail();
                 } else {
                     await AppData.apiUpdateContract(contract.id, data);
                     Utils.showToast('Contract saved');
-                    overlay.remove();
+                    modal.close();
                     self._renderContractDetail();
                 }
-            } catch (e) { Utils.showToast('Save failed: ' + e.message, 'error'); }
+            } catch (e) { restore(); Utils.showToast('Save failed: ' + e.message, 'error'); }
         });
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        document.body.appendChild(overlay);
     },
 
     // ── ITEM FORM ─────────────────────────────────────────────────────────────
@@ -619,11 +610,8 @@ window.AdminContracts = {
         var self = this;
         var isNew = !item;
         var esc = Utils.escapeHtml;
-        var overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.innerHTML =
-            '<div class="modal" style="max-width:520px">' +
-            '<h3>' + (isNew ? 'Add SOV Item' : 'Edit SOV Item') + '</h3>' +
+
+        var itemBodyHtml =
             '<div style="display:grid;grid-template-columns:1fr 2fr;gap:12px">' +
             '<div class="form-group"><label>Item #</label><input type="text" id="iNum" value="' + esc(item ? (item.itemNumber || '') : (existingCount + 1) + '') + '" placeholder="e.g. 01"></div>' +
             '<div class="form-group"><label>Description *</label><input type="text" id="iDesc" value="' + esc(item ? item.description : '') + '" placeholder="e.g. Site Preparation"></div>' +
@@ -640,39 +628,41 @@ window.AdminContracts = {
             '<div class="form-group"><label>Contract Qty</label><input type="number" id="iQty" value="' + (item ? (item.contractQuantity || '') : '') + '" min="0" step="any" placeholder="optional"></div>' +
             '<div class="form-group"><label>Unit Rate ($)</label><input type="number" id="iRate" value="' + (item ? (item.unitRate || '') : '') + '" min="0" step="0.01" placeholder="optional"></div>' +
             '</div>' +
-            '<div class="form-group"><label>Scheduled Value ($)</label><input type="number" id="iValue" value="' + (item ? item.scheduledValue : 0) + '" min="0" step="0.01" placeholder="Total value of this item"></div>' +
-            '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
-            '<button class="btn-secondary" id="cancelItemBtn">Cancel</button>' +
-            '<button class="btn-primary" id="saveItemBtn">' + (isNew ? 'Add Item' : 'Save') + '</button>' +
-            '</div>' +
-            '</div>';
+            '<div class="form-group"><label>Scheduled Value ($)</label><input type="number" id="iValue" value="' + (item ? item.scheduledValue : 0) + '" min="0" step="0.01" placeholder="Total value of this item"></div>';
+
+        var modal = UI.modal(
+            isNew ? 'Add SOV Item' : 'Edit SOV Item',
+            itemBodyHtml,
+            { width: '520px', submitLabel: isNew ? 'Add Item' : 'Save' }
+        );
+        var q = function(s) { return modal.q(s); };
 
         // Auto-calculate scheduled value for unit price
         function recalc() {
-            var qty = parseFloat(overlay.querySelector('#iQty').value) || 0;
-            var rate = parseFloat(overlay.querySelector('#iRate').value) || 0;
-            var bm = overlay.querySelector('#iBilling').value;
+            var qty = parseFloat(q('#iQty').value) || 0;
+            var rate = parseFloat(q('#iRate').value) || 0;
+            var bm = q('#iBilling').value;
             if (bm === 'unit_price_quantity' && qty && rate) {
-                overlay.querySelector('#iValue').value = (qty * rate).toFixed(2);
+                q('#iValue').value = (qty * rate).toFixed(2);
             }
         }
-        overlay.querySelector('#iQty').addEventListener('input', recalc);
-        overlay.querySelector('#iRate').addEventListener('input', recalc);
+        q('#iQty').addEventListener('input', recalc);
+        q('#iRate').addEventListener('input', recalc);
 
-        overlay.querySelector('#cancelItemBtn').addEventListener('click', function() { overlay.remove(); });
-        overlay.querySelector('#saveItemBtn').addEventListener('click', async function() {
-            var desc = overlay.querySelector('#iDesc').value.trim();
+        modal.submitBtn.addEventListener('click', async function() {
+            var desc = q('#iDesc').value.trim();
             if (!desc) { Utils.showToast('Description is required', 'error'); return; }
             var data = {
-                itemNumber: overlay.querySelector('#iNum').value.trim(),
+                itemNumber: q('#iNum').value.trim(),
                 description: desc,
-                billingMethod: overlay.querySelector('#iBilling').value,
-                uom: overlay.querySelector('#iUom').value.trim() || 'LS',
-                contractQuantity: parseFloat(overlay.querySelector('#iQty').value) || 0,
-                unitRate: parseFloat(overlay.querySelector('#iRate').value) || 0,
-                scheduledValue: parseFloat(overlay.querySelector('#iValue').value) || 0,
+                billingMethod: q('#iBilling').value,
+                uom: q('#iUom').value.trim() || 'LS',
+                contractQuantity: parseFloat(q('#iQty').value) || 0,
+                unitRate: parseFloat(q('#iRate').value) || 0,
+                scheduledValue: parseFloat(q('#iValue').value) || 0,
                 sortOrder: item ? item.sortOrder : existingCount,
             };
+            var restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 if (isNew) {
                     await AppData.apiCreateContractItem(contract.id, data);
@@ -681,12 +671,10 @@ window.AdminContracts = {
                     await AppData.apiUpdateContractItem(contract.id, item.id, data);
                     Utils.showToast('Item saved');
                 }
-                overlay.remove();
+                modal.close();
                 var tabContent = document.querySelector('#contractTabContent');
                 if (tabContent) self._renderItemsTab(tabContent, contract);
-            } catch (e) { Utils.showToast('Save failed: ' + e.message, 'error'); }
+            } catch (e) { restore(); Utils.showToast('Save failed: ' + e.message, 'error'); }
         });
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        document.body.appendChild(overlay);
     },
 };

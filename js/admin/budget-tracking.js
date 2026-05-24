@@ -679,112 +679,104 @@ window.AdminBudgetTracking = {
         const isNew = !existingItem;
         const item = existingItem || {};
 
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
-
-        overlay.innerHTML = `
-            <div style="background:var(--bg-secondary);border-radius:10px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box">
-                <h3 style="margin-bottom:20px">${isNew ? 'Add Work Item' : 'Edit Work Item'}</h3>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Cost Code <span style="color:#999;font-weight:normal">(optional)</span></label>
-                        <input id="fi_costCode" type="text" value="${item.costCode || ''}" placeholder="e.g. 03-3000" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                    </div>
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Division</label>
-                        <select id="fi_division" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                            <option value="">— Select —</option>
-                            ${self.DIVISIONS.map(d => `<option value="${d.code}" ${item.division === d.code ? 'selected' : ''}>${d.code} – ${d.name}</option>`).join('')}
-                        </select>
-                    </div>
+        const bodyHtml = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Cost Code <span style="color:#999;font-weight:normal">(optional)</span></label>
+                    <input id="fi_costCode" type="text" value="${item.costCode || ''}" placeholder="e.g. 03-3000" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
                 </div>
-
-                <div style="margin-top:12px">
-                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Description <span style="color:#e74c3c">*</span></label>
-                    <input id="fi_description" type="text" value="${Utils.escapeHtml(item.description || '')}" placeholder="Work item description" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Category</label>
-                        <select id="fi_category" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                            ${self.CATEGORIES.map(c => `<option value="${c}" ${(item.category || 'Labour') === c ? 'selected' : ''}>${c}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Unit</label>
-                        <select id="fi_unit" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                            ${self.UNITS.map(u => `<option value="${u}" ${(item.unit || 'LS') === u ? 'selected' : ''}>${u}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:12px">
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Quantity <span style="color:#e74c3c">*</span></label>
-                        <input id="fi_qty" type="number" min="0" step="any" value="${item.quantity !== undefined ? item.quantity : 1}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                    </div>
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Unit Cost ($) <span style="color:#e74c3c">*</span></label>
-                        <input id="fi_unitCost" type="number" min="0" step="any" value="${item.unitCost !== undefined ? item.unitCost : ''}" placeholder="0.00" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                    </div>
-                    <div>
-                        <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Total ($)</label>
-                        <input id="fi_total" type="number" min="0" step="any" value="${item.total !== undefined ? parseFloat(item.total).toFixed(2) : ''}" placeholder="Auto-calc" style="width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;box-sizing:border-box;font-size:.9em;background:var(--bg-input);color:var(--text-primary)">
-                        <div style="font-size:.75em;color:#999;margin-top:2px">Leave blank to auto-calculate</div>
-                    </div>
-                </div>
-
-                <div style="margin-top:12px">
-                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Notes <span style="color:#999;font-weight:normal">(optional)</span></label>
-                    <input id="fi_notes" type="text" value="${Utils.escapeHtml(item.notes || '')}" placeholder="Additional notes" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
-                </div>
-
-                <div id="fi_error" style="display:none;margin-top:12px;padding:8px 12px;background:var(--danger-bg);border-radius:6px;color:var(--danger);font-size:.85em"></div>
-
-                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
-                    <button class="btn-secondary" id="fi_cancel">Cancel</button>
-                    <button class="btn-primary" id="fi_save">${isNew ? 'Add Item' : 'Save Changes'}</button>
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Division</label>
+                    <select id="fi_division" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+                        <option value="">— Select —</option>
+                        ${self.DIVISIONS.map(d => `<option value="${d.code}" ${item.division === d.code ? 'selected' : ''}>${d.code} – ${d.name}</option>`).join('')}
+                    </select>
                 </div>
             </div>
+
+            <div style="margin-top:12px">
+                <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Description <span style="color:#e74c3c">*</span></label>
+                <input id="fi_description" type="text" value="${Utils.escapeHtml(item.description || '')}" placeholder="Work item description" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Category</label>
+                    <select id="fi_category" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+                        ${self.CATEGORIES.map(c => `<option value="${c}" ${(item.category || 'Labour') === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Unit</label>
+                    <select id="fi_unit" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+                        ${self.UNITS.map(u => `<option value="${u}" ${(item.unit || 'LS') === u ? 'selected' : ''}>${u}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:12px">
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Quantity <span style="color:#e74c3c">*</span></label>
+                    <input id="fi_qty" type="number" min="0" step="any" value="${item.quantity !== undefined ? item.quantity : 1}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+                </div>
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Unit Cost ($) <span style="color:#e74c3c">*</span></label>
+                    <input id="fi_unitCost" type="number" min="0" step="any" value="${item.unitCost !== undefined ? item.unitCost : ''}" placeholder="0.00" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+                </div>
+                <div>
+                    <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Total ($)</label>
+                    <input id="fi_total" type="number" min="0" step="any" value="${item.total !== undefined ? parseFloat(item.total).toFixed(2) : ''}" placeholder="Auto-calc" style="width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;box-sizing:border-box;font-size:.9em;background:var(--bg-input);color:var(--text-primary)">
+                    <div style="font-size:.75em;color:#999;margin-top:2px">Leave blank to auto-calculate</div>
+                </div>
+            </div>
+
+            <div style="margin-top:12px">
+                <label style="font-size:.85em;font-weight:600;display:block;margin-bottom:4px">Notes <span style="color:#999;font-weight:normal">(optional)</span></label>
+                <input id="fi_notes" type="text" value="${Utils.escapeHtml(item.notes || '')}" placeholder="Additional notes" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:.9em">
+            </div>
+
+            <div id="fi_error" style="display:none;margin-top:12px;padding:8px 12px;background:var(--danger-bg);border-radius:6px;color:var(--danger);font-size:.85em"></div>
         `;
 
-        document.body.appendChild(overlay);
+        const modal = UI.modal(isNew ? 'Add Work Item' : 'Edit Work Item', bodyHtml, {
+            width: '520px',
+            submitLabel: isNew ? 'Add Item' : 'Save Changes',
+            scrollBody: true,
+        });
+        const q = s => modal.q(s);
 
         // Auto-calc total when qty or unitCost changes
-        const qtyEl     = overlay.querySelector('#fi_qty');
-        const ucEl      = overlay.querySelector('#fi_unitCost');
-        const totalEl   = overlay.querySelector('#fi_total');
+        const qtyEl     = q('#fi_qty');
+        const ucEl      = q('#fi_unitCost');
+        const totalEl   = q('#fi_total');
         const calcTotal = () => {
-            const q = parseFloat(qtyEl.value);
-            const u = parseFloat(ucEl.value);
-            if (!isNaN(q) && !isNaN(u)) totalEl.value = (q * u).toFixed(2);
+            const qty = parseFloat(qtyEl.value);
+            const u   = parseFloat(ucEl.value);
+            if (!isNaN(qty) && !isNaN(u)) totalEl.value = (qty * u).toFixed(2);
         };
         qtyEl.addEventListener('input', calcTotal);
         ucEl.addEventListener('input', calcTotal);
 
         // Auto-fill division from cost code
-        overlay.querySelector('#fi_costCode').addEventListener('blur', function() {
+        q('#fi_costCode').addEventListener('blur', function() {
             const code = this.value.trim();
             if (code.length >= 2) {
                 const divCode = code.split('-')[0].padStart(2, '0');
-                const divEl = overlay.querySelector('#fi_division');
+                const divEl = q('#fi_division');
                 if (self.DIVISIONS.find(d => d.code === divCode)) divEl.value = divCode;
             }
         });
 
-        overlay.querySelector('#fi_cancel').onclick = () => document.body.removeChild(overlay);
-        overlay.querySelector('#fi_save').onclick = async () => {
-            const errorEl = overlay.querySelector('#fi_error');
-            const desc    = overlay.querySelector('#fi_description').value.trim();
-            const qty     = parseFloat(overlay.querySelector('#fi_qty').value);
-            const unitCost = parseFloat(overlay.querySelector('#fi_unitCost').value);
-            const totalOverride = overlay.querySelector('#fi_total').value;
-            const total   = totalOverride !== '' ? parseFloat(totalOverride) : qty * unitCost;
+        modal.submitBtn.addEventListener('click', async () => {
+            const errorEl  = q('#fi_error');
+            const desc     = q('#fi_description').value.trim();
+            const qty      = parseFloat(q('#fi_qty').value);
+            const unitCost = parseFloat(q('#fi_unitCost').value);
+            const totalOverride = q('#fi_total').value;
+            const total    = totalOverride !== '' ? parseFloat(totalOverride) : qty * unitCost;
 
             // Validation
-            const errors = self._validateItem({ description: desc, quantity: qty, unitCost, total, costCode: overlay.querySelector('#fi_costCode').value });
+            const errors = self._validateItem({ description: desc, quantity: qty, unitCost, total, costCode: q('#fi_costCode').value });
             if (errors.length > 0) {
                 errorEl.textContent = errors[0];
                 errorEl.style.display = 'block';
@@ -795,35 +787,30 @@ window.AdminBudgetTracking = {
                 id: item.id || (Date.now().toString(36) + Math.random().toString(36).substr(2,9)),
                 projectId: AppData.getBudgetVersion(self._budgetVersionId).projectId,
                 budgetVersionId: self._budgetVersionId,
-                costCode:    overlay.querySelector('#fi_costCode').value.trim(),
-                division:    overlay.querySelector('#fi_division').value,
+                costCode:    q('#fi_costCode').value.trim(),
+                division:    q('#fi_division').value,
                 description: desc,
-                category:    overlay.querySelector('#fi_category').value,
+                category:    q('#fi_category').value,
                 quantity:    qty,
-                unit:        overlay.querySelector('#fi_unit').value,
+                unit:        q('#fi_unit').value,
                 unitCost,
                 total:       isNaN(total) ? qty * unitCost : total,
-                notes:       overlay.querySelector('#fi_notes').value.trim(),
+                notes:       q('#fi_notes').value.trim(),
                 createdAt:   item.createdAt || new Date().toISOString(),
                 updatedAt:   new Date().toISOString(),
             };
-            const saveBtn = overlay.querySelector('#fi_save');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveBudgetItemAsync(saved);
             } catch (e) {
                 Utils.showToast('Failed to save item: ' + e.message, 'error');
-                saveBtn.disabled = false;
-                saveBtn.textContent = isNew ? 'Add Item' : 'Save Changes';
+                restore();
                 return;
             }
             AppData.addAuditLog('Admin', isNew ? 'budget_item_added' : 'budget_item_edited', desc + ' $' + saved.total.toFixed(2));
-            document.body.removeChild(overlay);
+            modal.close();
             self.render(self._container);
-        };
-
-        overlay.addEventListener('click', e => { if (e.target === overlay) document.body.removeChild(overlay); });
+        });
     },
 
     _deleteItem(itemId) {

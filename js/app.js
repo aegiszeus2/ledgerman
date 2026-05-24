@@ -73,6 +73,17 @@ window.LMIcons = {
                 return;
             }
 
+            // Check for an active session that survived a page refresh.
+            // sessionStorage keeps the JWT alive across refreshes (same tab) but not tab-close.
+            // Without this check, a worker without "Keep me signed in" would be logged out on
+            // every single page refresh — the JWT is still valid but init() falls to showLogin().
+            const activeJwt    = AppData.getJwt();
+            const activeCompId = AppData.getCompanyId();
+            if (activeJwt && activeCompId && !AppData.isTokenExpired(activeJwt)) {
+                this._restoreFromActiveSession(activeJwt);
+                return;
+            }
+
             // Signup flow removed — invitations now use pre-filled login only
 
             // Always show the main login screen — clean slate every session.
@@ -198,9 +209,25 @@ window.LMIcons = {
                         this._completeWorkerLogin(worker, 'Restored from persistent login');
                         return;
                     } catch(err) {
-                        // Credentials invalid OR timeout — clear ALL auth state
-                        console.log('[Ledgerman] Persistent worker restore failed:', err.message);
-                        AppData.clearAuthState();
+                        // Distinguish credential rejection (401/403) from network/timeout failures.
+                        // - Auth failure  → credentials are wrong/revoked; clear everything so the worker
+                        //   is prompted to enter their PIN again from a clean state.
+                        // - Network/timeout → Render cold-start or brief outage; the credentials are still
+                        //   valid, so PRESERVE the persistent login. The worker will see the login form and
+                        //   can retry; on their next submit the persistent login will be refreshed.
+                        const msg = (err.message || '').toLowerCase();
+                        const isAuthFailure = /\b40[13]\b|invalid|not active|not found|access (required|denied)/i.test(err.message || '');
+                        console.log('[Ledgerman] Persistent worker restore failed:', err.message,
+                            '— treating as', isAuthFailure ? 'auth failure (clearing)' : 'network/timeout (preserving login)');
+                        if (isAuthFailure) {
+                            // Credentials rejected by server — wipe everything
+                            AppData.clearAuthState();
+                        } else {
+                            // Network or timeout — only clear the active JWT/companyId,
+                            // keep the persistent-login credentials so the next attempt can succeed
+                            AppData.setJwt('');
+                            AppData.setCompanyId('');
+                        }
                         this.showWorkerLogin();
                     }
                 } else {
@@ -212,6 +239,78 @@ window.LMIcons = {
             } catch(err) {
                 console.error('[Ledgerman] Error restoring persistent login:', err);
                 AppData.clearPersistentLogin();
+                this.showLogin();
+            }
+        },
+
+        /**
+         * _restoreFromActiveSession(jwt)
+         * Called by init() when there is no persistent login in localStorage but there IS a
+         * valid JWT in sessionStorage (i.e. the worker refreshed the page without closing the tab,
+         * or is returning to a tab that never expired).
+         *
+         * Strategy:
+         *   1. Decode JWT claims to find role, workerId, and name.
+         *   2. Call syncFromServer() to re-hydrate the in-memory cache from the server.
+         *   3. Route directly to the correct portal — no re-authentication needed.
+         *   4. On sync failure (offline/timeout), fall back to cached localStorage data so
+         *      the worker can still use the app; do NOT force a re-login.
+         */
+        async _restoreFromActiveSession(jwt) {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="login-screen">
+                    <div class="login-card">
+                        <div style="font-size:2rem;margin-bottom:8px">⏳</div>
+                        <h2>Loading…</h2>
+                        <p class="text-muted">One moment…</p>
+                    </div>
+                </div>
+            `;
+
+            // Decode JWT (client-side, no secret needed — just reading claims)
+            let payload;
+            try {
+                const parts = jwt.split('.');
+                payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            } catch(e) {
+                console.warn('[Ledgerman] Could not decode JWT in _restoreFromActiveSession:', e.message);
+                AppData.clearAuthState();
+                this.showLogin();
+                return;
+            }
+
+            // Attempt to sync fresh data from the server
+            try {
+                await AppData.syncFromServer();
+            } catch(syncErr) {
+                // Sync failed (offline or server error) — fall back to localStorage cache.
+                // The JWT is still valid so we can continue with stale data rather than
+                // forcing a re-login that would fail anyway.
+                console.warn('[Ledgerman] Sync failed during session restore (using cache):', syncErr.message);
+            }
+
+            const role = payload.role;
+            if (role === 'worker' && payload.workerId) {
+                const worker = AppData.getWorker(payload.workerId) || {
+                    id:         payload.workerId,
+                    name:       payload.name || 'Worker',
+                    company_id: AppData.getCompanyId(),
+                    role:       payload.workerRole || 'Worker',
+                    // email intentionally omitted — sync failed and cache is empty so
+                    // email status is unknown. Leaving it undefined prevents the email
+                    // prompt from firing for workers whose email was set by the admin
+                    // but whose data hasn't been loaded yet (Render cold-start, etc).
+                };
+                this.currentUser = { type: 'worker', name: worker.name, id: worker.id };
+                this._completeWorkerLogin(worker, 'Session restored (page refresh)');
+            } else if (role === 'admin') {
+                this.currentUser = { type: 'admin', name: 'Admin' };
+                this.startAdminPanel();
+            } else {
+                // Unknown role — clear and show login
+                console.warn('[Ledgerman] Unknown role in active JWT:', role);
+                AppData.clearAuthState();
                 this.showLogin();
             }
         },
@@ -968,10 +1067,16 @@ window.LMIcons = {
         _completeWorkerLogin(worker, auditNote) {
             this.currentUser = { type: 'worker', name: worker.name, id: worker.id };
             AppData.addAuditLog(worker.name, 'Worker Login', auditNote || '');
-            // Ask for email only if not on file AND worker hasn't already skipped this prompt
+            // Ask for email only if email is *confirmed* empty on the server AND
+            // the worker hasn't already been prompted in this browser.
+            //
+            // worker.email === ''  → server confirmed no email (fresh login or successful sync)
+            // worker.email === undefined → email status unknown (sync failed, no cache) —
+            //   do NOT prompt: the worker may have an admin-set email we just can't see yet.
+            //   Prompting here would incorrectly interrupt workers whose email is already on file.
             const emailPromptKey = 'worker_email_prompted_' + worker.id;
             const alreadyPrompted = AppData.getData(emailPromptKey);
-            if (!worker.email && !alreadyPrompted) {
+            if (worker.email === '' && !alreadyPrompted) {
                 this._showEmailPrompt(worker);
             } else {
                 this.startWorkerPortal(worker);
@@ -1012,23 +1117,37 @@ window.LMIcons = {
                 proceed();
             };
 
-            document.getElementById('emailPromptForm').onsubmit = (e) => {
+            document.getElementById('emailPromptForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const email = document.getElementById('workerEmail').value.trim();
+                const errEl = document.getElementById('emailPromptError');
+                errEl.style.display = 'none';
                 if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    const err = document.getElementById('emailPromptError');
-                    err.textContent = 'Please enter a valid email address.';
-                    err.style.display = 'block';
+                    errEl.textContent = 'Please enter a valid email address.';
+                    errEl.style.display = 'block';
                     return;
                 }
                 if (email) {
-                    const w = AppData.getWorker(worker.id);
-                    if (w) {
-                        w.email = email;
-                        AppData.saveWorker(w);
-                        AppData.addAuditLog(w.name, 'Email Added', email);
+                    try {
+                        // Use the worker self-service endpoint — PUT /api/workers/<id> requires
+                        // admin role and would 403 with a worker JWT.
+                        await AppData.workerUpdateMyEmail(email);
+                        // Update local cache so portal shows correct data immediately
+                        const w = AppData.getWorker(worker.id);
+                        if (w) {
+                            w.email = email;
+                            AppData.saveWorker(w);
+                        }
+                        AppData.addAuditLog(worker.name, 'Email Added', email);
+                    } catch(saveErr) {
+                        // Non-blocking: log the failure but don't prevent the worker from proceeding.
+                        // The prompted flag below ensures they won't be pestered again.
+                        console.warn('[Ledgerman] Email save failed:', saveErr.message);
                     }
                 }
+                // Mark as prompted regardless of save outcome — never show this prompt again
+                // for this worker on this browser, even if the network save failed.
+                AppData.setData('worker_email_prompted_' + worker.id, true);
                 proceed();
             };
         },
@@ -1699,7 +1818,9 @@ window.LMIcons = {
             }
 
             // Inject "? How To" help button for worker pages
-            // setTimeout(300) ensures button fires after async module renders settle
+            // Positioned at bottom:128px so it stacks clearly above the AI Help FAB
+            // (FAB sits at bottom:80px ~33px tall → top edge ~113px; 15px gap below this button).
+            // Layout from bottom: 0–72px nav bar | 80–113px AI FAB | 128px+ this button.
             const _wHelpRoute = route;
             setTimeout(() => {
                 if (App.currentView !== _wHelpRoute) return; // user navigated away
@@ -1711,7 +1832,7 @@ window.LMIcons = {
                     helpBtn.innerHTML = '? How To';
                     helpBtn.style.cssText = [
                         'position:fixed',
-                        'bottom:70px',
+                        'bottom:128px',
                         'right:16px',
                         'z-index:888',
                         'background:#1a3a5c',

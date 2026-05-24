@@ -417,39 +417,34 @@ window.AdminApprovals = {
 
     _showRejectModal(subId) {
         const self = this;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:400px">
-                <h3>Reject Submission</h3>
-                <div class="form-group" style="margin-bottom:12px">
-                    <label>Reason for rejection</label>
-                    <textarea class="form-control" id="rejectReason" rows="3" placeholder="Enter reason..."></textarea>
-                </div>
-                <div class="form-actions">
-                    <button class="btn btn-danger" id="confirmReject">Reject</button>
-                    <button class="btn btn-secondary modal-close">Cancel</button>
-                </div>
+        const bodyHtml = `
+            <div class="form-group" style="margin-bottom:12px">
+                <label>Reason for rejection</label>
+                <textarea class="form-control" id="rejectReason" rows="3" placeholder="Enter reason..."></textarea>
             </div>
         `;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        const modal = UI.modal('Reject Submission', bodyHtml, {
+            width: '400px',
+            submitLabel: 'Reject',
+            danger: true,
+        });
+        const q = s => modal.q(s);
 
-        overlay.querySelector('#confirmReject').addEventListener('click', async function() {
-            const reason = overlay.querySelector('#rejectReason').value.trim();
+        modal.submitBtn.addEventListener('click', async function() {
+            const reason = q('#rejectReason').value.trim();
             const sub = AppData.getSubmission(subId);
-            if (!sub) { overlay.remove(); return; }
+            if (!sub) { modal.close(); return; }
 
             sub.status = 'Rejected';
             sub.rejectionReason = reason;
             sub.reviewedAt = new Date().toISOString();
             sub.reviewedBy = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
                 await AppData.saveEntityAsync('submissions', sub);
             } catch (e) {
                 Utils.showToast('Failed to reject submission: ' + e.message, 'error');
+                restore();
                 return;
             }
 
@@ -457,7 +452,7 @@ window.AdminApprovals = {
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, 'Submission Rejected', (worker ? worker.name : 'Worker') + (reason ? ' - ' + reason : ''));
             Utils.showToast('Submission rejected');
-            overlay.remove();
+            modal.close();
             self._renderContent();
         });
     },
@@ -467,14 +462,67 @@ window.AdminApprovals = {
         const sub = AppData.getSubmission(subId);
         if (!sub) return;
 
-        const worker = AppData.getWorker(sub.workerId);
-        const project = AppData.getProject(sub.projectId);
-        const isFlat = sub.rateType === 'Flat' || sub.rateType === 'flat';
         const isApproved = sub.status === 'Approved';
         const isRejected = sub.status === 'Rejected';
         const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
 
-        // Build edit history HTML
+        // ── Dropdown data ────────────────────────────────────────────────────
+        const allWorkers   = AppData.getWorkers   ? AppData.getWorkers()   : [];
+        const allProjects  = AppData.getProjects  ? AppData.getProjects()  : [];
+        const allEquipment = AppData.getEquipment ? AppData.getEquipment() : [];
+
+        function buildWorkerOptions(selId) {
+            return allWorkers.map(function(w) {
+                return '<option value="' + Utils.escapeHtml(w.id) + '"' + (w.id === selId ? ' selected' : '') + '>' + Utils.escapeHtml(w.name) + '</option>';
+            }).join('');
+        }
+        function buildProjectOptions(selId) {
+            return '<option value="">— Select Project —</option>' +
+                allProjects.map(function(p) {
+                    return '<option value="' + Utils.escapeHtml(p.id) + '"' + (p.id === selId ? ' selected' : '') + '>' + Utils.escapeHtml(p.name) + '</option>';
+                }).join('');
+        }
+        function buildSubtaskOptions(projectId, selId) {
+            const subs = projectId ? AppData.getSubtasks(projectId) : [];
+            return '<option value="">— None —</option>' +
+                subs.map(function(s) {
+                    return '<option value="' + Utils.escapeHtml(s.id) + '"' + (s.id === selId ? ' selected' : '') + '>' + Utils.escapeHtml(s.name) + '</option>';
+                }).join('');
+        }
+        function buildEquipOptions(selId) {
+            return '<option value="">— Select Equipment —</option>' +
+                allEquipment.map(function(e) {
+                    return '<option value="' + Utils.escapeHtml(e.id) + '"' + (e.id === selId ? ' selected' : '') + '>' + Utils.escapeHtml(e.name || e.id) + '</option>';
+                }).join('');
+        }
+        function equipRowHtml(eq) {
+            return '<div class="equip-entry-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px">' +
+                '<select class="form-control equip-id-sel" style="flex:1">' + buildEquipOptions(eq ? eq.equipmentId : '') + '</select>' +
+                '<input type="number" class="form-control equip-hrs-inp" value="' + (eq ? (eq.hours || 0) : 0) + '" step="0.25" min="0" style="width:88px" placeholder="hrs">' +
+                '<button type="button" class="btn-secondary equip-remove-btn" style="padding:4px 10px;flex-shrink:0">&#10005;</button>' +
+            '</div>';
+        }
+
+        // ── Computed HTML chunks (before template literal) ──────────────────
+        const currentRateType   = sub.rateType || 'Hourly';
+        const isInitiallyFlat   = currentRateType === 'Flat' || currentRateType === 'flat';
+        const existingEquip     = Array.isArray(sub.equipmentEntries) ? sub.equipmentEntries : [];
+        const equipListHtml     = existingEquip.map(function(eq) { return equipRowHtml(eq); }).join('');
+
+        const impactOptionsHtml = '<option value="">— None —</option>' + self._impactCodes.map(function(ic) {
+            const label = ic.code ? '[' + ic.code + '] ' + ic.name : ic.name;
+            return '<option value="' + Utils.escapeHtml(ic.id) + '"' + (ic.id === sub.impactCodeId ? ' selected' : '') + '>' + Utils.escapeHtml(label) + '</option>';
+        }).join('');
+
+        const billableOptionsHtml = ['Billable', 'Disputed', 'To Be Reviewed'].map(function(opt) {
+            return '<option value="' + opt + '"' + (sub.impactBillableStatus === opt ? ' selected' : '') + '>' + opt + '</option>';
+        }).join('');
+
+        const statusColor = isApproved ? 'rgba(46,204,113,.2);color:var(--success)'
+                          : isRejected ? 'rgba(233,69,96,.2);color:var(--accent)'
+                          : 'rgba(255,193,7,.2);color:#856404';
+
+        // ── Edit history HTML ───────────────────────────────────────────────
         let historyHtml = '';
         if (editHistory.length > 0) {
             historyHtml = '<div style="background:var(--bg-surface);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.8rem">' +
@@ -494,135 +542,285 @@ window.AdminApprovals = {
             '</div>';
         }
 
-        // Status warning banner
+        // ── Status warning banner ───────────────────────────────────────────
         let statusBanner = '';
         if (isApproved) {
             statusBanner = '<div style="background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.85rem">' +
                 '⚠️ This entry is <strong>Approved</strong>. Editing will update the record. ' +
-                'Check "Require re-approval" below to move it back to Pending and invalidate the linked expense.' +
-            '</div>';
+                'Check "Require re-approval" below to move it back to Pending and invalidate the linked expense.</div>';
         } else if (isRejected) {
             statusBanner = '<div style="background:rgba(52,152,219,.1);border:1px solid rgba(52,152,219,.3);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.85rem">' +
-                'ℹ️ This entry was <strong>Rejected</strong>. You can edit and optionally move it back to Pending for re-review.' +
-            '</div>';
+                'ℹ️ This entry was <strong>Rejected</strong>. You can edit and optionally move it back to Pending for re-review.</div>';
         }
 
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.innerHTML = `
-            <div class="modal" style="max-width:500px;max-height:90vh;overflow-y:auto">
-                <h3>Edit Submission</h3>
-                <p style="font-size:.85rem;color:var(--text2);margin-top:-8px;margin-bottom:14px">
-                    ${Utils.escapeHtml(worker ? worker.name : 'Worker')} &mdash; ${Utils.escapeHtml(project ? project.name : 'Project')}
-                    <span style="font-size:.78rem;padding:2px 7px;border-radius:10px;margin-left:6px;background:${isApproved ? 'rgba(46,204,113,.2);color:var(--success)' : isRejected ? 'rgba(233,69,96,.2);color:var(--accent)' : 'rgba(255,193,7,.2);color:#856404'}">${sub.status || 'Pending'}</span>
-                </p>
+        const bodyHtml = `
+            <p style="font-size:.85rem;color:var(--text2);margin:-8px 0 14px">
+                <span style="font-size:.78rem;padding:2px 7px;border-radius:10px;background:${statusColor}">${sub.status || 'Pending'}</span>
+            </p>
+            ${statusBanner}
+            ${historyHtml}
 
-                ${statusBanner}
-                ${historyHtml}
-
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Assignment</legend>
                 <div class="form-group">
-                    <label>Date</label>
+                    <label>Worker</label>
+                    <select class="form-control" id="editWorkerId">${buildWorkerOptions(sub.workerId)}</select>
+                </div>
+                <div class="form-group">
+                    <label>Project <span style="color:var(--accent)">*</span></label>
+                    <select class="form-control" id="editProjectId">${buildProjectOptions(sub.projectId)}</select>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label>Subtask / Cost Code</label>
+                    <select class="form-control" id="editSubtaskId">${buildSubtaskOptions(sub.projectId, sub.subtaskId)}</select>
+                </div>
+            </fieldset>
+
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Date &amp; Pay</legend>
+                <div class="form-group">
+                    <label>Date <span style="color:var(--accent)">*</span></label>
                     <input type="date" class="form-control" id="editDate" value="${sub.date || ''}">
                 </div>
+                <div class="form-group">
+                    <label>Pay Type</label>
+                    <select class="form-control" id="editRateType">
+                        <option value="Hourly"${!isInitiallyFlat ? ' selected' : ''}>Hourly</option>
+                        <option value="Flat"${isInitiallyFlat ? ' selected' : ''}>Flat Rate</option>
+                    </select>
+                </div>
+                <div id="editHourlySection" style="display:${isInitiallyFlat ? 'none' : 'block'}">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input type="time" class="form-control" id="editStartTime" value="${sub.startTime || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>End Time</label>
+                            <input type="time" class="form-control" id="editEndTime" value="${sub.endTime || ''}">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group" style="margin-bottom:0">
+                            <label>Hours</label>
+                            <input type="number" class="form-control" id="editHours" value="${sub.hours || 0}" step="0.25" min="0">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0">
+                            <label>Rate ($/hr)</label>
+                            <input type="number" class="form-control" id="editRate" value="${sub.rate || 0}" step="0.01" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div id="editFlatSection" style="display:${isInitiallyFlat ? 'block' : 'none'}">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Flat Amount ($)</label>
+                        <input type="number" class="form-control" id="editFlatAmount" value="${sub.flatAmount || sub.flatRate || sub.amount || 0}" step="0.01" min="0">
+                    </div>
+                </div>
+            </fieldset>
 
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Work Details</legend>
                 <div class="form-group">
                     <label>Description / Notes</label>
                     <textarea class="form-control" id="editDescription" rows="2">${Utils.escapeHtml(sub.description || '')}</textarea>
                 </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Units Completed</label>
+                        <input type="number" class="form-control" id="editUnitsCompleted" value="${sub.unitsCompleted || ''}" step="any" min="0" placeholder="0">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Unit of Measure</label>
+                        <input type="text" class="form-control" id="editUnitOfMeasure" value="${Utils.escapeHtml(sub.unitOfMeasure || '')}" placeholder="e.g. sq ft">
+                    </div>
+                </div>
+            </fieldset>
 
-                ${isFlat ? `
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Equipment</legend>
+                <div id="editEquipList">${equipListHtml}</div>
+                <button type="button" id="editAddEquipBtn" class="btn-secondary btn-sm" style="margin-top:4px">+ Add Equipment</button>
+                <div class="form-group" style="margin-top:10px;margin-bottom:0">
+                    <label>Equipment Note</label>
+                    <input type="text" class="form-control" id="editEquipNote" value="${Utils.escapeHtml(sub.equipmentNote || '')}" placeholder="General equipment note">
+                </div>
+            </fieldset>
+
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Impact / Delay Code</legend>
                 <div class="form-group">
-                    <label>Flat Amount ($)</label>
-                    <input type="number" class="form-control" id="editFlatAmount" value="${sub.flatAmount || sub.flatRate || sub.amount || 0}" step="0.01" min="0">
+                    <label>Impact Code</label>
+                    <select class="form-control" id="editImpactCodeId">${impactOptionsHtml}</select>
                 </div>
-                ` : `
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group">
-                        <label>Start Time</label>
-                        <input type="time" class="form-control" id="editStartTime" value="${sub.startTime || ''}">
+                <div id="editImpactDetails" style="display:${sub.impactCodeId ? 'block' : 'none'}">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group">
+                            <label>Impact Hours</label>
+                            <input type="number" class="form-control" id="editImpactHours" value="${sub.impactHours || ''}" step="0.25" min="0" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Billable Status</label>
+                            <select class="form-control" id="editImpactBillable">
+                                <option value="">— Select —</option>
+                                ${billableOptionsHtml}
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>End Time</label>
-                        <input type="time" class="form-control" id="editEndTime" value="${sub.endTime || ''}">
-                    </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                    <div class="form-group">
-                        <label>Hours</label>
-                        <input type="number" class="form-control" id="editHours" value="${sub.hours || 0}" step="0.25" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Rate ($/hr)</label>
-                        <input type="number" class="form-control" id="editRate" value="${sub.rate || 0}" step="0.01" min="0">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Impact Description</label>
+                        <textarea class="form-control" id="editImpactDesc" rows="2">${Utils.escapeHtml(sub.impactDescription || '')}</textarea>
                     </div>
                 </div>
-                `}
+            </fieldset>
 
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Admin Notes</legend>
                 <div class="form-group">
                     <label>Reason for modification <span style="color:var(--text2);font-weight:normal">(recommended)</span></label>
-                    <input type="text" class="form-control" id="editReason" placeholder="e.g. Worker reported wrong hours, corrected to 7.5">
+                    <input type="text" class="form-control" id="editReason" placeholder="e.g. Worker selected wrong project — corrected to Project ABC">
                 </div>
-
                 ${(isApproved || isRejected) ? `
-                <div class="form-group" style="display:flex;align-items:center;gap:8px">
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-bottom:0">
                     <input type="checkbox" id="editReApprove" ${isRejected ? 'checked' : ''}>
                     <label for="editReApprove" style="margin:0;cursor:pointer">
                         ${isApproved ? 'Require re-approval (moves back to Pending, removes linked expense)' : 'Move back to Pending for re-review'}
                     </label>
                 </div>
                 ` : ''}
+            </fieldset>
 
-                <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
-
-                <div class="form-actions">
-                    <button class="btn btn-primary" id="saveEditBtn">Save Changes</button>
-                    <button class="btn btn-secondary modal-close">Cancel</button>
-                </div>
-            </div>
+            <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
         `;
 
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('.modal-close').addEventListener('click', function() { overlay.remove(); });
+        const modal = UI.modal('Edit Submission', bodyHtml, {
+            width: '580px',
+            submitLabel: 'Save Changes',
+            scrollBody: true,
+        });
+        const q = s => modal.q(s);
 
-        overlay.querySelector('#saveEditBtn').addEventListener('click', async function() {
-            const saveBtn = overlay.querySelector('#saveEditBtn');
-            const errEl = overlay.querySelector('#editErrMsg');
+        // ── Dynamic wiring ──────────────────────────────────────────────────
+
+        // Pay-type toggle
+        q('#editRateType').addEventListener('change', function() {
+            const flat = this.value === 'Flat' || this.value === 'flat';
+            q('#editHourlySection').style.display = flat ? 'none' : 'block';
+            q('#editFlatSection').style.display   = flat ? 'block' : 'none';
+        });
+
+        // Project → reload subtasks
+        q('#editProjectId').addEventListener('change', function() {
+            q('#editSubtaskId').innerHTML = buildSubtaskOptions(this.value, '');
+        });
+
+        // Equipment remove existing rows
+        function bindEquipRemoveBtns() {
+            q('#editEquipList').querySelectorAll('.equip-remove-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    btn.closest('.equip-entry-row').remove();
+                });
+            });
+        }
+        bindEquipRemoveBtns();
+
+        // Equipment add row
+        q('#editAddEquipBtn').addEventListener('click', function() {
+            const list = q('#editEquipList');
+            const tmp = document.createElement('div');
+            tmp.innerHTML = equipRowHtml(null);
+            const row = tmp.firstChild;
+            list.appendChild(row);
+            row.querySelector('.equip-remove-btn').addEventListener('click', function() {
+                row.remove();
+            });
+        });
+
+        // Impact code details show/hide
+        q('#editImpactCodeId').addEventListener('change', function() {
+            q('#editImpactDetails').style.display = this.value ? 'block' : 'none';
+        });
+
+        // ── Save ────────────────────────────────────────────────────────────
+        modal.submitBtn.addEventListener('click', async function() {
+            const errEl = q('#editErrMsg');
             errEl.style.display = 'none';
 
-            const newDate = overlay.querySelector('#editDate').value;
-            if (!newDate) { errEl.textContent = 'Date is required.'; errEl.style.display = 'block'; return; }
+            const newDate      = q('#editDate').value;
+            const newProjectId = q('#editProjectId').value;
+            if (!newDate)      { errEl.textContent = 'Date is required.';    errEl.style.display = 'block'; return; }
+            if (!newProjectId) { errEl.textContent = 'Project is required.'; errEl.style.display = 'block'; return; }
 
-            const reason = overlay.querySelector('#editReason').value.trim();
-            const reApproveEl = overlay.querySelector('#editReApprove');
+            const reason       = q('#editReason').value.trim();
+            const reApproveEl  = q('#editReApprove');
             const requireReApproval = reApproveEl ? reApproveEl.checked : false;
 
-            const fields = { date: newDate, description: overlay.querySelector('#editDescription').value.trim() };
+            const newWorkerId    = q('#editWorkerId').value;
+            const newSubtaskId   = q('#editSubtaskId').value;
+            const newRateType    = q('#editRateType').value;
+            const newIsFlat      = newRateType === 'Flat' || newRateType === 'flat';
+            const newImpactCode  = q('#editImpactCodeId').value;
 
-            if (isFlat) {
-                const flatAmt = parseFloat(overlay.querySelector('#editFlatAmount').value) || 0;
+            const selWorker  = allWorkers.find(function(w) { return w.id === newWorkerId; });
+            const selProject = allProjects.find(function(p) { return p.id === newProjectId; });
+            const selSubtask = newSubtaskId ? AppData.getSubtask(newSubtaskId) : null;
+
+            // Collect equipment rows
+            const equipRows = q('#editEquipList').querySelectorAll('.equip-entry-row');
+            const equipmentEntries = [];
+            equipRows.forEach(function(row) {
+                const equipId = row.querySelector('.equip-id-sel').value;
+                const hrs     = parseFloat(row.querySelector('.equip-hrs-inp').value) || 0;
+                if (equipId) {
+                    const eqItem = allEquipment.find(function(e) { return e.id === equipId; });
+                    equipmentEntries.push({
+                        equipmentId:   equipId,
+                        equipmentName: eqItem ? (eqItem.name || eqItem.id) : equipId,
+                        hours:         hrs,
+                    });
+                }
+            });
+
+            const fields = {
+                date:         newDate,
+                description:  q('#editDescription').value.trim(),
+                projectId:    newProjectId,
+                workerId:     newWorkerId,
+                workerName:   selWorker  ? selWorker.name  : '',
+                subtaskId:    newSubtaskId || '',
+                subtaskName:  selSubtask  ? selSubtask.name : '',
+                rateType:     newRateType,
+                unitsCompleted:  parseFloat(q('#editUnitsCompleted').value) || null,
+                unitOfMeasure:   q('#editUnitOfMeasure').value.trim(),
+                equipmentEntries: equipmentEntries,
+                equipmentNote:   q('#editEquipNote').value.trim(),
+                impactCodeId:            newImpactCode || null,
+                impactHours:             newImpactCode ? (parseFloat(q('#editImpactHours').value) || null) : null,
+                impactBillableStatus:    newImpactCode ? q('#editImpactBillable').value : null,
+                impactDescription:       newImpactCode ? q('#editImpactDesc').value.trim() : null,
+            };
+
+            if (newIsFlat) {
+                const flatAmt    = parseFloat(q('#editFlatAmount').value) || 0;
                 fields.flatAmount = flatAmt;
-                fields.flatRate = flatAmt;
-                fields.amount = flatAmt;
+                fields.flatRate   = flatAmt;
+                fields.amount     = flatAmt;
             } else {
-                fields.startTime = overlay.querySelector('#editStartTime').value;
-                fields.endTime = overlay.querySelector('#editEndTime').value;
-                fields.hours = parseFloat(overlay.querySelector('#editHours').value) || 0;
-                fields.rate = parseFloat(overlay.querySelector('#editRate').value) || 0;
+                fields.startTime = q('#editStartTime').value;
+                fields.endTime   = q('#editEndTime').value;
+                fields.hours     = parseFloat(q('#editHours').value) || 0;
+                fields.rate      = parseFloat(q('#editRate').value) || 0;
             }
 
-            // If moving approved back to pending, also remove linked expense client-side
+            // Remove linked expense client-side if re-approving
             if (requireReApproval && isApproved) {
                 const allExpenses = AppData.getExpenses ? AppData.getExpenses() : [];
                 const linked = allExpenses.filter(function(e) { return e.submissionId === subId; });
                 linked.forEach(function(e) { AppData.deleteExpense(e.id); });
             }
 
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving…';
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
             try {
-                // Use editSubmissionAsync if available (dedicated route with full audit trail)
                 if (typeof AppData.editSubmissionAsync === 'function') {
                     await AppData.editSubmissionAsync(subId, fields, reason, requireReApproval);
                 } else {
@@ -634,13 +832,12 @@ window.AdminApprovals = {
             } catch (e) {
                 errEl.textContent = 'Failed to save: ' + e.message;
                 errEl.style.display = 'block';
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Changes';
+                restore();
                 return;
             }
 
             Utils.showToast('Submission updated' + (requireReApproval && (isApproved || isRejected) ? ' — moved to Pending' : ''));
-            overlay.remove();
+            modal.close();
             self._renderContent();
         });
     },
@@ -648,16 +845,12 @@ window.AdminApprovals = {
     _showPhotoLightbox(photo) {
         const blob = photo.blob || photo.thumbnail;
         if (!blob) return;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay active';
-        overlay.style.display = 'flex';
-        overlay.style.cursor = 'pointer';
         const url = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
-        overlay.innerHTML = '<img src="' + url + '" style="max-width:90vw;max-height:90vh;object-fit:contain;border-radius:var(--radius)">';
-        overlay.addEventListener('click', function() {
-            URL.revokeObjectURL(url);
-            overlay.remove();
+        const modal = UI.modal('', '<img src="' + url + '" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:var(--radius);display:block;margin:0 auto">', {
+            noFooter: true,
         });
-        document.body.appendChild(overlay);
+        // Revoke URL when modal is closed
+        const origClose = modal.close.bind(modal);
+        modal.close = function() { URL.revokeObjectURL(url); origClose(); };
     }
 };

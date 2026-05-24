@@ -317,6 +317,21 @@ async function apiWorkerPinResetConfirm(email, code, newPin) {
     });
 }
 
+/**
+ * workerUpdateMyEmail(email)
+ * Allows a logged-in worker to save their own email address.
+ * Uses PATCH /api/workers/me/email which accepts worker JWTs (not admin-only).
+ * This is the correct endpoint to call from the Worker Portal email prompt — the
+ * general PUT /api/workers/<id> endpoint requires admin role and will 403 for workers.
+ */
+async function workerUpdateMyEmail(email) {
+    return _apiFetch('/api/workers/me/email', {
+        method: 'PATCH',
+        body: JSON.stringify({ email: email })
+    });
+}
+
+
 async function apiVerify2FA(workerId, totpCode) {
     const companyId = getCompanyId();
     const data = await _apiFetch('/api/auth/worker/verify2fa', {
@@ -606,7 +621,12 @@ function saveSettings(settings) {
     setData('settings', settings);
     if (isApiMode() && getJwt()) {
         _apiFetch('/api/settings', { method: 'PUT', body: JSON.stringify(settings) })
-            .catch(function(e) { console.warn('[API] saveSettings:', e.message); });
+            .catch(function(e) {
+                console.warn('[API] saveSettings:', e.message);
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('Settings sync failed: ' + e.message, 'error');
+                }
+            });
     }
 }
 
@@ -674,8 +694,45 @@ function deleteWorker(id) {
     _setList('workers', _getList('workers').filter(function(w) { return w.id !== id; }));
     if (isApiMode() && getJwt()) {
         _apiFetch('/api/workers/' + id, { method: 'DELETE' })
-            .catch(function(e) { console.warn('[API] deleteWorker:', e.message); });
+            .catch(function(e) {
+                console.warn('[API] deleteWorker:', e.message);
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('Worker delete failed: ' + e.message, 'error');
+                }
+            });
     }
+}
+
+/**
+ * getWorkerDetail(workerId)
+ * Admin-only. Fetches a full worker profile from the server including PIN display status.
+ * Returns the worker object augmented with:
+ *   pin_display  — plain-text PIN if available, '[hashed — reset required]' if bcrypt
+ *   pin_is_hashed — boolean; true = admin must reset the PIN, original is unrecoverable
+ * Requires: admin JWT. Throws on non-admin callers (403).
+ */
+async function getWorkerDetail(workerId) {
+    if (!isApiMode() || !getJwt()) {
+        // Offline fallback: return cached worker without PIN info
+        var w = getWorker(workerId);
+        if (!w) throw new Error('Worker not found');
+        return Object.assign({}, w, { pin_display: w.pin || '', pin_is_hashed: false });
+    }
+    return _apiFetch('/api/workers/' + workerId);
+}
+
+/**
+ * getWorkerTimecards(workerId)
+ * Admin/supervisor. Fetches all timecards for a given worker.
+ * Used to build the hours summary in the worker detail modal.
+ */
+async function getWorkerTimecards(workerId) {
+    if (!isApiMode() || !getJwt()) {
+        // Offline fallback: filter local timecard cache
+        var all = getData('timecards') || [];
+        return all.filter(function(tc) { return tc.workerId === workerId || tc.worker_id === workerId; });
+    }
+    return _apiFetch('/api/timecards?workerId=' + encodeURIComponent(workerId));
 }
 
 // NOTE: In API mode, PINs are NOT in the cache (stripped by server for security).
@@ -988,6 +1045,9 @@ async function savePhoto(photoData) {
                 });
             } catch(e) {
                 console.warn('[API] photo upload failed:', e.message);
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('Photo sync failed: ' + e.message, 'error');
+                }
             }
         })();
     }
@@ -1036,10 +1096,20 @@ async function deletePhoto(id) {
     if (isApiMode() && getJwt()) {
         if (id === 'company_logo') {
             _apiFetch('/api/logo', { method: 'DELETE' })
-                .catch(function(e) { console.warn('[API] deleteLogo:', e.message); });
+                .catch(function(e) {
+                    console.warn('[API] deleteLogo:', e.message);
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Logo delete sync failed: ' + e.message, 'error');
+                    }
+                });
         } else {
             _apiFetch('/api/photos/' + id, { method: 'DELETE' })
-                .catch(function(e) { console.warn('[API] deletePhoto:', e.message); });
+                .catch(function(e) {
+                    console.warn('[API] deletePhoto:', e.message);
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Photo delete sync failed: ' + e.message, 'error');
+                    }
+                });
         }
     }
 }
@@ -1060,6 +1130,9 @@ async function saveLogo(blob) {
             await _apiFetch('/api/logo', { method: 'PUT', body: JSON.stringify({ data: b64 }) });
         } catch(e) {
             console.warn('[Logo] Server upload failed:', e.message);
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Logo sync failed: ' + e.message, 'error');
+            }
         }
     }
 }
@@ -1267,6 +1340,7 @@ window.AppData = {
     apiLoginWorkerByEmail, apiSendWorkerVerification, apiVerifyWorkerLogin,
     apiWorkerPinResetRequest, apiWorkerPinResetConfirm,
     apiVerify2FA,
+    workerUpdateMyEmail,
     apiCreateInvite, apiGetInvite, apiUseInvite,
     syncFromServer, isCacheLoaded,
     // Photos (IndexedDB)
@@ -1283,6 +1357,7 @@ window.AppData = {
     getCompanyModulesFromServer, saveCompanyModulesAsync,
     // Workers
     getWorkers, getWorker, saveWorker, deleteWorker, getWorkerByPin,
+    getWorkerDetail, getWorkerTimecards,
     // Clients
     getClients, getClient, saveClient, deleteClient,
     // Projects
