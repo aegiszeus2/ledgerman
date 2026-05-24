@@ -569,7 +569,12 @@ function saveSettings(settings) {
     setData('settings', settings);
     if (isApiMode() && getJwt()) {
         _apiFetch('/api/settings', { method: 'PUT', body: JSON.stringify(settings) })
-            .catch(function(e) { console.warn('[API] saveSettings:', e.message); });
+            .catch(function(e) {
+                console.warn('[API] saveSettings:', e.message);
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('Settings sync failed: ' + e.message, 'error');
+                }
+            });
     }
 }
 
@@ -637,7 +642,12 @@ function deleteWorker(id) {
     _setList('workers', _getList('workers').filter(function(w) { return w.id !== id; }));
     if (isApiMode() && getJwt()) {
         _apiFetch('/api/workers/' + id, { method: 'DELETE' })
-            .catch(function(e) { console.warn('[API] deleteWorker:', e.message); });
+            .catch(function(e) {
+                console.warn('[API] deleteWorker:', e.message);
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('Worker delete failed: ' + e.message, 'error');
+                }
+            });
     }
 }
 
@@ -1068,6 +1078,9 @@ async function saveLogo(blob) {
             await _apiFetch('/api/logo', { method: 'PUT', body: JSON.stringify({ data: b64 }) });
         } catch(e) {
             console.warn('[Logo] Server upload failed:', e.message);
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Logo sync failed: ' + e.message, 'error');
+            }
         }
     }
 }
