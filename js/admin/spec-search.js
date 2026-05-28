@@ -98,6 +98,65 @@ window.AdminSpecSearch = (function () {
     // ── Module state ──────────────────────────────────────────────────────────
     let _container = null;
     let _currentProject = null;
+    let _currentTab = 'docs'; // 'docs' | 'findings'
+
+    // ── Document type options ─────────────────────────────────────────────────
+    const DOC_TYPES = [
+        ['specification',   'Specification'],
+        ['contract',        'Contract Document'],
+        ['special_prov',    'Special Provisions'],
+        ['opss',            'OPSS Standard'],
+        ['mto',             'MTO Document'],
+        ['metrolinx',       'Metrolinx Specification'],
+        ['rfi',             'RFI'],
+        ['clarification',   'Clarification'],
+        ['meeting_minutes', 'Meeting Minutes'],
+        ['itp',             'Inspection & Test Plan'],
+        ['ncr',             'Non-Conformance Report'],
+        ['deviation',       'Approved Deviation'],
+        ['quality_report',  'Quality Report'],
+        ['drawing',         'Drawing'],
+        ['other',           'Other'],
+    ];
+
+    const FINDING_TYPES = [
+        ['confirmed_compliance',     'Confirmed Compliance'],
+        ['confirmed_non_compliance', 'Confirmed Non-Compliance'],
+        ['potential_concern',        'Potential Concern'],
+        ['missing_info',             'Missing Information'],
+        ['informational',            'Informational Observation'],
+        ['requires_engineering',     'Requires Engineering Judgment'],
+        ['requires_contractual',     'Requires Contractual Clarification'],
+    ];
+
+    const FINDING_STATUS_COLORS = {
+        pending:  ['#f59e0b', '#fef9c3'],
+        accepted: ['#22c55e', '#dcfce7'],
+        rejected: ['#ef4444', '#fee2e2'],
+        override: ['#8b5cf6', '#ede9fe'],
+    };
+
+    const FINDING_TYPE_COLORS = {
+        confirmed_compliance:     ['#22c55e', '#dcfce7'],
+        confirmed_non_compliance: ['#ef4444', '#fee2e2'],
+        potential_concern:        ['#f59e0b', '#fef9c3'],
+        missing_info:             ['#94a3b8', '#f1f5f9'],
+        informational:            ['#64748b', '#f8fafc'],
+        requires_engineering:     ['#8b5cf6', '#ede9fe'],
+        requires_contractual:     ['#06b6d4', '#ecfeff'],
+    };
+
+    function findingStatusBadge(status) {
+        const [fg, bg] = FINDING_STATUS_COLORS[status] || ['#94a3b8', '#f1f5f9'];
+        const label = status.charAt(0).toUpperCase() + status.slice(1);
+        return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:600;color:${fg};background:${bg}">${esc(label)}</span>`;
+    }
+
+    function findingTypeBadge(type) {
+        const [fg, bg] = FINDING_TYPE_COLORS[type] || ['#94a3b8', '#f1f5f9'];
+        const label = (FINDING_TYPES.find(([k]) => k === type) || [type, type])[1];
+        return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:600;color:${fg};background:${bg}">${esc(label)}</span>`;
+    }
 
     // ══════════════════════════════════════════════════════════════════════════
     // PROJECTS LIST
@@ -507,8 +566,9 @@ window.AdminSpecSearch = (function () {
     // ══════════════════════════════════════════════════════════════════════════
     async function renderProjectDetail(project) {
         _currentProject = project;
+        _currentTab = 'docs';
         _container.innerHTML = `
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
                 <button class="btn btn-secondary btn-sm" id="ss-back">← Projects</button>
                 <h2 style="margin:0;flex:1">${esc(project.name)}</h2>
                 ${project.project_number ? `<span style="font-size:0.85rem;color:var(--text-muted)">#${esc(project.project_number)}</span>` : ''}
@@ -516,48 +576,62 @@ window.AdminSpecSearch = (function () {
                 <button class="btn btn-sm" id="ss-delete-btn" style="background:transparent;color:#ef4444;border-color:#ef4444">🗑 Delete</button>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:20px;align-items:start" id="ss-detail-grid">
-                <!-- Documents panel -->
-                <div>
-                    <div class="card">
-                        <div style="padding:14px 16px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
-                            <strong>Documents</strong>
-                            <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
-                                + Upload PDF
-                                <input type="file" id="ss-file-input" accept=".pdf" style="display:none">
-                            </label>
-                        </div>
-                        <div id="ss-upload-progress" style="display:none;padding:10px 16px;background:#f0f9ff;font-size:0.85rem;color:#0369a1"></div>
-                        <div id="ss-docs-list" style="min-height:80px">${spinner('Loading…')}</div>
-                    </div>
-                </div>
+            <!-- Tab bar -->
+            <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border-color);padding-bottom:0">
+                <button id="ss-tab-docs" data-tab="docs" class="ss-tab-btn" style="padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:0.9rem;font-weight:600;color:var(--accent-color,#4f8ef7);border-bottom:2px solid var(--accent-color,#4f8ef7);margin-bottom:-2px">Docs &amp; Q&amp;A</button>
+                <button id="ss-tab-findings" data-tab="findings" class="ss-tab-btn" style="padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:0.9rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px">Findings</button>
+            </div>
 
-                <!-- Ask panel -->
-                <div>
-                    <div class="card">
-                        <div style="padding:14px 16px;border-bottom:1px solid var(--border-color)">
-                            <strong>Ask a Question</strong>
-                        </div>
-                        <div style="padding:16px">
-                            <div style="display:flex;gap:8px">
-                                <textarea id="ss-question-input" class="form-control" rows="2"
-                                    placeholder="e.g. What is the compressive strength requirement for concrete footings?"
-                                    style="resize:vertical;flex:1"></textarea>
-                                <button class="btn btn-primary" id="ss-ask-btn" style="align-self:flex-end;white-space:nowrap">Ask</button>
+            <!-- Docs + Ask tab -->
+            <div id="ss-tab-content-docs">
+                <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:20px;align-items:start" id="ss-detail-grid">
+                    <!-- Documents panel -->
+                    <div>
+                        <div class="card">
+                            <div style="padding:14px 16px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+                                <strong>Documents</strong>
+                                <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
+                                    + Upload PDF
+                                    <input type="file" id="ss-file-input" accept=".pdf" style="display:none">
+                                </label>
                             </div>
-                            <div id="ss-ask-error" style="color:#ef4444;font-size:0.82rem;margin-top:6px;display:none"></div>
+                            <div id="ss-upload-progress" style="display:none;padding:10px 16px;background:#f0f9ff;font-size:0.85rem;color:#0369a1"></div>
+                            <div id="ss-docs-list" style="min-height:80px">${spinner('Loading…')}</div>
                         </div>
-                        <div id="ss-answer-area" style="padding:0 16px 16px"></div>
                     </div>
 
-                    <div class="card" style="margin-top:16px">
-                        <div style="padding:14px 16px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
-                            <strong>History</strong>
-                            <button class="btn btn-secondary btn-sm" id="ss-refresh-history">↻</button>
+                    <!-- Ask panel -->
+                    <div>
+                        <div class="card">
+                            <div style="padding:14px 16px;border-bottom:1px solid var(--border-color)">
+                                <strong>Ask a Question</strong>
+                            </div>
+                            <div style="padding:16px">
+                                <div style="display:flex;gap:8px">
+                                    <textarea id="ss-question-input" class="form-control" rows="2"
+                                        placeholder="e.g. What is the compressive strength requirement for concrete footings?"
+                                        style="resize:vertical;flex:1"></textarea>
+                                    <button class="btn btn-primary" id="ss-ask-btn" style="align-self:flex-end;white-space:nowrap">Ask</button>
+                                </div>
+                                <div id="ss-ask-error" style="color:#ef4444;font-size:0.82rem;margin-top:6px;display:none"></div>
+                            </div>
+                            <div id="ss-answer-area" style="padding:0 16px 16px"></div>
                         </div>
-                        <div id="ss-history-list" style="min-height:60px">${spinner('Loading…')}</div>
+
+                        <div class="card" style="margin-top:16px">
+                            <div style="padding:14px 16px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+                                <strong>History</strong>
+                                <button class="btn btn-secondary btn-sm" id="ss-refresh-history">↻</button>
+                            </div>
+                            <div id="ss-history-list" style="min-height:60px">${spinner('Loading…')}</div>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Findings tab -->
+            <div id="ss-tab-content-findings" style="display:none">
+                <div id="ss-findings-panel">${spinner('Loading findings…')}</div>
             </div>`;
 
         // Make grid single-column on narrow viewports
@@ -579,7 +653,7 @@ window.AdminSpecSearch = (function () {
 
         _container.querySelector('#ss-file-input').addEventListener('change', e => {
             const file = e.target.files[0];
-            if (file) uploadDocument(project.id, file);
+            if (file) showUploadModal(project.id, file);
             e.target.value = '';
         });
 
@@ -596,6 +670,24 @@ window.AdminSpecSearch = (function () {
         });
 
         _container.querySelector('#ss-refresh-history').addEventListener('click', () => loadHistory(project.id));
+
+        // ── Tab switching ─────────────────────────────────────────────────────
+        _container.querySelectorAll('.ss-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                _currentTab = tab;
+                // Update button styles
+                _container.querySelectorAll('.ss-tab-btn').forEach(b => {
+                    const active = b.dataset.tab === tab;
+                    b.style.color = active ? 'var(--accent-color,#4f8ef7)' : 'var(--text-muted)';
+                    b.style.borderBottomColor = active ? 'var(--accent-color,#4f8ef7)' : 'transparent';
+                });
+                // Show/hide panels
+                _container.querySelector('#ss-tab-content-docs').style.display   = tab === 'docs'     ? '' : 'none';
+                _container.querySelector('#ss-tab-content-findings').style.display = tab === 'findings' ? '' : 'none';
+                if (tab === 'findings') loadFindings(project.id);
+            });
+        });
 
         await Promise.all([loadDocuments(project.id), loadHistory(project.id)]);
     }
@@ -711,14 +803,31 @@ window.AdminSpecSearch = (function () {
                     <div style="font-weight:500">${esc(question)}</div>
                 </div>
                 <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:16px">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
                         <span style="font-size:0.75rem;font-weight:600;color:${confColor};background:${confColor}22;padding:2px 8px;border-radius:999px;text-transform:uppercase">
                             ${esc(result.confidence_level || 'unknown')} confidence
                         </span>
+                        <button class="btn btn-secondary btn-sm" id="ss-create-finding-btn" style="font-size:0.78rem">+ Create Finding</button>
                     </div>
                     <div style="line-height:1.6;white-space:pre-wrap;color:var(--text-primary)">${esc(result.answer)}</div>
                     ${renderCitations(result.citations)}
                 </div>`;
+
+            // Wire up the "Create Finding" button
+            const findingBtn = answerArea.querySelector('#ss-create-finding-btn');
+            if (findingBtn) {
+                findingBtn.addEventListener('click', () => {
+                    const firstCitation = result.citations && result.citations[0];
+                    showCreateFindingModal(projectId, {
+                        question_id: result.question_id,
+                        title: question.length > 80 ? question.slice(0, 77) + '…' : question,
+                        ai_assessment: result.answer,
+                        confidence_score: result.confidence_level,
+                        source_clause: firstCitation ? (firstCitation.section_number || '') : '',
+                        requirement_text: firstCitation ? (firstCitation.quoted_text || '') : '',
+                    });
+                });
+            }
 
             _container.querySelector('#ss-question-input').value = '';
             loadHistory(projectId);
@@ -786,11 +895,342 @@ window.AdminSpecSearch = (function () {
         });
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // UPLOAD WITH CLASSIFICATION MODAL
+    // ══════════════════════════════════════════════════════════════════════════
+    function showUploadModal(projectId, file) {
+        const docTypeOpts = DOC_TYPES.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+        const bodyHtml = `
+            <div class="form-group">
+                <label style="font-size:0.85rem;color:var(--text-muted)">Selected file</label>
+                <div style="font-weight:600;margin-top:4px;font-size:0.9rem">${esc(file.name)}</div>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${(file.size / 1024).toFixed(0)} KB — PDF</div>
+            </div>
+            <div class="form-group">
+                <label>Document Type</label>
+                <select class="form-control" id="ss-upload-type" style="margin-top:4px">
+                    ${docTypeOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Revision / Version <span style="color:var(--text-muted);font-size:0.82rem">(optional)</span></label>
+                <input class="form-control" id="ss-upload-rev" placeholder="e.g. Rev. 3, 2026-04-15">
+            </div>
+            <div class="form-group">
+                <label>Discipline <span style="color:var(--text-muted);font-size:0.82rem">(optional)</span></label>
+                <input class="form-control" id="ss-upload-disc" placeholder="e.g. Civil, Structural, Mechanical">
+            </div>
+            <div id="ss-upload-modal-err" style="color:#ef4444;font-size:0.85rem;display:none"></div>`;
+
+        const uiModal = UI.modal('Upload Document', bodyHtml, {
+            width: '460px',
+            submitLabel: 'Upload & Index',
+        });
+
+        uiModal.submitBtn.addEventListener('click', async () => {
+            const docType  = uiModal.q('#ss-upload-type').value;
+            const revision = uiModal.q('#ss-upload-rev').value.trim() || null;
+            const discipline = uiModal.q('#ss-upload-disc').value.trim() || null;
+
+            const restore = UI.btnLoading(uiModal.submitBtn, 'Uploading…');
+            try {
+                await uploadDocument(projectId, file, docType, revision, discipline);
+                uiModal.close();
+            } catch (e) {
+                const errEl = uiModal.q('#ss-upload-modal-err');
+                errEl.textContent = e.message;
+                errEl.style.display = '';
+                restore();
+            }
+        });
+    }
+
+    async function uploadDocument(projectId, file, docType, revision, discipline) {
+        const progress = _container.querySelector('#ss-upload-progress');
+        if (progress) {
+            progress.textContent = `⏳ Uploading ${file.name}…`;
+            progress.style.display = '';
+        }
+
+        const fd = new FormData();
+        fd.append('project_id', projectId);
+        fd.append('file', file);
+        if (docType)    fd.append('document_type', docType);
+        if (revision)   fd.append('revision', revision);
+        if (discipline) fd.append('discipline', discipline);
+
+        try {
+            await api('POST', '/documents', fd, true);
+            if (progress) {
+                progress.textContent = `✅ ${file.name} uploaded — indexing in background.`;
+                setTimeout(() => { progress.style.display = 'none'; }, 3000);
+            }
+            loadDocuments(projectId);
+        } catch (e) {
+            if (progress) {
+                progress.textContent = `⚠ Upload failed: ${e.message}`;
+                progress.style.background = '#fef2f2';
+                progress.style.color = '#ef4444';
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                    progress.style.background = '';
+                    progress.style.color = '';
+                }, 5000);
+            }
+            throw e;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CREATE FINDING MODAL
+    // ══════════════════════════════════════════════════════════════════════════
+    function showCreateFindingModal(projectId, prefill) {
+        prefill = prefill || {};
+        const typeOpts = FINDING_TYPES.map(([v, l]) =>
+            `<option value="${esc(v)}" ${v === 'potential_concern' ? 'selected' : ''}>${esc(l)}</option>`
+        ).join('');
+
+        const bodyHtml = `
+            <div class="form-group">
+                <label>Title <span style="color:#ef4444">*</span></label>
+                <input class="form-control" id="ss-f-title" value="${esc(prefill.title || '')}">
+            </div>
+            <div class="form-group">
+                <label>Finding Type</label>
+                <select class="form-control" id="ss-f-type">${typeOpts}</select>
+            </div>
+            <div class="form-group">
+                <label>Source Clause / Reference</label>
+                <input class="form-control" id="ss-f-clause" value="${esc(prefill.source_clause || '')}" placeholder="e.g. §3.04, Clause 7.2">
+            </div>
+            <div class="form-group">
+                <label>Requirement / Excerpt</label>
+                <textarea class="form-control" id="ss-f-req" rows="3" placeholder="Paste the relevant specification text…">${esc(prefill.requirement_text || '')}</textarea>
+            </div>
+            <div class="form-group">
+                <label>AI Assessment</label>
+                <textarea class="form-control" id="ss-f-ai" rows="3" style="font-size:0.82rem;color:var(--text-secondary)">${esc(prefill.ai_assessment || '')}</textarea>
+            </div>
+            <div id="ss-f-err" style="color:#ef4444;font-size:0.85rem;display:none"></div>`;
+
+        const uiModal = UI.modal('Create Finding', bodyHtml, {
+            width: '540px',
+            submitLabel: 'Save Finding',
+        });
+
+        uiModal.submitBtn.addEventListener('click', async () => {
+            const title = uiModal.q('#ss-f-title').value.trim();
+            const errEl = uiModal.q('#ss-f-err');
+            if (!title) {
+                errEl.textContent = 'Title is required.';
+                errEl.style.display = '';
+                return;
+            }
+            errEl.style.display = 'none';
+            const restore = UI.btnLoading(uiModal.submitBtn, 'Saving…');
+            try {
+                await api('POST', '/findings', {
+                    project_id:       projectId,
+                    question_id:      prefill.question_id || null,
+                    title,
+                    finding_type:     uiModal.q('#ss-f-type').value,
+                    source_clause:    uiModal.q('#ss-f-clause').value.trim() || null,
+                    requirement_text: uiModal.q('#ss-f-req').value.trim() || null,
+                    ai_assessment:    uiModal.q('#ss-f-ai').value.trim() || null,
+                    confidence_score: prefill.confidence_score || null,
+                });
+                uiModal.close();
+                // If findings tab is active, refresh it
+                if (_currentTab === 'findings') loadFindings(projectId);
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = '';
+                restore();
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // FINDINGS PANEL
+    // ══════════════════════════════════════════════════════════════════════════
+    async function loadFindings(projectId) {
+        const panel = _container.querySelector('#ss-findings-panel');
+        if (!panel) return;
+        panel.innerHTML = spinner('Loading findings…');
+
+        let findings;
+        try {
+            findings = await api('GET', `/findings?project_id=${encodeURIComponent(projectId)}`);
+        } catch (e) {
+            panel.innerHTML = `<div style="padding:16px;color:#ef4444">⚠ ${esc(e.message)}</div>`;
+            return;
+        }
+
+        renderFindingsPanel(panel, projectId, findings);
+    }
+
+    function renderFindingsPanel(panel, projectId, findings) {
+        panel.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+                <h3 style="margin:0">Findings &amp; Review Records</h3>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" id="ss-findings-refresh">↻ Refresh</button>
+                    <button class="btn btn-primary btn-sm" id="ss-findings-new">+ New Finding</button>
+                </div>
+            </div>
+            ${findings.length === 0
+                ? `<div class="card" style="text-align:center;padding:40px">
+                    <div style="font-size:2rem;margin-bottom:10px">📋</div>
+                    <h4>No Findings Yet</h4>
+                    <p style="color:var(--text-muted);font-size:0.9rem">
+                        Ask a question and click <em>+ Create Finding</em> to create a review record,
+                        or click <em>+ New Finding</em> to create one manually.
+                    </p>
+                   </div>`
+                : `<div class="card">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border-color)">
+                                <th style="padding:10px 12px;text-align:left;font-weight:600">Finding</th>
+                                <th style="padding:10px 12px;text-align:left;font-weight:600">Type</th>
+                                <th style="padding:10px 12px;text-align:left;font-weight:600">Status</th>
+                                <th style="padding:10px 12px;text-align:left;font-weight:600">Date</th>
+                                <th style="padding:10px 12px;text-align:right;font-weight:600">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ss-findings-tbody">
+                            ${findings.map(f => renderFindingRow(f)).join('')}
+                        </tbody>
+                    </table>
+                   </div>`
+            }`;
+
+        panel.querySelector('#ss-findings-refresh').addEventListener('click', () => loadFindings(projectId));
+        panel.querySelector('#ss-findings-new').addEventListener('click', () => {
+            showCreateFindingModal(projectId);
+            // After modal save, if still on findings tab, it auto-refreshes
+        });
+
+        // Bind review buttons
+        panel.querySelectorAll('.ss-finding-review').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const findingId = btn.dataset.id;
+                const f = findings.find(x => x.id === findingId);
+                if (f) showReviewFindingModal(f, projectId);
+            });
+        });
+
+        // Bind delete buttons
+        panel.querySelectorAll('.ss-finding-delete').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const findingId = btn.dataset.id;
+                const f = findings.find(x => x.id === findingId);
+                if (!f) return;
+                if (!confirm(`Delete finding "${f.title}"? This cannot be undone.`)) return;
+                btn.disabled = true;
+                try {
+                    await api('DELETE', `/findings/${encodeURIComponent(findingId)}`);
+                    loadFindings(projectId);
+                } catch (e) {
+                    alert('Delete failed: ' + e.message);
+                    btn.disabled = false;
+                }
+            });
+        });
+    }
+
+    function renderFindingRow(f) {
+        return `
+        <tr style="border-bottom:1px solid var(--border-color)">
+            <td style="padding:10px 12px">
+                <div style="font-weight:600;margin-bottom:3px">${esc(f.title)}</div>
+                ${f.source_clause ? `<div style="font-size:0.78rem;color:var(--text-muted)">§ ${esc(f.source_clause)}</div>` : ''}
+            </td>
+            <td style="padding:10px 12px">${findingTypeBadge(f.finding_type)}</td>
+            <td style="padding:10px 12px">${findingStatusBadge(f.reviewer_status)}</td>
+            <td style="padding:10px 12px;font-size:0.8rem;color:var(--text-muted)">${fmt(f.created_at)}</td>
+            <td style="padding:10px 12px;text-align:right;white-space:nowrap">
+                <button class="btn btn-secondary btn-sm ss-finding-review" data-id="${esc(f.id)}" style="margin-right:4px">Review</button>
+                <button class="btn btn-sm ss-finding-delete" data-id="${esc(f.id)}" style="color:#ef4444;border-color:#ef4444;background:transparent">✕</button>
+            </td>
+        </tr>`;
+    }
+
+    function showReviewFindingModal(finding, projectId) {
+        const typeOpts = FINDING_TYPES.map(([v, l]) =>
+            `<option value="${esc(v)}" ${v === finding.finding_type ? 'selected' : ''}>${esc(l)}</option>`
+        ).join('');
+
+        const statusOpts = [
+            ['pending',  'Pending Review'],
+            ['accepted', 'Accepted'],
+            ['rejected', 'Rejected'],
+            ['override', 'Overridden'],
+        ].map(([v, l]) =>
+            `<option value="${esc(v)}" ${v === finding.reviewer_status ? 'selected' : ''}>${esc(l)}</option>`
+        ).join('');
+
+        const bodyHtml = `
+            <div class="form-group">
+                <label style="font-size:0.8rem;color:var(--text-muted)">Finding</label>
+                <div style="font-weight:600;margin-top:4px">${esc(finding.title)}</div>
+                ${finding.source_clause ? `<div style="font-size:0.82rem;color:var(--text-muted)">§ ${esc(finding.source_clause)}</div>` : ''}
+            </div>
+            ${finding.ai_assessment ? `
+            <div class="form-group">
+                <label style="font-size:0.8rem;color:var(--text-muted)">AI Assessment</label>
+                <div style="font-size:0.82rem;line-height:1.5;color:var(--text-secondary);background:var(--bg-surface,#1c2746);border-radius:6px;padding:10px;margin-top:4px;max-height:120px;overflow-y:auto">${esc(finding.ai_assessment.slice(0, 600))}${finding.ai_assessment.length > 600 ? '…' : ''}</div>
+            </div>` : ''}
+            <div class="form-group">
+                <label>Finding Type</label>
+                <select class="form-control" id="ss-r-type">${typeOpts}</select>
+            </div>
+            <div class="form-group">
+                <label>Reviewer Status</label>
+                <select class="form-control" id="ss-r-status">${statusOpts}</select>
+            </div>
+            <div class="form-group">
+                <label>Reviewer Comments</label>
+                <textarea class="form-control" id="ss-r-comments" rows="3" placeholder="Add your review notes…">${esc(finding.reviewer_comments || '')}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Final Disposition</label>
+                <input class="form-control" id="ss-r-disposition" value="${esc(finding.final_disposition || '')}" placeholder="e.g. No action required, RFI submitted">
+            </div>
+            <div id="ss-r-err" style="color:#ef4444;font-size:0.85rem;display:none"></div>`;
+
+        const uiModal = UI.modal('Review Finding', bodyHtml, {
+            width: '540px',
+            submitLabel: 'Save Review',
+        });
+
+        uiModal.submitBtn.addEventListener('click', async () => {
+            const errEl = uiModal.q('#ss-r-err');
+            errEl.style.display = 'none';
+            const restore = UI.btnLoading(uiModal.submitBtn, 'Saving…');
+            try {
+                await api('PATCH', `/findings/${encodeURIComponent(finding.id)}`, {
+                    finding_type:     uiModal.q('#ss-r-type').value,
+                    reviewer_status:  uiModal.q('#ss-r-status').value,
+                    reviewer_comments: uiModal.q('#ss-r-comments').value.trim() || null,
+                    final_disposition: uiModal.q('#ss-r-disposition').value.trim() || null,
+                });
+                uiModal.close();
+                loadFindings(projectId);
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = '';
+                restore();
+            }
+        });
+    }
+
     // ── Public API ────────────────────────────────────────────────────────────
     return {
         render(container) {
             _container = container;
             _currentProject = null;
+            _currentTab = 'docs';
             renderProjects();
         }
     };
