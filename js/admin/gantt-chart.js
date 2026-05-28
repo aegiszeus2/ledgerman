@@ -364,7 +364,7 @@ td.r{text-align:right} td.c{text-align:center}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
 <div class="doc-header">
-  <div><div class="co-name">${esc(companyName)}</div><div class="co-tag">Powered by Ledgerman</div></div>
+  <div><div class="co-name">${esc(companyName)}</div><div class="co-tag">Powered by LedgerMan</div></div>
   <div class="doc-label"><h2>Project Timeline</h2><p>${esc(selectedProject.name)}</p><p>Generated ${today}</p></div>
 </div>
 <div class="gold-banner">${esc(selectedProject.name)}${selectedProject.clientName ? ' &nbsp;—&nbsp; ' + esc(selectedProject.clientName) : ''}</div>
