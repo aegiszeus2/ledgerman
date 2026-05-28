@@ -596,6 +596,7 @@ window.AdminSpecSearch = (function () {
                                 </label>
                             </div>
                             <div id="ss-upload-progress" style="display:none;padding:10px 16px;background:#f0f9ff;font-size:0.85rem;color:#0369a1"></div>
+                            <div id="ss-drop-zone" style="margin:10px 12px 4px;"></div>
                             <div id="ss-docs-list" style="min-height:80px">${spinner('Loading…')}</div>
                         </div>
                     </div>
@@ -656,6 +657,21 @@ window.AdminSpecSearch = (function () {
             if (file) showUploadModal(project.id, file);
             e.target.value = '';
         });
+
+        // ── Drag-and-drop upload zone ────────────────────────────────────────
+        if (window.UploadHelper) {
+            UploadHelper.initDragDrop({
+                zone:          _container.querySelector('#ss-drop-zone'),
+                input:         _container.querySelector('#ss-file-input'),
+                accept:        '.pdf',
+                multiple:      false,
+                maxFileSizeMB: 100,
+                listenToInput: false,
+                onFiles:       files => showUploadModal(project.id, files[0]),
+                label:         'Drag a PDF specification here',
+                hint:          'Or click + Upload PDF above • PDF files only',
+            });
+        }
 
         _container.querySelector('#ss-ask-btn').addEventListener('click', () => {
             const q = _container.querySelector('#ss-question-input').value.trim();

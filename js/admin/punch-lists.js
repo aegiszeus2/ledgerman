@@ -309,6 +309,7 @@ window.AdminPunchLists = {
         const status = item ? item.status : 'Open';
         const projectId = item ? item.projectId : (projects.length > 0 ? projects[0].id : '');
         const photoId = item ? (item.photoId || null) : null;
+        let punchDroppedFile = null;  // stores file from drag-drop (input.files[0] used for click path)
 
         // Load existing photo if editing
         let existingPhotoUrl = null;
@@ -373,6 +374,7 @@ window.AdminPunchLists = {
                     <div style="margin-bottom:16px">
                         <label style="display:block;font-weight:500;margin-bottom:6px">📷 Photo</label>
                         <div id="punchPhotoPreview" style="margin-bottom:8px">${photoId ? '<em style="color:#94a9c4;font-size:0.85em">Loading existing photo…</em>' : ''}</div>
+                        <div id="punchPhotoDropZone" style="margin-bottom:6px;"></div>
                         <input type="file" id="punchPhotoInput" accept="image/*" capture="environment"
                                style="width:100%;padding:6px;border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;background:var(--bg-input)" />
                         <div style="font-size:0.8em;color:#94a9c4;margin-top:4px">Take a photo or select from gallery. Max 10 MB.</div>
@@ -388,14 +390,38 @@ window.AdminPunchLists = {
 
         document.getElementById('cancelBtn').onclick = () => self._renderList();
 
-        // Live preview when file is picked
-        document.getElementById('punchPhotoInput').addEventListener('change', function() {
-            const file = this.files[0];
-            if (!file) return;
+        // Helper: show photo preview in the punch form
+        function showPunchPreview(file) {
             const preview = document.getElementById('punchPhotoPreview');
             const url = URL.createObjectURL(file);
             preview.innerHTML = `<img src="${url}" style="max-width:100%;max-height:180px;border-radius:6px;border:1px solid #ddd" alt="Preview">`;
+        }
+
+        // Live preview when file is picked via click/camera
+        document.getElementById('punchPhotoInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            punchDroppedFile = null;  // clear any previously dropped file
+            showPunchPreview(file);
         });
+
+        // Drag-and-drop zone (desktop enhancement — camera input remains primary on mobile)
+        if (window.UploadHelper) {
+            UploadHelper.initDragDrop({
+                zone:          document.getElementById('punchPhotoDropZone'),
+                input:         document.getElementById('punchPhotoInput'),
+                accept:        'image/*',
+                multiple:      false,
+                maxFileSizeMB: 10,
+                listenToInput: false,
+                onFiles: function(files) {
+                    punchDroppedFile = files[0];
+                    showPunchPreview(punchDroppedFile);
+                },
+                label: 'Drag photo here',
+                hint:  'Or use camera input below • images only, max 10 MB',
+            });
+        }
 
         document.getElementById('punchForm').onsubmit = async (e) => {
             e.preventDefault();
@@ -404,10 +430,10 @@ window.AdminPunchLists = {
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
 
             try {
-                // Handle photo upload
+                // Handle photo upload (punchDroppedFile covers drag-drop; fileInput.files[0] covers click/camera)
                 let savedPhotoId = photoId; // keep existing if no new file
                 const fileInput = document.getElementById('punchPhotoInput');
-                const file = fileInput && fileInput.files[0];
+                const file = punchDroppedFile || (fileInput && fileInput.files[0]);
                 if (file) {
                     if (file.size > 10 * 1024 * 1024) {
                         throw new Error('Photo exceeds 10 MB limit');

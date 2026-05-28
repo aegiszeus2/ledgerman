@@ -454,6 +454,7 @@ window.WorkerTimeEntry = {
                         '<button type="button" class="btn btn-secondary" id="addExpenseBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
                     '</div>' +
                     '<div id="teExpenseFileStatus" style="display:none;font-size:.82rem;font-weight:600;color:var(--success);padding:5px 6px;margin-top:4px;background:rgba(46,204,113,.08);border-radius:5px;border:1px solid rgba(46,204,113,.25)"></div>' +
+                    '<div id="teExpenseDropZone" style="margin-top:6px;"></div>' +
                     '<input type="file" id="teExpenseInput" accept="image/*,.pdf,.doc,.docx,.heic,.heif" multiple style="display:none">' +
                 '</div>';
 
@@ -496,6 +497,7 @@ window.WorkerTimeEntry = {
                         '<button type="button" class="camera-btn" id="teAddPhotosBtn" aria-label="Add photos">&#128247; Add Photos</button>' +
                     '</div>' +
                     '<input type="file" id="tePhotoInput" accept="image/*" multiple style="display:none">' +
+                    '<div id="tePhotoDropZone" style="margin-top:6px;"></div>' +
                     '<div class="photo-preview-grid" id="photoPreviewArea"></div>' +
                 '</div>';
 
@@ -728,6 +730,26 @@ window.WorkerTimeEntry = {
                 this.value = ''; // Reset so same file can be re-selected
             });
 
+            // Expense drag-and-drop zone (desktop enhancement — 📎 Attach button remains primary on mobile)
+            if (window.UploadHelper) {
+                UploadHelper.initDragDrop({
+                    zone:          form.querySelector('#teExpenseDropZone'),
+                    input:         form.querySelector('#teExpenseInput'),
+                    accept:        'image/*,.pdf,.doc,.docx,.heic,.heif',
+                    multiple:      true,
+                    maxFileSizeMB: 20,
+                    listenToInput: false,
+                    onFiles: function(files) {
+                        pendingExpenseFiles = files;
+                        updateExpenseFileStatus();
+                        var n = files.length;
+                        Utils.showToast('📎 ' + n + (n === 1 ? ' file' : ' files') + ' dropped — click Add to attach', 'success');
+                    },
+                    label: 'Drag receipts or documents here',
+                    hint:  'Or tap \u{1F4CE} Attach above • images, PDF, DOC',
+                });
+            }
+
             form.querySelector('#addExpenseBtn').addEventListener('click', function() {
                 var desc = form.querySelector('#teExpenseDesc').value.trim();
                 var amt  = parseFloat(form.querySelector('#teExpenseAmount').value);
@@ -847,6 +869,21 @@ window.WorkerTimeEntry = {
             // Photos — single input triggers iOS native sheet (Take Photo / Photo Library / Files)
             form.querySelector('#teAddPhotosBtn').addEventListener('click', function() { form.querySelector('#tePhotoInput').click(); });
             form.querySelector('#tePhotoInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
+
+            // Photo drag-and-drop zone (desktop enhancement — Add Photos button remains primary on mobile)
+            if (window.UploadHelper) {
+                UploadHelper.initDragDrop({
+                    zone:          form.querySelector('#tePhotoDropZone'),
+                    input:         form.querySelector('#tePhotoInput'),
+                    accept:        'image/*',
+                    multiple:      true,
+                    maxFileSizeMB: 10,
+                    listenToInput: false,
+                    onFiles:       function(files) { handlePhotos(files); },
+                    label:         'Drag photos here',
+                    hint:          'Or tap \u{1F4F7} Add Photos above • images only, max 10 MB each',
+                });
+            }
 
             function handlePhotos(files) {
                 var MAX_PHOTOS = 10;

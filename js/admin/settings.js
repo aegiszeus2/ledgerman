@@ -65,14 +65,14 @@ window.AdminSettings = {
                   <div class="card-body">
                     <h3 class="section-title">Company Logo</h3>
                     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-                        <div id="logoPreview" style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;overflow:hidden">
+                        <div id="logoPreview" style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" title="Drag a logo here or click Upload Logo">
                             <span style="color:var(--text2);font-size:.8rem">No logo</span>
                         </div>
                         <div>
                             <input type="file" id="logoInput" accept="image/*" style="display:none">
                             <button type="button" class="btn-secondary btn-sm" id="logoUploadBtn">Upload Logo</button>
                             <button type="button" class="btn-ghost btn-sm" id="logoRemoveBtn" style="display:none">Remove</button>
-                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">PNG or JPG, max 2MB</p>
+                            <p style="font-size:.75rem;color:var(--text2);margin-top:4px">PNG or JPG, max 2MB — or drag a logo onto the preview</p>
                         </div>
                     </div>
                   </div>
@@ -205,6 +205,7 @@ window.AdminSettings = {
                     <button type="button" class="btn btn-secondary" id="importBtn">Import JSON Backup</button>
                     <input type="file" id="importInput" accept=".json" style="display:none">
                 </div>
+                <div id="jsonImportDropZone" style="margin-bottom:12px;"></div>
                 <div style="background:rgba(233,69,96,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:12px;font-size:.85rem">
                     <strong style="color:var(--accent)">Warning:</strong> Importing a backup will replace ALL current data. Make sure to export a backup first if you want to preserve your existing data.
                 </div>
@@ -299,12 +300,8 @@ window.AdminSettings = {
             }
         }
 
-        // Logo upload
-        container.querySelector('#logoUploadBtn').addEventListener('click', function() {
-            container.querySelector('#logoInput').click();
-        });
-        container.querySelector('#logoInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
+        // Logo upload — shared helper to update preview + save
+        function applyLogo(file) {
             if (!file) return;
             if (file.size > 2 * 1024 * 1024) {
                 Utils.showToast('Logo file must be under 2MB', 'error');
@@ -318,7 +315,28 @@ window.AdminSettings = {
                 container.querySelector('#logoRemoveBtn').style.display = '';
                 Utils.showToast('Logo uploaded');
             });
+        }
+
+        container.querySelector('#logoUploadBtn').addEventListener('click', function() {
+            container.querySelector('#logoInput').click();
         });
+        container.querySelector('#logoInput').addEventListener('change', function(e) {
+            applyLogo(e.target.files[0]);
+        });
+
+        // Logo drag-drop: wire the preview box itself as a drop zone (already styled with dashed border)
+        if (window.UploadHelper) {
+            UploadHelper.initDragDrop({
+                zone:          container.querySelector('#logoPreview'),
+                input:         container.querySelector('#logoInput'),
+                accept:        'image/*',
+                multiple:      false,
+                maxFileSizeMB: 2,
+                addZoneClass:  false,   // keep existing dashed-border styling
+                listenToInput: false,
+                onFiles:       function(files) { applyLogo(files[0]); },
+            });
+        }
         container.querySelector('#logoRemoveBtn').addEventListener('click', function() {
             AppData.deletePhoto('company_logo').then(function() {
                 container.querySelector('#logoPreview').innerHTML = '<span style="color:var(--text2);font-size:.8rem">No logo</span>';
@@ -412,6 +430,35 @@ window.AdminSettings = {
             }
             e.target.value = '';
         });
+
+        // JSON import drag-drop zone (shared helper for dragging a .json backup file onto the zone)
+        if (window.UploadHelper) {
+            async function processImportFile(file) {
+                const confirmed = await Utils.confirm('Importing a backup will REPLACE ALL current data. Are you sure you want to continue?');
+                if (!confirmed) return;
+                try {
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    await AppData.importAllData(data);
+                    const username = (window.App && window.App.currentUser && window.App.currentUser.name) || 'Admin';
+                    AppData.addAuditLog(username, 'Data Imported', 'Backup restored from file');
+                    Utils.showToast('Data imported successfully. Reloading...');
+                    setTimeout(function() { location.reload(); }, 1500);
+                } catch (err) {
+                    Utils.showToast('Import failed: ' + err.message, 'error');
+                }
+            }
+            UploadHelper.initDragDrop({
+                zone:          container.querySelector('#jsonImportDropZone'),
+                input:         container.querySelector('#importInput'),
+                accept:        '.json',
+                multiple:      false,
+                listenToInput: false,
+                onFiles:       function(files) { processImportFile(files[0]); },
+                label:         'Drag a JSON backup file here to import',
+                hint:          'Or click Import JSON Backup above • .json only',
+            });
+        }
 
         // Wizard mode
         container.querySelector('#settingsWizardBtn').addEventListener('click', function() {

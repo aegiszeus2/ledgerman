@@ -1216,7 +1216,8 @@ window.AdminBudgetTracking = {
                     <strong>Expected columns:</strong> cost_code, division, description*, category, quantity*, unit, unit_cost*, total, notes<br>
                     <span style="color:#999">* required · total auto-calculated if blank · category: Labour/Material/Equipment/Subcontract/Other</span>
                 </div>
-                <input type="file" id="csv_file" accept=".csv,.txt" style="width:100%;padding:10px;border:2px dashed #ddd;border-radius:6px;font-size:.9em;box-sizing:border-box;cursor:pointer">
+                <div id="csv_drop_zone" style="margin-bottom:8px;"></div>
+                <input type="file" id="csv_file" accept=".csv,.txt" style="display:none">
                 <div id="csv_status" style="margin-top:10px;font-size:.85em;color:var(--text-muted)"></div>
                 <div id="csv_preview" style="display:none;margin-top:16px"></div>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
@@ -1230,8 +1231,8 @@ window.AdminBudgetTracking = {
         overlay.querySelector('#downloadTplBtn').onclick = e => { e.preventDefault(); self._downloadCsvTemplate(); };
         overlay.querySelector('#csv_cancel').onclick = () => document.body.removeChild(overlay);
 
-        overlay.querySelector('#csv_file').onchange = function() {
-            const file = this.files[0];
+        // Shared handler for both click-select and drag-drop CSV files
+        function processCsvFile(file) {
             if (!file) return;
             const reader = new FileReader();
             reader.onload = e => {
@@ -1248,7 +1249,25 @@ window.AdminBudgetTracking = {
                 }
             };
             reader.readAsText(file);
+        }
+
+        overlay.querySelector('#csv_file').onchange = function() {
+            processCsvFile(this.files[0]);
         };
+
+        // Drag-and-drop zone
+        if (window.UploadHelper) {
+            UploadHelper.initDragDrop({
+                zone:          overlay.querySelector('#csv_drop_zone'),
+                input:         overlay.querySelector('#csv_file'),
+                accept:        '.csv,.txt',
+                multiple:      false,
+                listenToInput: false,
+                onFiles:       function(files) { processCsvFile(files[0]); },
+                label:         'Drag a CSV file here to import',
+                hint:          'Or click to browse • .csv or .txt only',
+            });
+        }
 
         overlay.addEventListener('click', e => { if (e.target === overlay) document.body.removeChild(overlay); });
     },
