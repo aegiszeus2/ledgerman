@@ -9,7 +9,7 @@ window.AdminHelp = {
             title: 'Getting Started',
             icon: '&#9889;',
             content:
-                '<h4>Welcome to Ledgerman</h4>' +
+                '<h4>Welcome to LedgerMan</h4>' +
                 '<p>This application helps you manage construction projects, track worker time, handle expenses, generate compliant invoices, and maintain financial records &mdash; all from one place.</p>' +
 
                 '<h4 style="margin-top:16px">First-Time Setup</h4>' +

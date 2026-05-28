@@ -4,9 +4,9 @@ window.LedgermanOnboarding = {
     _noviceSteps: [
         {
             icon: '👋',
-            title: 'Welcome to Ledgerman',
+            title: 'Welcome to LedgerMan',
             subtitle: 'Your construction management platform',
-            body: 'Ledgerman helps you run your construction business from your phone or computer. Track projects, manage workers, approve time, and invoice clients — all in one place. This guide will walk you through the essentials in under 5 minutes.',
+            body: 'LedgerMan helps you run your construction business from your phone or computer. Track projects, manage workers, approve time, and invoice clients — all in one place. This guide will walk you through the essentials in under 5 minutes.',
             action: null
         },
         {
@@ -34,7 +34,7 @@ window.LedgermanOnboarding = {
             icon: '📱',
             title: 'Workers Log Their Time',
             subtitle: 'Simple mobile time entry',
-            body: 'Workers open Ledgerman on their phone, select a project, and log their time — either by clocking in/out in real time or entering hours manually. They can attach photos and expense receipts right from the field. All entries land in your approval queue.',
+            body: 'Workers open LedgerMan on their phone, select a project, and log their time — either by clocking in/out in real time or entering hours manually. They can attach photos and expense receipts right from the field. All entries land in your approval queue.',
             action: null
         },
         {
@@ -55,7 +55,7 @@ window.LedgermanOnboarding = {
             icon: '📄',
             title: 'Invoice Your Clients',
             subtitle: 'Get paid faster',
-            body: 'When work is complete, go to <strong>Invoices</strong> and click <em>+ New Invoice</em>. Ledgerman pulls in all your approved billable expenses so you can build an invoice in seconds. Send it as a PDF, track payment status, and log when you\'re paid.',
+            body: 'When work is complete, go to <strong>Invoices</strong> and click <em>+ New Invoice</em>. LedgerMan pulls in all your approved billable expenses so you can build an invoice in seconds. Send it as a PDF, track payment status, and log when you\'re paid.',
             action: { label: 'Go to Invoices', route: 'invoices' }
         },
         {
@@ -69,7 +69,7 @@ window.LedgermanOnboarding = {
             icon: '🎉',
             title: "You're Ready",
             subtitle: 'Start managing your first project',
-            body: 'That\'s the core of Ledgerman. Create a project, invite your workers, let them log time, approve it, and invoice your client. Everything is saved securely and syncs across devices. Tap <strong>Advanced Guide</strong> below to explore the full platform — or jump straight in. — or jump straight in.',
+            body: 'That\'s the core of LedgerMan. Create a project, invite your workers, let them log time, approve it, and invoice your client. Everything is saved securely and syncs across devices. Tap <strong>Advanced Guide</strong> below to explore the full platform — or jump straight in. — or jump straight in.',
             action: { label: 'Create First Project', route: 'projects' },
             switchToAdvanced: true
         }
@@ -79,7 +79,7 @@ window.LedgermanOnboarding = {
         {
             icon: '🚀',
             title: 'Advanced Project Management',
-            subtitle: 'The full Ledgerman platform',
+            subtitle: 'The full LedgerMan platform',
             body: 'This guide covers the complete feature set — everything you need to run a multi-crew, multi-project construction operation. Built for PMs who need real accountability, real data, and real control.',
             action: null
         },
@@ -150,7 +150,7 @@ window.LedgermanOnboarding = {
             icon: '📊',
             title: 'Budget Tracking',
             subtitle: 'Estimated vs. actual — always visible',
-            body: 'Set budgets by cost category at the project level. As labour and expenses are logged, Ledgerman tracks spend against budget in real time. Get early warning before you\'re over budget — not after. Export budget vs. actual reports for owner billing and project reviews.',
+            body: 'Set budgets by cost category at the project level. As labour and expenses are logged, LedgerMan tracks spend against budget in real time. Get early warning before you\'re over budget — not after. Export budget vs. actual reports for owner billing and project reviews.',
             action: { label: 'Budget Tracking', route: 'budget-tracking' }
         },
         {
@@ -184,15 +184,15 @@ window.LedgermanOnboarding = {
         {
             icon: '⚙️',
             title: 'Settings & Customization',
-            subtitle: 'Configure Ledgerman for your operation',
-            body: 'Set your company name, logo, HST number, invoice prefix, and default payment terms. Enable or disable modules based on your subscription tier. Configure session timeouts, backup schedules, and notification preferences. Make Ledgerman fit your workflow — not the other way around.',
+            subtitle: 'Configure LedgerMan for your operation',
+            body: 'Set your company name, logo, HST number, invoice prefix, and default payment terms. Enable or disable modules based on your subscription tier. Configure session timeouts, backup schedules, and notification preferences. Make LedgerMan fit your workflow — not the other way around.',
             action: { label: 'Go to Settings', route: 'settings' }
         },
         {
             icon: '🏆',
             title: 'You Have the Full Picture',
             subtitle: 'Built for serious construction management',
-            body: 'Ledgerman gives you the full stack: estimates, projects, crews, time, expenses, invoices, schedules, and reports. Every dollar tracked, every hour logged, every client invoiced — all in one platform designed for the field. Time to put it to work.',
+            body: 'LedgerMan gives you the full stack: estimates, projects, crews, time, expenses, invoices, schedules, and reports. Every dollar tracked, every hour logged, every client invoiced — all in one platform designed for the field. Time to put it to work.',
             action: { label: 'Go to Dashboard', route: 'dashboard' },
             switchToNovice: true
         }
@@ -207,7 +207,7 @@ window.LedgermanOnboarding = {
             <div style="background:var(--bg-secondary);border-radius:16px;max-width:520px;width:92%;box-shadow:0 24px 80px rgba(0,0,0,.22);overflow:hidden;color:var(--text-primary)">
                 <div style="background:linear-gradient(135deg,#1a1a2e 0%,#2d2d5e 100%);padding:32px;text-align:center">
                     <div style="font-size:2.8rem;margin-bottom:12px">🏗️</div>
-                    <h2 style="color:#fff;margin:0 0 8px;font-size:1.4rem">Welcome to Ledgerman</h2>
+                    <h2 style="color:#fff;margin:0 0 8px;font-size:1.4rem">Welcome to LedgerMan</h2>
                     <p style="color:rgba(255,255,255,.7);margin:0;font-size:.95rem">Choose your guide level to get started</p>
                 </div>
                 <div style="padding:28px">
@@ -215,7 +215,7 @@ window.LedgermanOnboarding = {
                         <button id="onboardNoviceBtn" style="border:2px solid var(--border-color);border-radius:12px;padding:20px 14px;background:var(--bg-surface);color:var(--text-primary);cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">🌱</div>
                             <div style="font-weight:700;color:var(--text-primary);font-size:.95rem;margin-bottom:4px">Basic PM</div>
-                            <div style="font-size:.8rem;color:var(--text-muted);line-height:1.4">New to Ledgerman? Learn the essentials — projects, workers, time, and invoicing in 10 steps.</div>
+                            <div style="font-size:.8rem;color:var(--text-muted);line-height:1.4">New to LedgerMan? Learn the essentials — projects, workers, time, and invoicing in 10 steps.</div>
                         </button>
                         <button id="onboardAdvancedBtn" style="border:2px solid var(--border-color);border-radius:12px;padding:20px 14px;background:var(--bg-surface);color:var(--text-primary);cursor:pointer;text-align:center;transition:all .2s">
                             <div style="font-size:2rem;margin-bottom:8px">⚡</div>

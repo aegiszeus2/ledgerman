@@ -12,7 +12,7 @@ window.TOTP = {
 
     // Build otpauth:// URL for Google Authenticator / Authy QR scanning
     getOtpAuthUrl(secret, accountName, issuer) {
-        issuer = issuer || AppData.getCompanyName() || 'Ledgerman';
+        issuer = issuer || AppData.getCompanyName() || 'LedgerMan';
         const label = encodeURIComponent(issuer + ':' + accountName);
         return 'otpauth://totp/' + label +
             '?secret=' + secret +

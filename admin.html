@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ledgerman Super Admin</title>
+    <title>LedgerMan Super Admin</title>
     <style>
         :root {
             --bg: #0a0a14;
@@ -35,7 +35,7 @@
 <body>
     <div id="passwordScreen">
         <div class="password-box">
-            <h1>Ledgerman Super Admin</h1>
+            <h1>LedgerMan Super Admin</h1>
             <p>Enter your admin key to continue</p>
             <div id="errorMsg"></div>
             <div class="form-group">
@@ -55,10 +55,10 @@
 <div id="loginScreen">
     <div class="login-box">
         <div class="login-logo">
-            <img src="../ledgerman/LedgemanLogo.jpg" alt="Ledgerman" style="max-width:220px;width:100%;height:auto;border-radius:6px;margin-bottom:4px" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🛡️',style:'font-size:3rem'}))">
+            <img src="../ledgerman/LedgerManLogo.svg" alt="LedgerMan" style="max-width:220px;width:100%;height:auto;border-radius:6px;margin-bottom:4px" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🛡️',style:'font-size:3rem'}))">
         </div>
         <h1>LittleShield</h1>
-        <p class="subtitle">Ledgerman Super Admin Console</p>
+        <p class="subtitle">LedgerMan Super Admin Console</p>
         <div id="loginForm">
             <div class="form-group" style="text-align:left">
                 <label>API Key</label>
@@ -81,7 +81,7 @@
     <div class="top-bar">
         <div class="top-bar-brand">
             <span class="shield">🛡️</span>
-            <span>LittleShield <span style="color:var(--text2);font-weight:400;font-size:.875rem">— Ledgerman Console</span></span>
+            <span>LittleShield <span style="color:var(--text2);font-weight:400;font-size:.875rem">— LedgerMan Console</span></span>
         </div>
         <div class="top-bar-right">
             <div class="status-dot" id="serverDot" title="Server status"></div>
@@ -909,8 +909,8 @@ function generateOnboardLink() {
     const el = document.getElementById('onboardResult');
     if (!appUrl) { toast('Enter the app URL first.', 'error'); return; }
     const msg = name
-        ? `Hi ${name},\n\nYour Ledgerman account is ready to set up!\n\nClick the link below to get started:\n${appUrl}\n\n1. Click "Get Started"\n2. Enter your company name: ${name}\n3. Choose an admin password\n4. You're in!\n\nQuestions? Reply to this email.\n\n— Ledgerman Support\naegiszeus2@gmail.com`
-        : `Welcome to Ledgerman!\n\nSet up your account at: ${appUrl}\n\n— Ledgerman Support`;
+        ? `Hi ${name},\n\nYour LedgerMan account is ready to set up!\n\nClick the link below to get started:\n${appUrl}\n\n1. Click "Get Started"\n2. Enter your company name: ${name}\n3. Choose an admin password\n4. You're in!\n\nQuestions? Reply to this email.\n\n— LedgerMan Support\naegiszeus2@gmail.com`
+        : `Welcome to LedgerMan!\n\nSet up your account at: ${appUrl}\n\n— LedgerMan Support`;
     el.innerHTML = `
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:8px">
             <div class="flex-between mb-1">
@@ -989,7 +989,7 @@ async function generateInvite() {
             '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
             '<button class="btn btn-primary" onclick="copyInviteHtml()">📋 Copy HTML</button>' +
             '<button class="btn btn-secondary" onclick="copyInvitePlain()">📝 Copy Plain Text</button>' +
-            '<a class="btn btn-secondary" href="mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent('Streamline Your Workforce Management — Ledgerman') + '&body=' + encodeURIComponent(pitchPlain) + '" target="_blank">📧 Open in Email</a>' +
+            '<a class="btn btn-secondary" href="mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent('Streamline Your Workforce Management — LedgerMan') + '&body=' + encodeURIComponent(pitchPlain) + '" target="_blank">📧 Open in Email</a>' +
             '</div>';
 
         window._inviteHtml = pitchHtml;
@@ -1052,8 +1052,8 @@ function buildPitchEmail(greeting, displayName, domain, logoUrl, primary, second
         '</div>' +
         '<div style="padding:28px 24px;color:#333;font-size:15px;line-height:1.6">' +
         '<p>' + greeting + '</p>' +
-        '<p>I came across <strong>' + esc(displayName || domain) + '</strong> and wanted to reach out — I think <strong>Ledgerman</strong> could save your team serious time and money.</p>' +
-        '<p><strong>What Ledgerman does:</strong></p>' +
+        '<p>I came across <strong>' + esc(displayName || domain) + '</strong> and wanted to reach out — I think <strong>LedgerMan</strong> could save your team serious time and money.</p>' +
+        '<p><strong>What LedgerMan does:</strong></p>' +
         '<ul style="padding-left:20px;margin:12px 0">' +
         '<li><strong>Digital timesheets</strong> — workers clock in/out from their phone. No paper, no buddy punching.</li>' +
         '<li><strong>Photo documentation</strong> — timestamped, GPS-tagged job site photos. Proof of work, instantly.</li>' +
@@ -1061,13 +1061,13 @@ function buildPitchEmail(greeting, displayName, domain, logoUrl, primary, second
         '<li><strong>One-click invoicing</strong> — generate professional invoices from approved timesheets.</li>' +
         '<li><strong>Zero IT setup</strong> — works on any phone, any browser. 5-minute onboarding.</li>' +
         '</ul>' +
-        '<p>Companies using Ledgerman cut admin time by <strong>10+ hours/week</strong> and eliminate timesheet disputes entirely.</p>' +
+        '<p>Companies using LedgerMan cut admin time by <strong>10+ hours/week</strong> and eliminate timesheet disputes entirely.</p>' +
         '<div style="text-align:center;margin:24px 0">' +
         '<a href="https://ledgerman.org" style="display:inline-block;background:' + primary + ';color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px">Start Free Trial →</a>' +
         '</div>' +
         '<p style="font-size:14px;color:#666">No credit card required. Set up in under 5 minutes.</p>' +
         '<p>Happy to jump on a quick call if you\'d like a walkthrough.</p>' +
-        '<p>Best,<br><strong>Lucas</strong><br><span style="color:#888;font-size:13px">Ledgerman · <a href="https://ledgerman.org" style="color:' + primary + '">ledgerman.org</a></span></p>' +
+        '<p>Best,<br><strong>Lucas</strong><br><span style="color:#888;font-size:13px">LedgerMan · <a href="https://ledgerman.org" style="color:' + primary + '">ledgerman.org</a></span></p>' +
         '</div>' +
         '<div style="background:' + primary + '10;border-top:2px solid ' + primary + ';padding:16px 24px;text-align:center;font-size:12px;color:#888">' +
         'Ledgerman — Workforce management, simplified. · <a href="https://ledgerman.org" style="color:' + primary + '">ledgerman.org</a>' +
@@ -1186,9 +1186,9 @@ function toggleEmailPreview() {
         const workerUrl = appBase + '/daily-report.html';
         const id        = _newCompanyData.companyId || _newCompanyData.id;
         el.textContent = [
-            'Subject: Welcome to Ledgerman — ' + _newCompanyData.name,
+            'Subject: Welcome to LedgerMan — ' + _newCompanyData.name,
             '─'.repeat(50),
-            'Welcome to Ledgerman!',
+            'Welcome to LedgerMan!',
             '',
             'Company:        ' + _newCompanyData.name,
             'Company ID:     ' + id,
@@ -1206,7 +1206,7 @@ function toggleEmailPreview() {
             '',
             '⚠️  Please change your password after first login.',
             '',
-            '— The Ledgerman Team',
+            '— The LedgerMan Team',
         ].join('\n');
     }
 

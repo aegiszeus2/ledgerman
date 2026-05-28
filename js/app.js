@@ -321,7 +321,7 @@ window.LMIcons = {
                 <div class="login-screen">
                     <div class="login-header">
                         <div class="login-logo" id="loginLogo"></div>
-                        <h1>Ledgerman</h1>
+                        <h1>LedgerMan</h1>
                         <p class="text-muted">Construction Management</p>
                     </div>
                     <div class="login-options">
@@ -339,7 +339,7 @@ window.LMIcons = {
                 </div>
             `;
             // Load logo — static asset
-            document.getElementById('loginLogo').innerHTML = `<img src="assets/images/logo.jpg" alt="Ledgerman Logo" style="max-height:80px;">`;
+            document.getElementById('loginLogo').innerHTML = `<img src="assets/images/logo.svg" alt="LedgerMan Logo" style="max-height:80px;">`;
 
             document.getElementById('workerLoginBtn').onclick = () => this.showWorkerLogin();
             document.getElementById('adminLoginBtn').onclick = () => this.showAdminLogin();
@@ -1354,7 +1354,7 @@ window.LMIcons = {
                 // ── Always-on last ─────────────────────────────────────────
                 '<hr class="nav-sep">',
                 item('settings', 'gear', 'Settings', 'Settings — company info, modules, password & backups'),
-                item('help',     'help', 'Help',      'Help — how to use Ledgerman'),
+                item('help',     'help', 'Help',      'Help — how to use LedgerMan'),
             ].join('\n');
         },
 
