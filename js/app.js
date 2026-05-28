@@ -1805,6 +1805,10 @@ window.LMIcons = {
                         <span class="worker-nav-icon">${LMIcons.check}</span>
                         <span class="worker-nav-label">Tasks</span>
                     </a>`}
+                    <a class="worker-nav-item" data-route="worker-safety">
+                        <span class="worker-nav-icon">${LMIcons.warn}</span>
+                        <span class="worker-nav-label">Safety</span>
+                    </a>
                     <a class="worker-nav-item" data-route="help">
                         <span class="worker-nav-icon">${LMIcons.help}</span>
                         <span class="worker-nav-label">Help</span>
@@ -1889,6 +1893,10 @@ window.LMIcons = {
                     // Supervisor/Approver only — create/edit/submit daily field reports
                     if (window.WorkerFieldReports) WorkerFieldReports.render(content, worker);
                     else content.innerHTML = '<div class="empty-state"><h2>Field Reports module not loaded</h2></div>';
+                    break;
+                case 'worker-safety':
+                    if (window.WorkerSafety) WorkerSafety.render(content, worker);
+                    else content.innerHTML = '<div class="empty-state"><h2>Safety module not loaded</h2></div>';
                     break;
                 case 'help':
                     if (window.WorkerHelp) WorkerHelp.render(content);
