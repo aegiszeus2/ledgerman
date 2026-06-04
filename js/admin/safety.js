@@ -815,6 +815,10 @@ window.AdminSafety = {
 
         const statusColors = { Draft: '#6c757d', Active: '#0d6efd', Completed: '#198754', Archived: '#6c757d' };
 
+        const allWorkers = AppData.getWorkers ? AppData.getWorkers() : [];
+        const workerMap  = {};
+        allWorkers.forEach(w => { workerMap[w.id] = w.name; });
+
         // Build ack count map per jhaRecordId
         const jhaAckMap = {};
         acks.forEach(a => { if (a.jhaRecordId) { jhaAckMap[a.jhaRecordId] = (jhaAckMap[a.jhaRecordId] || 0) + 1; } });
@@ -882,7 +886,9 @@ window.AdminSafety = {
                             const proj = projectMap[j.projectId] || (j.projectId || '—');
                             const sColor = statusColors[j.status] || '#6c757d';
                             const ackCount = jhaAckMap[j.id] || 0;
-                            const workers = Array.isArray(j.assignedWorkers) ? j.assignedWorkers.join(', ') : (j.assignedWorkers || '—');
+                            const workers = Array.isArray(j.assignedWorkers)
+                                ? j.assignedWorkers.map(id => workerMap[id] || id).join(', ')
+                                : (j.assignedWorkers || '—');
                             return `<tr style="border-bottom:1px solid var(--border)">
                                 <td style="padding:10px 14px;white-space:nowrap">${esc(j.date || '—')}</td>
                                 <td style="padding:10px 14px">${esc(proj)}</td>
@@ -938,8 +944,9 @@ window.AdminSafety = {
         const today = new Date().toISOString().slice(0, 10);
         const statuses = ['Draft', 'Active', 'Completed', 'Archived'];
 
-        // assignedWorkers may be array or comma-string
-        const assignedWorkersStr = Array.isArray(val('assignedWorkers')) ? val('assignedWorkers').join(', ') : val('assignedWorkers');
+        // assignedWorkers: stored as array of worker IDs
+        const allWorkers_    = AppData.getWorkers ? AppData.getWorkers() : [];
+        const assignedIds    = Array.isArray(val('assignedWorkers')) ? val('assignedWorkers') : [];
         // hazards and controls may be arrays
         const hazardsStr = Array.isArray(val('hazards')) ? val('hazards').join('\n') : val('hazards');
         const controlsStr = Array.isArray(val('controls')) ? val('controls').join('\n') : val('controls');
@@ -985,9 +992,19 @@ window.AdminSafety = {
                     </div>
 
                     <div style="margin-bottom:14px">
-                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Assigned Workers <span style="font-weight:400;color:var(--text2)">(comma-separated)</span></label>
-                        <input type="text" id="jhaWorkers" value="${esc(assignedWorkersStr)}" placeholder="e.g. John Smith, Maria Garcia, Tom Lee"
-                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Assigned Workers</label>
+                        <div id="jhaWorkerPicker" style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg-primary);max-height:180px;overflow-y:auto">
+                            ${allWorkers_.length === 0
+                                ? '<div style="padding:12px;color:var(--text2);font-size:.85rem">No workers found — add workers first.</div>'
+                                : allWorkers_.map(w => `
+                                <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.88rem">
+                                    <input type="checkbox" name="jhaWorkerCb" value="${esc(w.id)}" ${assignedIds.includes(w.id) ? 'checked' : ''}
+                                        style="width:15px;height:15px;cursor:pointer;flex-shrink:0" />
+                                    <span>${esc(w.name)}</span>
+                                    ${(w.role && w.role !== 'Worker') ? `<span style="font-size:.73rem;color:var(--text2);margin-left:auto">${esc(w.role)}</span>` : ''}
+                                </label>`).join('')}
+                        </div>
+                        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">Select workers who must sign off on this JHA/FLHA.</div>
                     </div>
 
                     <div style="margin-bottom:14px">
@@ -1021,11 +1038,12 @@ window.AdminSafety = {
         document.getElementById('jhaForm').onsubmit = e => {
             e.preventDefault();
             const now = new Date().toISOString();
-            const workersRaw = document.getElementById('jhaWorkers').value;
-            const hazardsRaw = document.getElementById('jhaHazards').value;
+            const hazardsRaw  = document.getElementById('jhaHazards').value;
             const controlsRaw = document.getElementById('jhaControls').value;
 
-            const assignedWorkers = workersRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const assignedWorkers = Array.from(
+                document.querySelectorAll('input[name="jhaWorkerCb"]:checked')
+            ).map(cb => cb.value);
             const hazardsArr = hazardsRaw.split('\n').map(s => s.trim()).filter(Boolean);
             const controlsArr = controlsRaw.split('\n').map(s => s.trim()).filter(Boolean);
 

@@ -1,7 +1,9 @@
 // WorkerSafety — Worker portal Health & Safety module
 // Endpoints used: /api/worker/safety/*  (worker-scoped, tenant-isolated)
+//                /api/worker/coworkers  (company roster for JHA assignee picker)
 // Workers can: report hazards, report incidents, view+ack toolbox talks,
 //              view+ack assigned JHAs, and review their own submissions.
+// Supervisors/Approvers additionally: create JHAs and assign them for sign-off.
 // Workers CANNOT: read other workers' records, approve/close/review records.
 
 window.WorkerSafety = {
@@ -408,7 +410,7 @@ window.WorkerSafety = {
 
         let talks = [];
         try {
-            talks = await self._api('GET', '/api/worker/safety/toolbox-talks');
+            talks = (await self._api('GET', '/api/worker/safety/toolbox-talks')).toolbox_talks || [];
         } catch(e) {
             content.innerHTML = `<div style="padding:12px 14px;background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);border-radius:8px;color:#dc3545">
                 ⚠️ ${esc(e.message)}
@@ -489,12 +491,15 @@ window.WorkerSafety = {
         const self = this;
         const content = document.getElementById('workerSafetyContent');
         const esc = Utils.escapeHtml;
+        const isSupervisor = self._worker &&
+            (self._worker.role === 'Supervisor' || self._worker.role === 'Approver');
 
         content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">Loading JHA/FLHA records…</div>';
 
         let jhas = [];
         try {
-            jhas = await self._api('GET', '/api/worker/safety/jha');
+            const resp = await self._api('GET', '/api/worker/safety/jha');
+            jhas = resp.jha_records || [];
         } catch(e) {
             content.innerHTML = `<div style="padding:12px 14px;background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);border-radius:8px;color:#dc3545">
                 ⚠️ ${esc(e.message)}
@@ -502,86 +507,296 @@ window.WorkerSafety = {
             return;
         }
 
-        if (jhas.length === 0) {
-            content.innerHTML = `
-                <div style="padding:40px;text-align:center;color:var(--text2)">
-                    <div style="font-size:2rem;margin-bottom:8px">📝</div>
-                    <div style="font-weight:500">No JHAs assigned</div>
-                    <div style="font-size:.85rem;margin-top:4px">JHA/FLHA records assigned to you will appear here for review and acknowledgement.</div>
-                </div>`;
-            return;
+        // Separate: JHAs created by this supervisor vs. JHAs assigned to this user
+        const createdByMe  = isSupervisor ? jhas.filter(j => j._created_by_me) : [];
+        const assignedToMe = jhas.filter(j => !j._created_by_me);
+        const pending      = assignedToMe.filter(j => !j._worker_acknowledged);
+
+        let html = '';
+
+        // Supervisor action bar
+        if (isSupervisor) {
+            html += `
+            <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+                <button id="jhaCreateBtn" class="btn-primary" style="font-size:.88rem;padding:8px 16px">+ Create JHA / FLHA</button>
+            </div>`;
         }
 
-        const pending = jhas.filter(j => !j._worker_acknowledged);
+        // Assigned to me section
+        if (assignedToMe.length === 0) {
+            html += `
+            <div style="padding:${createdByMe.length > 0 ? '16px' : '40px'};text-align:center;color:var(--text2);border:1px solid var(--border);border-radius:8px;margin-bottom:${createdByMe.length > 0 ? '20px' : '0'}">
+                <div style="font-size:${createdByMe.length > 0 ? '1.4rem' : '2rem'};margin-bottom:6px">📝</div>
+                <div style="font-weight:500">No JHAs assigned to you</div>
+                <div style="font-size:.85rem;margin-top:4px">JHA/FLHA records assigned to you will appear here for review and sign-off.</div>
+            </div>`;
+        } else {
+            html += `
+            ${pending.length > 0
+                ? `<div style="margin-bottom:8px;font-weight:600;font-size:.9rem;color:#fd7e14">⚠️ ${pending.length} JHA${pending.length > 1 ? 's' : ''} require${pending.length === 1 ? 's' : ''} sign-off</div>`
+                : `<div style="margin-bottom:12px;font-weight:500;font-size:.9rem;color:#198754">✅ All JHAs signed</div>`}
+            <div id="jhaList" style="display:grid;gap:12px;margin-bottom:${createdByMe.length > 0 ? '28px' : '0'}"></div>`;
+        }
 
-        content.innerHTML = `
-            ${pending.length > 0 ? `
-            <div style="margin-bottom:8px;font-weight:600;font-size:.9rem;color:#fd7e14">
-                ⚠️ ${pending.length} JHA${pending.length > 1 ? 's' : ''} require${pending.length === 1 ? 's' : ''} acknowledgement
-            </div>` : `
-            <div style="margin-bottom:12px;font-weight:500;font-size:.9rem;color:#198754">✅ All JHAs acknowledged</div>`}
+        // Created by me section (supervisor only)
+        if (createdByMe.length > 0) {
+            html += `
+            <div style="border-top:1px solid var(--border);padding-top:20px">
+                <h4 style="margin:0 0 12px 0;font-size:.95rem;font-weight:600;color:var(--text-primary)">JHAs You Created</h4>
+                <div id="jhaCreatedList" style="display:grid;gap:12px"></div>
+            </div>`;
+        }
 
-            <div id="jhaList" style="display:grid;gap:12px"></div>
-        `;
+        content.innerHTML = html;
 
-        const listEl = document.getElementById('jhaList');
-        jhas.forEach(jha => {
-            const acked = jha._worker_acknowledged;
-            const hazardsArr = Array.isArray(jha.hazards) ? jha.hazards : (jha.hazards ? [jha.hazards] : []);
-            const controlsArr = Array.isArray(jha.controls) ? jha.controls : (jha.controls ? [jha.controls] : []);
-
-            const card = document.createElement('div');
-            card.style.cssText = `padding:16px;background:var(--card);border:1px solid ${acked ? 'var(--border)' : '#fd7e14'};border-radius:8px`;
-            card.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
-                    <div>
-                        <div style="font-weight:600;font-size:.95rem">${esc(jha.jobTitle || jha.task || 'JHA/FLHA')}</div>
-                        <div style="font-size:.82rem;color:var(--text2);margin-top:3px">
-                            ${esc(jha.date || '—')} · Conducted by: ${esc(jha.conductedBy || '—')}
+        // Render assigned JHAs
+        if (assignedToMe.length > 0) {
+            const listEl = document.getElementById('jhaList');
+            assignedToMe.forEach(jha => {
+                const acked = jha._worker_acknowledged;
+                const hazardsArr  = Array.isArray(jha.hazards)  ? jha.hazards  : (jha.hazards  ? [jha.hazards]  : []);
+                const controlsArr = Array.isArray(jha.controls) ? jha.controls : (jha.controls ? [jha.controls] : []);
+                const card = document.createElement('div');
+                card.style.cssText = `padding:16px;background:var(--card);border:1px solid ${acked ? 'var(--border)' : '#fd7e14'};border-radius:8px`;
+                card.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+                        <div>
+                            <div style="font-weight:600;font-size:.95rem">${esc(jha.jobTitle || jha.task || 'JHA/FLHA')}</div>
+                            <div style="font-size:.82rem;color:var(--text2);margin-top:3px">
+                                ${esc(jha.date || '—')} · Conducted by: ${esc(jha.conductedBy || '—')}
+                            </div>
+                        </div>
+                        <div style="flex-shrink:0">
+                            ${acked
+                                ? `<span style="padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:600;background:#198754;color:white">✓ Signed</span>`
+                                : `<button class="btn-primary" style="font-size:.82rem;padding:6px 14px" data-ack-jha="${esc(jha.id)}">Sign Off</button>`}
                         </div>
                     </div>
-                    <div style="flex-shrink:0">
-                        ${acked
-                            ? `<span style="padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:600;background:#198754;color:white">✓ Acknowledged</span>`
-                            : `<button class="btn-primary" style="font-size:.82rem;padding:6px 14px" data-ack-jha="${esc(jha.id)}">Sign Off</button>`
-                        }
-                    </div>
-                </div>
-                ${hazardsArr.length > 0 ? `
-                <div style="padding:10px;background:rgba(220,53,69,.05);border-radius:6px;margin-bottom:8px">
-                    <div style="font-size:.8rem;font-weight:600;color:#dc3545;margin-bottom:4px">IDENTIFIED HAZARDS</div>
-                    <ul style="margin:0;padding-left:18px">
-                        ${hazardsArr.map(h => `<li style="font-size:.85rem;color:var(--text2);margin-bottom:2px">${esc(h)}</li>`).join('')}
-                    </ul>
-                </div>` : ''}
-                ${controlsArr.length > 0 ? `
-                <div style="padding:10px;background:rgba(25,135,84,.05);border-radius:6px">
-                    <div style="font-size:.8rem;font-weight:600;color:#198754;margin-bottom:4px">CONTROLS / MITIGATIONS</div>
-                    <ul style="margin:0;padding-left:18px">
-                        ${controlsArr.map(c => `<li style="font-size:.85rem;color:var(--text2);margin-bottom:2px">${esc(c)}</li>`).join('')}
-                    </ul>
-                </div>` : ''}
-                ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
-            `;
-            listEl.appendChild(card);
-        });
+                    ${hazardsArr.length > 0 ? `
+                    <div style="padding:10px;background:rgba(220,53,69,.05);border-radius:6px;margin-bottom:8px">
+                        <div style="font-size:.8rem;font-weight:600;color:#dc3545;margin-bottom:4px">IDENTIFIED HAZARDS</div>
+                        <ul style="margin:0;padding-left:18px">
+                            ${hazardsArr.map(h => `<li style="font-size:.85rem;color:var(--text2);margin-bottom:2px">${esc(h)}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                    ${controlsArr.length > 0 ? `
+                    <div style="padding:10px;background:rgba(25,135,84,.05);border-radius:6px">
+                        <div style="font-size:.8rem;font-weight:600;color:#198754;margin-bottom:4px">CONTROLS / MITIGATIONS</div>
+                        <ul style="margin:0;padding-left:18px">
+                            ${controlsArr.map(c => `<li style="font-size:.85rem;color:var(--text2);margin-bottom:2px">${esc(c)}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                    ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
+                `;
+                listEl.appendChild(card);
+            });
 
-        listEl.querySelectorAll('[data-ack-jha]').forEach(btn => {
-            btn.onclick = async () => {
-                const jhaId = btn.dataset.ackJha;
-                btn.disabled = true;
-                btn.textContent = '…';
-                try {
-                    await self._api('POST', '/api/worker/safety/jha-acknowledgement', { jhaRecordId: jhaId });
-                    Utils.showToast('JHA acknowledged', 'success');
-                    self._renderJHA();
-                } catch(err) {
-                    Utils.showToast(err.message, 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Sign Off';
-                }
+            listEl.querySelectorAll('[data-ack-jha]').forEach(btn => {
+                btn.onclick = async () => {
+                    const jhaId = btn.dataset.ackJha;
+                    btn.disabled = true;
+                    btn.textContent = '…';
+                    try {
+                        await self._api('POST', '/api/worker/safety/jha-acknowledgement', { jhaRecordId: jhaId });
+                        Utils.showToast('JHA signed', 'success');
+                        self._renderJHA();
+                    } catch(err) {
+                        Utils.showToast(err.message, 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Sign Off';
+                    }
+                };
+            });
+        }
+
+        // Render supervisor-created JHAs with signature status
+        if (createdByMe.length > 0) {
+            const createdEl = document.getElementById('jhaCreatedList');
+            createdByMe.forEach(jha => {
+                const assigned    = Array.isArray(jha.assignedWorkers) ? jha.assignedWorkers : [];
+                const ackStatus   = jha._ack_status || [];
+                const signedCount = ackStatus.length;
+                const totalCount  = jha._assignee_count != null ? jha._assignee_count : assigned.length;
+                const allSigned   = totalCount > 0 && signedCount >= totalCount;
+                const hazardsArr  = Array.isArray(jha.hazards) ? jha.hazards : [];
+                const controlsArr = Array.isArray(jha.controls) ? jha.controls : [];
+                const card = document.createElement('div');
+                card.style.cssText = 'padding:16px;background:var(--card);border:1px solid var(--border);border-radius:8px';
+                card.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+                        <div>
+                            <div style="font-weight:600;font-size:.95rem">${esc(jha.jobTitle || jha.task || 'JHA/FLHA')}</div>
+                            <div style="font-size:.82rem;color:var(--text2);margin-top:3px">
+                                ${esc(jha.date || '—')} · ${totalCount} assignee${totalCount !== 1 ? 's' : ''}
+                            </div>
+                        </div>
+                        <span style="padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:600;flex-shrink:0;
+                            background:${allSigned ? '#198754' : signedCount > 0 ? '#fd7e14' : '#6c757d'};color:white">
+                            ${signedCount}/${totalCount} signed
+                        </span>
+                    </div>
+                    ${hazardsArr.length > 0 ? `
+                    <div style="padding:8px 10px;background:rgba(220,53,69,.05);border-radius:6px;margin-bottom:8px">
+                        <div style="font-size:.78rem;font-weight:600;color:#dc3545;margin-bottom:3px">HAZARDS</div>
+                        ${hazardsArr.map(h => `<div style="font-size:.82rem;color:var(--text2)">${esc(h)}</div>`).join('')}
+                    </div>` : ''}
+                    ${ackStatus.length > 0 ? `
+                    <div style="padding:8px 10px;background:rgba(25,135,84,.05);border-radius:6px">
+                        <div style="font-size:.78rem;font-weight:600;color:#198754;margin-bottom:4px">SIGNED BY</div>
+                        ${ackStatus.map(a => `
+                        <div style="font-size:.82rem;color:var(--text2);display:flex;justify-content:space-between">
+                            <span>${esc(a.workerName || '—')}</span>
+                            <span style="color:var(--text2);font-size:.75rem">${esc((a.acknowledgedAt || '').slice(0,10) || '—')}</span>
+                        </div>`).join('')}
+                    </div>` : (totalCount > 0 ? '<div style="font-size:.82rem;color:var(--text2);margin-top:4px">No signatures yet.</div>' : '')}
+                    ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
+                `;
+                createdEl.appendChild(card);
+            });
+        }
+
+        // Create button handler (supervisor only)
+        if (isSupervisor) {
+            const createBtn = document.getElementById('jhaCreateBtn');
+            if (createBtn) createBtn.onclick = () => self._showJHAForm();
+        }
+    },
+
+    // ── JHA Creation Form (Supervisor / Approver only) ────────────────────────
+
+    async _showJHAForm() {
+        const self = this;
+        const content = document.getElementById('workerSafetyContent');
+        const esc = Utils.escapeHtml;
+        const today = new Date().toISOString().slice(0, 10);
+        const supervisorName = (self._worker && (self._worker.name || self._worker.workerName)) || '';
+        const supervisorId   = (self._worker && self._worker.id) || '';
+
+        content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">Loading…</div>';
+
+        // Fetch company roster for assignee picker
+        let coworkers = [];
+        try {
+            const resp = await self._api('GET', '/api/worker/coworkers');
+            coworkers = resp.workers || [];
+        } catch(_) { /* non-fatal — show empty picker */ }
+
+        content.innerHTML = `
+            <div style="max-width:560px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+                    <button id="jhaFormBackBtn" style="border:none;background:transparent;cursor:pointer;color:var(--text2);font-size:1.1rem;padding:4px">← Back</button>
+                    <h3 style="margin:0;font-size:1.1rem">Create JHA / FLHA</h3>
+                </div>
+
+                <form id="workerJHAForm" style="display:grid;gap:14px">
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div>
+                            <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Date *</label>
+                            <input type="date" id="jfDate" value="${today}"
+                                style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required />
+                        </div>
+                        <div>
+                            <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Project / Work Area</label>
+                            <input type="text" id="jfProject" placeholder="e.g. Level 3 Framing"
+                                style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Work Activity / Task *</label>
+                        <input type="text" id="jfJobTitle" placeholder="e.g. Installing roof trusses at heights"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Conducted By</label>
+                        <input type="text" id="jfConductedBy" value="${esc(supervisorName)}"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Identified Hazards <span style="font-weight:400;color:var(--text2)">(one per line)</span></label>
+                        <textarea id="jfHazards" placeholder="e.g.&#10;Fall from heights&#10;Struck by falling objects&#10;Electrical contact"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical"></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Controls / Mitigations <span style="font-weight:400;color:var(--text2)">(one per line)</span></label>
+                        <textarea id="jfControls" placeholder="e.g.&#10;Install guardrails and safety nets&#10;Hard hats required&#10;LOTO procedures enforced"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical"></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Assign for Sign-Off</label>
+                        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg-primary);max-height:200px;overflow-y:auto">
+                            ${coworkers.length === 0
+                                ? '<div style="padding:12px;color:var(--text2);font-size:.85rem">No workers found in company roster.</div>'
+                                : coworkers.map(w => `
+                                <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.88rem">
+                                    <input type="checkbox" name="jfWorker" value="${esc(w.id)}" ${w.id === supervisorId ? 'checked' : ''}
+                                        style="width:15px;height:15px;cursor:pointer;flex-shrink:0" />
+                                    <span>${esc(w.name)}</span>
+                                    ${(w.role && w.role !== 'Worker') ? `<span style="font-size:.73rem;color:var(--text2);margin-left:auto">${esc(w.role)}</span>` : ''}
+                                </label>`).join('')}
+                        </div>
+                        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">Select everyone who must review and sign this JHA before work begins.</div>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Notes</label>
+                        <textarea id="jfNotes" placeholder="Additional safety instructions or notes…"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical"></textarea>
+                    </div>
+
+                    <div id="jfStatus" style="padding:0"></div>
+
+                    <div style="display:flex;gap:10px;justify-content:flex-end">
+                        <button type="button" id="jhaFormCancelBtn" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary" id="jfSubmitBtn">Create JHA / FLHA</button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        document.getElementById('jhaFormBackBtn').onclick   = () => self._renderJHA();
+        document.getElementById('jhaFormCancelBtn').onclick = () => self._renderJHA();
+
+        document.getElementById('workerJHAForm').onsubmit = async e => {
+            e.preventDefault();
+            const statusEl  = document.getElementById('jfStatus');
+            const submitBtn = document.getElementById('jfSubmitBtn');
+            submitBtn.disabled  = true;
+            submitBtn.textContent = 'Creating…';
+            statusEl.innerHTML  = '';
+
+            const assignedWorkers = Array.from(
+                document.querySelectorAll('input[name="jfWorker"]:checked')
+            ).map(cb => cb.value);
+
+            const payload = {
+                date:            document.getElementById('jfDate').value,
+                projectId:       document.getElementById('jfProject').value.trim() || null,
+                jobTitle:        document.getElementById('jfJobTitle').value.trim(),
+                conductedBy:     document.getElementById('jfConductedBy').value.trim(),
+                hazards:         document.getElementById('jfHazards').value.split('\n').map(s => s.trim()).filter(Boolean),
+                controls:        document.getElementById('jfControls').value.split('\n').map(s => s.trim()).filter(Boolean),
+                assignedWorkers,
+                notes:           document.getElementById('jfNotes').value.trim(),
             };
-        });
+
+            try {
+                await self._api('POST', '/api/worker/safety/jha', payload);
+                Utils.showToast('JHA created', 'success');
+                self._renderJHA();
+            } catch(err) {
+                statusEl.innerHTML = `<div style="padding:10px 12px;background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);border-radius:6px;color:#dc3545;font-size:.9rem">
+                    ⚠️ ${esc(err.message)}
+                </div>`;
+                submitBtn.disabled  = false;
+                submitBtn.textContent = 'Create JHA / FLHA';
+            }
+        };
     },
 
     // ── My Submissions ───────────────────────────────────────────────────────
@@ -593,7 +808,7 @@ window.WorkerSafety = {
 
         content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">Loading your submissions…</div>';
 
-        let data = { hazards: [], incidents: [], jha_acks: [], toolbox_acks: [] };
+        let data = { hazard_observations: [], safety_incidents: [], jha_records: [], talk_acknowledgements: [] };
         try {
             data = await self._api('GET', '/api/worker/safety/my-submissions');
         } catch(e) {
@@ -603,10 +818,11 @@ window.WorkerSafety = {
             return;
         }
 
-        const hazards   = data.hazards   || [];
-        const incidents = data.incidents  || [];
-        const jhaAcks   = data.jha_acks  || [];
-        const ttAcks    = data.toolbox_acks || [];
+        const hazards   = data.hazard_observations || [];
+        const incidents = data.safety_incidents    || [];
+        const allAcks   = data.talk_acknowledgements || [];
+        const jhaAcks   = allAcks.filter(a => a.jhaRecordId);
+        const ttAcks    = allAcks.filter(a => a.toolboxTalkId);
 
         const sevColors = { Low: '#198754', Medium: '#fd7e14', High: '#dc3545', Critical: '#6f0000' };
         const incSevColors = { Minor: '#6c757d', Moderate: '#fd7e14', Serious: '#dc3545', Critical: '#6f0000' };
