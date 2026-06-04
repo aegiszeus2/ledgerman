@@ -27,7 +27,7 @@ window.WorkerSafety = {
     _container: null,
     _worker: null,
     _activeTab: 'report',   // 'report' | 'toolbox' | 'jha' | 'submissions'
-    _subView: null,         // null | 'log-hazard' | 'report-incident'
+    _subView: null,         // null | 'log-hazard' | 'report-near-miss' | 'report-incident'
 
     // ── Entry point ──────────────────────────────────────────────────────────
 
@@ -88,8 +88,9 @@ window.WorkerSafety = {
 
     _renderSubView() {
         const self = this;
-        if (self._subView === 'log-hazard')      self._renderHazardForm();
-        else if (self._subView === 'report-incident') self._renderIncidentForm();
+        if      (self._subView === 'log-hazard')       self._renderHazardForm();
+        else if (self._subView === 'report-near-miss') self._renderNearMissForm();
+        else if (self._subView === 'report-incident')  self._renderIncidentForm();
         else self._renderReportMenu();
     },
 
@@ -99,38 +100,43 @@ window.WorkerSafety = {
         const self = this;
         const content = document.getElementById('workerSafetyContent');
 
+        const btnStyle = 'display:flex;align-items:center;gap:14px;padding:18px 20px;background:var(--card);' +
+            'border:2px solid var(--border);border-radius:10px;cursor:pointer;text-align:left;width:100%;' +
+            'transition:border-color .15s';
+
         content.innerHTML = `
             <div style="max-width:480px">
                 <p style="color:var(--text2);margin-bottom:20px;font-size:.9rem">
-                    Use the buttons below to report a site hazard or incident/near miss.
-                    Your submission will be reviewed by your supervisor.
+                    Select the type of report you want to submit. All reports are reviewed by your supervisor.
                 </p>
 
-                <div style="display:grid;gap:14px">
-                    <button id="btnLogHazard"
-                        style="display:flex;align-items:center;gap:14px;padding:18px 20px;background:var(--card);
-                        border:2px solid var(--border);border-radius:10px;cursor:pointer;text-align:left;
-                        transition:border-color .15s">
-                        <span style="font-size:2rem;line-height:1">⚠️</span>
+                <div style="display:grid;gap:12px">
+                    <button id="btnLogHazard" style="${btnStyle}">
+                        <span style="font-size:2rem;line-height:1;flex-shrink:0">⚠️</span>
                         <div>
-                            <div style="font-weight:600;font-size:1rem;color:var(--text-primary)">Log Hazard Observation</div>
-                            <div style="font-size:.83rem;color:var(--text2);margin-top:2px">Report an unsafe condition or potential hazard on site.</div>
+                            <div style="font-weight:600;font-size:1rem;color:var(--text-primary)">Hazard Observation</div>
+                            <div style="font-size:.83rem;color:var(--text2);margin-top:2px">An unsafe condition or act you observed — no injury yet occurred.</div>
                         </div>
                     </button>
 
-                    <button id="btnReportIncident"
-                        style="display:flex;align-items:center;gap:14px;padding:18px 20px;background:var(--card);
-                        border:2px solid var(--border);border-radius:10px;cursor:pointer;text-align:left;
-                        transition:border-color .15s">
-                        <span style="font-size:2rem;line-height:1">🚨</span>
+                    <button id="btnReportNearMiss" style="${btnStyle}">
+                        <span style="font-size:2rem;line-height:1;flex-shrink:0">⚡</span>
                         <div>
-                            <div style="font-weight:600;font-size:1rem;color:var(--text-primary)">Report Incident / Near Miss</div>
-                            <div style="font-size:.83rem;color:var(--text2);margin-top:2px">Report an injury, near miss, or any safety-related event.</div>
+                            <div style="font-weight:600;font-size:1rem;color:var(--text-primary)">Near Miss</div>
+                            <div style="font-size:.83rem;color:var(--text2);margin-top:2px">Something happened that could have caused injury or damage, but didn't.</div>
+                        </div>
+                    </button>
+
+                    <button id="btnReportIncident" style="${btnStyle}">
+                        <span style="font-size:2rem;line-height:1;flex-shrink:0">🚨</span>
+                        <div>
+                            <div style="font-weight:600;font-size:1rem;color:var(--text-primary)">Incident Report</div>
+                            <div style="font-size:.83rem;color:var(--text2);margin-top:2px">An event that caused actual injury, illness, property damage, or environmental impact.</div>
                         </div>
                     </button>
                 </div>
 
-                <div style="margin-top:20px;padding:12px 14px;background:rgba(220,53,69,.06);border:1px solid rgba(220,53,69,.2);border-radius:8px">
+                <div style="margin-top:18px;padding:12px 14px;background:rgba(220,53,69,.06);border:1px solid rgba(220,53,69,.2);border-radius:8px">
                     <p style="margin:0;font-size:.83rem;color:var(--text2)">
                         <strong style="color:#dc3545">Emergency?</strong> Call 911 immediately. Do not use this form in an emergency.
                     </p>
@@ -141,6 +147,10 @@ window.WorkerSafety = {
         document.getElementById('btnLogHazard').onclick = () => {
             self._subView = 'log-hazard';
             self._renderHazardForm();
+        };
+        document.getElementById('btnReportNearMiss').onclick = () => {
+            self._subView = 'report-near-miss';
+            self._renderNearMissForm();
         };
         document.getElementById('btnReportIncident').onclick = () => {
             self._subView = 'report-incident';
@@ -205,6 +215,12 @@ window.WorkerSafety = {
                     </div>
 
                     <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Immediate Action Taken</label>
+                        <textarea id="whImmediateAction" placeholder="Describe any immediate steps taken to address the hazard..."
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical"></textarea>
+                    </div>
+
+                    <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Your Name</label>
                         <input type="text" id="whReportedBy" value="${esc(workerName)}"
                             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
@@ -238,12 +254,13 @@ window.WorkerSafety = {
             statusEl.innerHTML = '';
 
             const payload = {
-                date:        document.getElementById('whDate').value,
-                hazardType:  document.getElementById('whType').value,
-                severity:    document.getElementById('whSeverity').value,
-                location:    document.getElementById('whLocation').value.trim(),
-                description: document.getElementById('whDescription').value.trim(),
-                reportedBy:  document.getElementById('whReportedBy').value.trim(),
+                date:                   document.getElementById('whDate').value,
+                hazardType:             document.getElementById('whType').value,
+                severity:               document.getElementById('whSeverity').value,
+                location:               document.getElementById('whLocation').value.trim(),
+                description:            document.getElementById('whDescription').value.trim(),
+                immediateActionTaken:   document.getElementById('whImmediateAction').value.trim(),
+                reportedBy:             document.getElementById('whReportedBy').value.trim(),
             };
 
             try {
@@ -266,6 +283,146 @@ window.WorkerSafety = {
         };
     },
 
+    // ── Near Miss Form ───────────────────────────────────────────────────────
+
+    _renderNearMissForm() {
+        const self = this;
+        const content = document.getElementById('workerSafetyContent');
+        const esc = Utils.escapeHtml;
+        const today = new Date().toISOString().slice(0, 10);
+        const workerName = (self._worker && (self._worker.name || self._worker.workerName)) || '';
+        const severities = ['Low', 'Medium', 'High', 'Critical'];
+
+        content.innerHTML = `
+            <div style="max-width:520px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+                    <button id="nmBackBtn" style="border:none;background:transparent;cursor:pointer;color:var(--text2);font-size:1.1rem;padding:4px">← Back</button>
+                    <h3 style="margin:0;font-size:1.1rem">Report Near Miss ⚡</h3>
+                </div>
+
+                <div style="padding:10px 14px;background:rgba(253,126,20,.06);border:1px solid rgba(253,126,20,.3);border-radius:8px;margin-bottom:16px">
+                    <p style="margin:0;font-size:.83rem;color:#fd7e14">
+                        <strong>Near Miss:</strong> An event that could have caused injury, damage, or loss — but didn't.
+                        Reporting near misses helps prevent real incidents.
+                    </p>
+                </div>
+
+                <form id="workerNearMissForm" style="display:grid;gap:14px">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div>
+                            <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Date *</label>
+                            <input type="date" id="nmDate" value="${today}"
+                                style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required />
+                        </div>
+                        <div>
+                            <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Time</label>
+                            <input type="time" id="nmTime"
+                                style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Location / Work Area</label>
+                        <input type="text" id="nmLocation" placeholder="Where did this occur?"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">What almost happened? *</label>
+                        <textarea id="nmDescription" placeholder="Describe the near miss event in detail — what occurred, what almost happened, and the conditions at the time..."
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:90px;resize:vertical" required></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Potential Consequence</label>
+                        <textarea id="nmPotentialConsequence" placeholder="What injury, damage, or loss could have occurred?"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical"></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Potential Severity *</label>
+                        <select id="nmSeverity" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required>
+                            ${severities.map(s => `<option value="${s}" ${s === 'Medium' ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Immediate Action Taken</label>
+                        <textarea id="nmImmediateAction" placeholder="What did you do immediately to prevent harm?"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical"></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Workers / Equipment Involved</label>
+                        <input type="text" id="nmWorkersInvolved" placeholder="Names or equipment involved (if any)"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Reported By *</label>
+                        <input type="text" id="nmReportedBy" value="${esc(workerName)}"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required />
+                    </div>
+
+                    <div id="nmStatus" style="padding:0"></div>
+
+                    <div style="display:flex;gap:10px;justify-content:flex-end">
+                        <button type="button" id="nmBackBtn2" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary" id="nmSubmitBtn">Submit Near Miss Report</button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        const goBack = () => { self._subView = null; self._renderReportMenu(); };
+        document.getElementById('nmBackBtn').onclick  = goBack;
+        document.getElementById('nmBackBtn2').onclick = goBack;
+
+        document.getElementById('workerNearMissForm').onsubmit = async e => {
+            e.preventDefault();
+            const statusEl  = document.getElementById('nmStatus');
+            const submitBtn = document.getElementById('nmSubmitBtn');
+            submitBtn.disabled   = true;
+            submitBtn.textContent = 'Submitting…';
+            statusEl.innerHTML   = '';
+
+            const potentialConsequence = document.getElementById('nmPotentialConsequence').value.trim();
+            const immediateAction      = document.getElementById('nmImmediateAction').value.trim();
+            const descriptionBase      = document.getElementById('nmDescription').value.trim();
+            // Compose a rich description that includes the structured near-miss fields
+            const fullDescription = descriptionBase +
+                (potentialConsequence ? '\n\nPotential consequence: ' + potentialConsequence : '') +
+                (immediateAction      ? '\n\nImmediate action taken: ' + immediateAction      : '');
+
+            const payload = {
+                incidentType:          'Near Miss',
+                date:                  document.getElementById('nmDate').value,
+                time:                  document.getElementById('nmTime').value || null,
+                location:              document.getElementById('nmLocation').value.trim(),
+                severity:              document.getElementById('nmSeverity').value,
+                description:           fullDescription,
+                immediateActionTaken:  immediateAction,
+                workersInvolved:       document.getElementById('nmWorkersInvolved').value.trim(),
+                reportedBy:            document.getElementById('nmReportedBy').value.trim(),
+                notes:                 potentialConsequence ? 'Potential consequence: ' + potentialConsequence : '',
+            };
+
+            try {
+                await self._api('POST', '/api/worker/safety/incident', payload);
+                statusEl.innerHTML = `<div style="padding:10px 12px;background:rgba(25,135,84,.1);border:1px solid rgba(25,135,84,.3);border-radius:6px;color:#198754;font-size:.9rem">
+                    ✅ Near miss reported successfully. Your supervisor has been notified.
+                </div>`;
+                setTimeout(() => goBack(), 2500);
+            } catch(err) {
+                statusEl.innerHTML = `<div style="padding:10px 12px;background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);border-radius:6px;color:#dc3545;font-size:.9rem">
+                    ⚠️ ${esc(err.message)}
+                </div>`;
+                submitBtn.disabled    = false;
+                submitBtn.textContent = 'Submit Near Miss Report';
+            }
+        };
+    },
+
     // ── Incident Form ────────────────────────────────────────────────────────
 
     _renderIncidentForm() {
@@ -275,14 +432,14 @@ window.WorkerSafety = {
         const today = new Date().toISOString().slice(0, 10);
         const workerName = (self._worker && (self._worker.name || self._worker.workerName)) || '';
 
-        const incidentTypes = ['Near Miss', 'First Aid', 'Medical Aid', 'Lost Time', 'Property Damage', 'Environmental', 'Other'];
+        const incidentTypes = ['First Aid', 'Medical Aid', 'Lost Time', 'Property Damage', 'Environmental', 'Other'];
         const severities = ['Minor', 'Moderate', 'Serious', 'Critical'];
 
         content.innerHTML = `
             <div style="max-width:520px">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
                     <button id="incBackBtn" style="border:none;background:transparent;cursor:pointer;color:var(--text2);font-size:1.1rem;padding:4px">← Back</button>
-                    <h3 style="margin:0;font-size:1.1rem">Report Incident / Near Miss</h3>
+                    <h3 style="margin:0;font-size:1.1rem">Report Incident 🚨</h3>
                 </div>
 
                 <div style="padding:10px 14px;background:rgba(220,53,69,.06);border:1px solid rgba(220,53,69,.2);border-radius:8px;margin-bottom:16px">
@@ -331,9 +488,15 @@ window.WorkerSafety = {
                     </div>
 
                     <div>
-                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Workers Involved <span style="font-weight:400;color:var(--text2)">(comma-separated)</span></label>
-                        <input type="text" id="wiWorkersInvolved" placeholder="Names of any workers involved"
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Workers / Equipment Involved</label>
+                        <input type="text" id="wiWorkersInvolved" placeholder="Names of workers or equipment involved"
                             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Immediate Action Taken</label>
+                        <textarea id="wiImmediateAction" placeholder="Steps taken immediately to address the situation..."
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical"></textarea>
                     </div>
 
                     <div>
@@ -370,14 +533,15 @@ window.WorkerSafety = {
             statusEl.innerHTML = '';
 
             const payload = {
-                date:             document.getElementById('wiDate').value,
-                time:             document.getElementById('wiTime').value || null,
-                incidentType:     document.getElementById('wiType').value,
-                severity:         document.getElementById('wiSeverity').value,
-                location:         document.getElementById('wiLocation').value.trim(),
-                description:      document.getElementById('wiDescription').value.trim(),
-                workersInvolved:  document.getElementById('wiWorkersInvolved').value.trim(),
-                reportedBy:       document.getElementById('wiReportedBy').value.trim(),
+                date:                 document.getElementById('wiDate').value,
+                time:                 document.getElementById('wiTime').value || null,
+                incidentType:         document.getElementById('wiType').value,
+                severity:             document.getElementById('wiSeverity').value,
+                location:             document.getElementById('wiLocation').value.trim(),
+                description:          document.getElementById('wiDescription').value.trim(),
+                workersInvolved:      document.getElementById('wiWorkersInvolved').value.trim(),
+                immediateActionTaken: document.getElementById('wiImmediateAction').value.trim(),
+                reportedBy:           document.getElementById('wiReportedBy').value.trim(),
             };
 
             try {
@@ -852,13 +1016,15 @@ window.WorkerSafety = {
             return;
         }
 
-        const hazards   = data.hazard_observations || [];
-        const incidents = data.safety_incidents    || [];
-        const allAcks   = data.talk_acknowledgements || [];
-        const jhaAcks   = allAcks.filter(a => a.jhaRecordId);
-        const ttAcks    = allAcks.filter(a => a.toolboxTalkId);
+        const hazards    = data.hazard_observations || [];
+        const allIncidents = data.safety_incidents  || [];
+        const nearMisses = allIncidents.filter(i => i.incidentType === 'Near Miss');
+        const incidents  = allIncidents.filter(i => i.incidentType !== 'Near Miss');
+        const allAcks    = data.talk_acknowledgements || [];
+        const jhaAcks    = allAcks.filter(a => a.jhaRecordId);
+        const ttAcks     = allAcks.filter(a => a.toolboxTalkId);
 
-        const sevColors = { Low: '#198754', Medium: '#fd7e14', High: '#dc3545', Critical: '#6f0000' };
+        const sevColors    = { Low: '#198754', Medium: '#fd7e14', High: '#dc3545', Critical: '#6f0000' };
         const incSevColors = { Minor: '#6c757d', Moderate: '#fd7e14', Serious: '#dc3545', Critical: '#6f0000' };
 
         function badge(val, colors) {
@@ -866,7 +1032,7 @@ window.WorkerSafety = {
             return `<span style="padding:2px 8px;border-radius:10px;font-size:.73rem;font-weight:600;background:${c};color:white">${esc(val || '—')}</span>`;
         }
 
-        const total = hazards.length + incidents.length;
+        const total = hazards.length + allIncidents.length;
 
         if (total === 0 && jhaAcks.length === 0 && ttAcks.length === 0) {
             content.innerHTML = `
@@ -879,21 +1045,25 @@ window.WorkerSafety = {
         }
 
         content.innerHTML = `
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px">
-                <div style="padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
-                    <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Hazards</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:20px">
+                <div style="padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
+                    <div style="font-size:.72rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Hazards</div>
                     <div style="font-size:1.5rem;font-weight:700">${hazards.length}</div>
                 </div>
-                <div style="padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
-                    <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Incidents</div>
-                    <div style="font-size:1.5rem;font-weight:700">${incidents.length}</div>
+                <div style="padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid ${nearMisses.length > 0 ? 'rgba(253,126,20,.4)' : 'var(--border)'}">
+                    <div style="font-size:.72rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Near Miss</div>
+                    <div style="font-size:1.5rem;font-weight:700;color:${nearMisses.length > 0 ? '#fd7e14' : 'var(--text-primary)'}">${nearMisses.length}</div>
                 </div>
-                <div style="padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
-                    <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">JHA Acks</div>
+                <div style="padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid ${incidents.length > 0 ? 'rgba(220,53,69,.4)' : 'var(--border)'}">
+                    <div style="font-size:.72rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Incidents</div>
+                    <div style="font-size:1.5rem;font-weight:700;color:${incidents.length > 0 ? '#dc3545' : 'var(--text-primary)'}">${incidents.length}</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
+                    <div style="font-size:.72rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">JHA Acks</div>
                     <div style="font-size:1.5rem;font-weight:700;color:#198754">${jhaAcks.length}</div>
                 </div>
-                <div style="padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
-                    <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Talk Acks</div>
+                <div style="padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
+                    <div style="font-size:.72rem;color:var(--text2);text-transform:uppercase;margin-bottom:3px">Talk Acks</div>
                     <div style="font-size:1.5rem;font-weight:700;color:#198754">${ttAcks.length}</div>
                 </div>
             </div>
@@ -929,13 +1099,42 @@ window.WorkerSafety = {
                 </div>
             </div>` : ''}
 
-            ${incidents.length > 0 ? `
+            ${nearMisses.length > 0 ? `
             <div style="margin-bottom:20px">
-                <h4 style="margin:0 0 10px 0;font-size:.95rem;color:var(--text2)">Incident Reports</h4>
-                <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border)">
+                <h4 style="margin:0 0 10px 0;font-size:.95rem;color:#fd7e14">⚡ Near Miss Reports</h4>
+                <div style="overflow-x:auto;border-radius:8px;border:1px solid rgba(253,126,20,.3)">
                     <table style="width:100%;border-collapse:collapse;font-size:.88rem">
                         <thead>
-                            <tr style="background:var(--card)">
+                            <tr style="background:rgba(253,126,20,.05)">
+                                <th style="padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)">Date</th>
+                                <th style="padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)">Description</th>
+                                <th style="padding:9px 12px;text-align:center;border-bottom:1px solid var(--border)">Severity</th>
+                                <th style="padding:9px 12px;text-align:center;border-bottom:1px solid var(--border)">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${nearMisses.map(i => {
+                                const desc = (i.description || '').length > 65 ? i.description.slice(0, 65) + '…' : (i.description || '—');
+                                const statusColor = { Submitted: '#0d6efd', 'Under Review': '#fd7e14', Closed: '#198754' };
+                                return `<tr style="border-bottom:1px solid var(--border)">
+                                    <td style="padding:8px 12px;white-space:nowrap">${esc(i.date || '—')}</td>
+                                    <td style="padding:8px 12px;max-width:240px">${esc(desc)}</td>
+                                    <td style="padding:8px 12px;text-align:center">${badge(i.severity, incSevColors)}</td>
+                                    <td style="padding:8px 12px;text-align:center">${badge(i.status, statusColor)}</td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>` : ''}
+
+            ${incidents.length > 0 ? `
+            <div style="margin-bottom:20px">
+                <h4 style="margin:0 0 10px 0;font-size:.95rem;color:#dc3545">🚨 Incident Reports</h4>
+                <div style="overflow-x:auto;border-radius:8px;border:1px solid rgba(220,53,69,.3)">
+                    <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+                        <thead>
+                            <tr style="background:rgba(220,53,69,.04)">
                                 <th style="padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)">Date</th>
                                 <th style="padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)">Type</th>
                                 <th style="padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)">Description</th>
