@@ -650,6 +650,9 @@ window.WorkerSafety = {
                         </div>`).join('')}
                     </div>` : (totalCount > 0 ? '<div style="font-size:.82rem;color:var(--text2);margin-top:4px">No signatures yet.</div>' : '')}
                     ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);text-align:right">
+                        <button class="btn-secondary" style="font-size:.78rem;padding:4px 12px" data-edit-jha="${esc(jha.id)}">✏️ Edit</button>
+                    </div>
                 `;
                 createdEl.appendChild(card);
             });
@@ -658,17 +661,28 @@ window.WorkerSafety = {
         // Create button handler (supervisor only)
         if (isSupervisor) {
             const createBtn = document.getElementById('jhaCreateBtn');
-            if (createBtn) createBtn.onclick = () => self._showJHAForm();
+            if (createBtn) createBtn.onclick = () => self._showJHAForm(null);
         }
+
+        // Edit button handlers — pass the full JHA object
+        content.querySelectorAll('[data-edit-jha]').forEach(btn => {
+            btn.onclick = () => {
+                const jhaId = btn.dataset.editJha;
+                const jha   = jhas.find(j => j.id === jhaId);
+                if (jha) self._showJHAForm(jha);
+            };
+        });
     },
 
     // ── JHA Creation Form (Supervisor / Approver only) ────────────────────────
 
-    async _showJHAForm() {
-        const self = this;
+    // jha = null → create mode; jha = object → edit mode (supervisor's own JHA only)
+    async _showJHAForm(jha) {
+        const self    = this;
+        const isEdit  = !!jha;
         const content = document.getElementById('workerSafetyContent');
-        const esc = Utils.escapeHtml;
-        const today = new Date().toISOString().slice(0, 10);
+        const esc     = Utils.escapeHtml;
+        const today   = new Date().toISOString().slice(0, 10);
         const supervisorName = (self._worker && (self._worker.name || self._worker.workerName)) || '';
         const supervisorId   = (self._worker && self._worker.id) || '';
 
@@ -681,11 +695,23 @@ window.WorkerSafety = {
             coworkers = resp.workers || [];
         } catch(_) { /* non-fatal — show empty picker */ }
 
+        // Pre-fill values for edit mode
+        const prefill = {
+            date:            (jha && jha.date)        || today,
+            projectId:       (jha && jha.projectId)   || '',
+            jobTitle:        (jha && jha.jobTitle)     || '',
+            conductedBy:     (jha && jha.conductedBy)  || supervisorName,
+            hazards:         Array.isArray(jha && jha.hazards)  ? jha.hazards.join('\n')  : '',
+            controls:        Array.isArray(jha && jha.controls) ? jha.controls.join('\n') : '',
+            assignedWorkers: Array.isArray(jha && jha.assignedWorkers) ? jha.assignedWorkers : [],
+            notes:           (jha && jha.notes) || '',
+        };
+
         content.innerHTML = `
             <div style="max-width:560px">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
                     <button id="jhaFormBackBtn" style="border:none;background:transparent;cursor:pointer;color:var(--text2);font-size:1.1rem;padding:4px">← Back</button>
-                    <h3 style="margin:0;font-size:1.1rem">Create JHA / FLHA</h3>
+                    <h3 style="margin:0;font-size:1.1rem">${isEdit ? 'Edit JHA / FLHA' : 'Create JHA / FLHA'}</h3>
                 </div>
 
                 <form id="workerJHAForm" style="display:grid;gap:14px">
@@ -693,38 +719,38 @@ window.WorkerSafety = {
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                         <div>
                             <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Date *</label>
-                            <input type="date" id="jfDate" value="${today}"
+                            <input type="date" id="jfDate" value="${esc(prefill.date)}"
                                 style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required />
                         </div>
                         <div>
                             <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Project / Work Area</label>
-                            <input type="text" id="jfProject" placeholder="e.g. Level 3 Framing"
+                            <input type="text" id="jfProject" value="${esc(prefill.projectId)}" placeholder="e.g. Level 3 Framing"
                                 style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
                         </div>
                     </div>
 
                     <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Work Activity / Task *</label>
-                        <input type="text" id="jfJobTitle" placeholder="e.g. Installing roof trusses at heights"
+                        <input type="text" id="jfJobTitle" value="${esc(prefill.jobTitle)}" placeholder="e.g. Installing roof trusses at heights"
                             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required />
                     </div>
 
                     <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Conducted By</label>
-                        <input type="text" id="jfConductedBy" value="${esc(supervisorName)}"
+                        <input type="text" id="jfConductedBy" value="${esc(prefill.conductedBy)}"
                             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" />
                     </div>
 
                     <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Identified Hazards <span style="font-weight:400;color:var(--text2)">(one per line)</span></label>
                         <textarea id="jfHazards" placeholder="e.g.&#10;Fall from heights&#10;Struck by falling objects&#10;Electrical contact"
-                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical"></textarea>
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical">${esc(prefill.hazards)}</textarea>
                     </div>
 
                     <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Controls / Mitigations <span style="font-weight:400;color:var(--text2)">(one per line)</span></label>
                         <textarea id="jfControls" placeholder="e.g.&#10;Install guardrails and safety nets&#10;Hard hats required&#10;LOTO procedures enforced"
-                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical"></textarea>
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical">${esc(prefill.controls)}</textarea>
                     </div>
 
                     <div>
@@ -734,26 +760,29 @@ window.WorkerSafety = {
                                 ? '<div style="padding:12px;color:var(--text2);font-size:.85rem">No workers found in company roster.</div>'
                                 : coworkers.map(w => `
                                 <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.88rem">
-                                    <input type="checkbox" name="jfWorker" value="${esc(w.id)}" ${w.id === supervisorId ? 'checked' : ''}
+                                    <input type="checkbox" name="jfWorker" value="${esc(w.id)}"
+                                        ${(isEdit ? prefill.assignedWorkers.includes(w.id) : w.id === supervisorId) ? 'checked' : ''}
                                         style="width:15px;height:15px;cursor:pointer;flex-shrink:0" />
                                     <span>${esc(w.name)}</span>
                                     ${(w.role && w.role !== 'Worker') ? `<span style="font-size:.73rem;color:var(--text2);margin-left:auto">${esc(w.role)}</span>` : ''}
                                 </label>`).join('')}
                         </div>
-                        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">Select everyone who must review and sign this JHA before work begins.</div>
+                        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">
+                            ${isEdit ? 'Add or remove workers who must sign off.' : 'Select everyone who must review and sign this JHA before work begins.'}
+                        </div>
                     </div>
 
                     <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Notes</label>
                         <textarea id="jfNotes" placeholder="Additional safety instructions or notes…"
-                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical"></textarea>
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:60px;resize:vertical">${esc(prefill.notes)}</textarea>
                     </div>
 
                     <div id="jfStatus" style="padding:0"></div>
 
                     <div style="display:flex;gap:10px;justify-content:flex-end">
                         <button type="button" id="jhaFormCancelBtn" class="btn-secondary">Cancel</button>
-                        <button type="submit" class="btn-primary" id="jfSubmitBtn">Create JHA / FLHA</button>
+                        <button type="submit" class="btn-primary" id="jfSubmitBtn">${isEdit ? 'Save Changes' : 'Create JHA / FLHA'}</button>
                     </div>
                 </form>
             </div>
@@ -786,15 +815,20 @@ window.WorkerSafety = {
             };
 
             try {
-                await self._api('POST', '/api/worker/safety/jha', payload);
-                Utils.showToast('JHA created', 'success');
+                if (isEdit) {
+                    await self._api('PATCH', '/api/worker/safety/jha/' + jha.id, payload);
+                    Utils.showToast('JHA updated', 'success');
+                } else {
+                    await self._api('POST', '/api/worker/safety/jha', payload);
+                    Utils.showToast('JHA created', 'success');
+                }
                 self._renderJHA();
             } catch(err) {
                 statusEl.innerHTML = `<div style="padding:10px 12px;background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);border-radius:6px;color:#dc3545;font-size:.9rem">
                     ⚠️ ${esc(err.message)}
                 </div>`;
-                submitBtn.disabled  = false;
-                submitBtn.textContent = 'Create JHA / FLHA';
+                submitBtn.disabled    = false;
+                submitBtn.textContent = isEdit ? 'Save Changes' : 'Create JHA / FLHA';
             }
         };
     },

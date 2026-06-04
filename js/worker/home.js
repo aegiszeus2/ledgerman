@@ -1,5 +1,50 @@
 // Worker Home Module
 window.WorkerHome = {
+
+    // Async: fetch pending JHA sign-offs and inject a banner card if any exist
+    async _injectPendingJHAs(container, worker) {
+        try {
+            const jwt = AppData.getJwt();
+            if (!jwt) return;
+            const resp = await fetch(AppData.API_BASE + '/api/worker/safety/jha', {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const pending = (data.jha_records || []).filter(function(j) {
+                return !j._created_by_me && !j._worker_acknowledged;
+            });
+            if (pending.length === 0) return;
+            // Insert after the welcome card (first .card element)
+            var ref = container.querySelector('.card');
+            var banner = document.createElement('div');
+            banner.className = 'card';
+            banner.style.cssText = 'border-color:#fd7e14;background:rgba(253,126,20,.08);cursor:pointer;padding:16px;margin-bottom:0';
+            banner.innerHTML =
+                '<div style="display:flex;align-items:center;gap:12px">' +
+                    '<span style="background:#fd7e14;color:#fff;font-size:.85rem;font-weight:700;' +
+                           'padding:4px 12px;border-radius:12px;flex-shrink:0">' + pending.length + '</span>' +
+                    '<div style="flex:1">' +
+                        '<strong style="color:#fd7e14">JHA Sign-Off Required</strong>' +
+                        '<p style="font-size:.85rem;color:var(--text2);margin-top:2px">' +
+                            (pending.length === 1 ? '1 Job Hazard Analysis requires' : pending.length + ' Job Hazard Analyses require') +
+                            ' your signature before work begins.' +
+                        '</p>' +
+                    '</div>' +
+                    '<span style="color:var(--text2);font-size:1.3rem">&#8250;</span>' +
+                '</div>';
+            banner.addEventListener('click', function() {
+                if (window.WorkerSafety) window.WorkerSafety._activeTab = 'jha';
+                window.App.navigateWorker('worker-safety', worker);
+            });
+            if (ref && ref.parentNode) {
+                ref.parentNode.insertBefore(banner, ref.nextSibling);
+            } else {
+                container.appendChild(banner);
+            }
+        } catch(_) {}
+    },
+
     render(container, worker) {
         const esc = Utils.escapeHtml;
         const projects = AppData.getProjects();
@@ -98,5 +143,8 @@ window.WorkerHome = {
                 container.appendChild(card);
             });
         }
+
+        // Async: inject pending JHA sign-off banner if any exist
+        this._injectPendingJHAs(container, worker);
     }
 };

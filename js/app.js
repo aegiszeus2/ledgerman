@@ -1844,6 +1844,36 @@ window.LMIcons = {
             }
 
             this.navigateWorker('home', worker);
+            this._refreshSafetyBadge();
+        },
+
+        // Check for pending JHA sign-offs and badge the Safety nav item
+        async _refreshSafetyBadge() {
+            try {
+                const jwt = AppData.getJwt();
+                if (!jwt) return;
+                const resp = await fetch(AppData.API_BASE + '/api/worker/safety/jha', {
+                    headers: { 'Authorization': 'Bearer ' + jwt }
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const pending = (data.jha_records || []).filter(j => !j._created_by_me && !j._worker_acknowledged);
+                const safetyNav = document.querySelector('[data-route="worker-safety"]');
+                if (!safetyNav) return;
+                // Remove existing badge
+                const old = safetyNav.querySelector('.safety-badge');
+                if (old) old.remove();
+                if (pending.length > 0) {
+                    safetyNav.style.position = 'relative';
+                    const badge = document.createElement('span');
+                    badge.className = 'safety-badge';
+                    badge.style.cssText = 'position:absolute;top:3px;right:6px;background:#dc3545;color:#fff;' +
+                        'font-size:.62rem;font-weight:700;border-radius:10px;padding:1px 5px;' +
+                        'min-width:16px;text-align:center;line-height:1.4;pointer-events:none';
+                    badge.textContent = pending.length > 9 ? '9+' : String(pending.length);
+                    safetyNav.appendChild(badge);
+                }
+            } catch(_) {}
         },
 
         navigateWorker(route, workerOrProjectId = null, params = {}) {
@@ -1897,6 +1927,11 @@ window.LMIcons = {
                 case 'worker-safety':
                     if (window.WorkerSafety) WorkerSafety.render(content, worker);
                     else content.innerHTML = '<div class="empty-state"><h2>Safety module not loaded</h2></div>';
+                    // Clear badge while on Safety tab; re-check when they leave
+                    (function() {
+                        const nb = document.querySelector('[data-route="worker-safety"] .safety-badge');
+                        if (nb) nb.remove();
+                    })();
                     break;
                 case 'help':
                     if (window.WorkerHelp) WorkerHelp.render(content);
