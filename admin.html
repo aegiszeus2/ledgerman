@@ -31,6 +31,9 @@
         .password-toggle { position: absolute; right: 8px; background: none; border: none; color: #8888aa; cursor: pointer; font-size: 0.75rem; font-weight: 600; padding: 4px 6px; transition: color .2s; }
         .password-toggle:hover { color: var(--primary); }
     </style>
+    <!-- config.js sets window.LEDGERMAN_API_URL = window.location.origin in production
+         so all API calls use the correct same-origin backend URL automatically. -->
+    <script src="config.js"></script>
 </head>
 <body>
     <div id="passwordScreen">
