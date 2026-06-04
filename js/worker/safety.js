@@ -814,11 +814,32 @@ window.WorkerSafety = {
                         </div>`).join('')}
                     </div>` : (totalCount > 0 ? '<div style="font-size:.82rem;color:var(--text2);margin-top:4px">No signatures yet.</div>' : '')}
                     ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
-                    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);text-align:right">
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+                        ${jha._worker_acknowledged
+                            ? `<span style="font-size:.8rem;color:#198754;font-weight:500">✓ You have signed</span>`
+                            : `<button class="btn-primary" style="font-size:.78rem;padding:4px 12px" data-ack-jha="${esc(jha.id)}">Sign Off</button>`}
                         <button class="btn-secondary" style="font-size:.78rem;padding:4px 12px" data-edit-jha="${esc(jha.id)}">✏️ Edit</button>
                     </div>
                 `;
                 createdEl.appendChild(card);
+            });
+        }
+
+        // Sign-off handlers in the created-by-me section
+        if (createdByMe.length > 0) {
+            content.querySelectorAll('#jhaCreatedList [data-ack-jha]').forEach(btn => {
+                btn.onclick = async () => {
+                    const jhaId = btn.dataset.ackJha;
+                    btn.disabled = true; btn.textContent = '…';
+                    try {
+                        await self._api('POST', '/api/worker/safety/jha-acknowledgement', { jhaRecordId: jhaId });
+                        Utils.showToast('JHA signed', 'success');
+                        self._renderJHA();
+                    } catch(err) {
+                        Utils.showToast(err.message, 'error');
+                        btn.disabled = false; btn.textContent = 'Sign Off';
+                    }
+                };
             });
         }
 
