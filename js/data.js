@@ -353,6 +353,17 @@ async function apiGetInvite(token) {
     return _apiFetch('/api/invites/' + token);
 }
 
+// Resend the welcome / invite email to an existing worker.
+// Optionally pass a corrected email to update + send to.
+async function apiResendWelcome(workerId, email) {
+    const payload = {};
+    if (email) payload.email = email;
+    return _apiFetch('/api/workers/' + workerId + '/resend-welcome', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
 async function apiUseInvite(token, inviteData) {
     const data = await _apiFetch('/api/invites/' + token + '/use', {
         method: 'PUT',
@@ -1341,7 +1352,7 @@ window.AppData = {
     apiWorkerPinResetRequest, apiWorkerPinResetConfirm,
     apiVerify2FA,
     workerUpdateMyEmail,
-    apiCreateInvite, apiGetInvite, apiUseInvite,
+    apiCreateInvite, apiGetInvite, apiUseInvite, apiResendWelcome,
     syncFromServer, isCacheLoaded,
     // Photos (IndexedDB)
     savePhoto, getPhotosByProject, getPhotosBySubmission, getPhoto, deletePhoto,
