@@ -93,6 +93,7 @@ window.AdminUsers = {
                                         '<button class="btn-ghost btn-sm view-worker" data-id="' + w.id + '" style="color:var(--info,#3b82f6)">View</button>' +
                                         '<button class="btn-ghost btn-sm edit-worker" data-id="' + w.id + '">Edit</button>' +
                                         '<button class="btn-ghost btn-sm invite-worker" data-id="' + w.id + '" style="color:var(--success)">Invite</button>' +
+                                        '<button class="btn-ghost btn-sm resend-welcome-worker" data-id="' + w.id + '" style="color:var(--success)">Resend Welcome Email</button>' +
                                         '<button class="btn-ghost btn-sm reset-pin-worker" data-id="' + w.id + '" style="color:var(--warn)">Reset PIN</button>' +
                                         '<button class="btn-ghost btn-sm delete-worker" data-id="' + w.id + '" style="color:var(--accent)">Delete</button>' +
                                     '</td>' +
@@ -237,6 +238,12 @@ window.AdminUsers = {
         container.querySelectorAll('.invite-worker').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 self._showInviteModal(btn.dataset.id);
+            });
+        });
+
+        container.querySelectorAll('.resend-welcome-worker').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self._showResendWelcomeModal(btn.dataset.id);
             });
         });
 
@@ -478,6 +485,7 @@ window.AdminUsers = {
         var footerHtml =
             '<div class="modal-footer">' +
                 '<button class="btn btn-primary detail-edit-btn">Edit Worker</button>' +
+                '<button class="btn btn-secondary detail-resend-welcome-btn">Resend Welcome Email</button>' +
                 '<button class="btn btn-secondary modal-close">Close</button>' +
             '</div>';
 
@@ -500,6 +508,12 @@ window.AdminUsers = {
         modal.querySelector('.detail-edit-btn').addEventListener('click', function() {
             overlay.remove();
             self._showModal(worker.id);
+        });
+
+        // Resend welcome email from the profile view
+        modal.querySelector('.detail-resend-welcome-btn').addEventListener('click', function() {
+            overlay.remove();
+            self._showResendWelcomeModal(worker.id);
         });
 
         // Reset PIN from detail view
@@ -889,6 +903,82 @@ window.AdminUsers = {
             _buildModal(token);
             AppData.addAuditLog(username, 'Invite Generated', 'Worker: ' + worker.name);
         }
+    },
+
+    // Resend the welcome / login email to an existing worker. Confirms before
+    // sending, lets the admin correct the email first, reuses the account (never
+    // creates a duplicate), and reports clear success/failure. Backend records
+    // who sent it and when.
+    _showResendWelcomeModal(workerId) {
+        const self = this;
+        const worker = AppData.getWorker(workerId);
+        if (!worker) return;
+
+        if (!AppData.isApiMode() || !AppData.getJwt || !AppData.getJwt()) {
+            Utils.showToast('Resend Welcome Email needs you to be signed in to the server.', 'error');
+            return;
+        }
+
+        const esc = Utils.escapeHtml;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.display = 'flex';
+        overlay.innerHTML =
+            '<div class="modal" style="max-width:460px">' +
+                '<h3>Resend Welcome Email</h3>' +
+                '<p style="color:var(--text2);margin-bottom:16px">' +
+                    'Send <strong>' + esc(worker.name) + '</strong> a fresh welcome email with a link to ' +
+                    'activate their account, choose their PIN, and log in. This reuses their existing ' +
+                    'account and cancels any earlier unused invite link.</p>' +
+                '<div class="form-group" style="margin-bottom:18px">' +
+                    '<label>Send to email address</label>' +
+                    '<input type="email" class="form-control" id="resendWelcomeEmail" ' +
+                        'value="' + esc(worker.email || '') + '" placeholder="worker@email.com">' +
+                    '<p style="font-size:.78rem;color:var(--text2);margin:6px 0 0">' +
+                        'Wrong address? Correct it here before sending and it will be saved.</p>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                    '<button class="btn btn-primary" id="resendWelcomeConfirm">Send Welcome Email</button>' +
+                    '<button class="btn btn-secondary modal-close">Cancel</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+        const close = function() { overlay.remove(); };
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+        overlay.querySelector('.modal-close').addEventListener('click', close);
+
+        const confirmBtn = overlay.querySelector('#resendWelcomeConfirm');
+        confirmBtn.addEventListener('click', function() {
+            const email = (overlay.querySelector('#resendWelcomeEmail').value || '').trim();
+            if (!email || email.indexOf('@') < 0 || email.indexOf('.') < 0) {
+                Utils.showToast('Please enter a valid email address.', 'error');
+                return;
+            }
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Sending…';
+
+            // Only send a corrected email if it actually changed.
+            const corrected = (email !== (worker.email || '')) ? email : null;
+            const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+
+            AppData.apiResendWelcomeEmail(workerId, corrected)
+                .then(function(resp) {
+                    if (resp && resp.ok === false) {
+                        throw new Error(resp.error || 'Email failed to send');
+                    }
+                    if (corrected) { worker.email = email; } // keep local cache in sync
+                    Utils.showToast('Welcome email sent to ' + email, 'success');
+                    AppData.addAuditLog(username, 'Welcome Email Resent', 'Worker: ' + worker.name + ' → ' + email);
+                    close();
+                    self._renderList();
+                })
+                .catch(function(err) {
+                    Utils.showToast('Could not send welcome email: ' + (err.message || 'unknown error'), 'error');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Send Welcome Email';
+                });
+        });
     },
 
     _startWizard() {
