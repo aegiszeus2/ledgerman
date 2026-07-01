@@ -28,6 +28,10 @@ window.AdminPhotos = {
         const projects = AppData.getProjects();
         const esc = Utils.escapeHtml;
 
+        const pad = function(n) { return String(n).padStart(2, '0'); };
+        const now = new Date();
+        const todayStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
                 <h2>Photo Gallery</h2>
@@ -44,11 +48,26 @@ window.AdminPhotos = {
                     </select>
                 </div>
             </div>
+            <div class="card" id="photoUploadCard" style="margin-bottom:16px;display:none">
+                <h3 style="margin-bottom:12px">Upload Photos to this Project</h3>
+                <div class="form-group">
+                    <label>Label / note for this batch (applies to all selected photos)</label>
+                    <input type="text" id="photoUploadBy" placeholder="e.g. Site inspection — J. Smith" maxlength="120">
+                </div>
+                <div class="form-group">
+                    <label>Photo date</label>
+                    <input type="date" id="photoUploadDate" value="${todayStr}">
+                </div>
+                <button class="btn-primary btn-sm" id="uploadPhotosBtn">Select photos to upload…</button>
+                <input type="file" id="photoUploadInput" accept="image/*" multiple style="display:none">
+                <div id="photoUploadStatus" style="margin-top:8px;color:var(--text2);font-size:.9rem"></div>
+            </div>
             <div id="photoGalleryBody"></div>
         `;
 
         container.querySelector('#photoProjectSelect').addEventListener('change', function() {
             self._selectedProjectId = this.value || null;
+            self._updateUploadVisibility();
             self._loadPhotos();
         });
 
@@ -56,12 +75,82 @@ window.AdminPhotos = {
             self._exportPhotos();
         });
 
+        container.querySelector('#uploadPhotosBtn').addEventListener('click', function() {
+            container.querySelector('#photoUploadInput').click();
+        });
+
+        container.querySelector('#photoUploadInput').addEventListener('change', function() {
+            self._uploadPhotos(this.files);
+        });
+
+        self._updateUploadVisibility();
+
         if (self._selectedProjectId) {
             self._loadPhotos();
         } else {
             container.querySelector('#photoGalleryBody').innerHTML =
                 '<div class="card"><div class="empty"><h3>Select a Project</h3><p>Choose a project from the dropdown above to view its photos.</p></div></div>';
         }
+    },
+
+    _updateUploadVisibility() {
+        const card = this._container.querySelector('#photoUploadCard');
+        if (card) card.style.display = this._selectedProjectId ? '' : 'none';
+    },
+
+    _uploadPhotos(fileList) {
+        const self = this;
+        const container = self._container;
+        const files = Array.prototype.slice.call(fileList || []);
+        if (!files.length) return;
+        if (!self._selectedProjectId) { Utils.showToast('Select a project first.', 'error'); return; }
+
+        const MAX_MB = 15;
+        const label = (container.querySelector('#photoUploadBy').value || '').trim();
+        const pad = function(n) { return String(n).padStart(2, '0'); };
+        const now = new Date();
+        const dateVal = container.querySelector('#photoUploadDate').value ||
+            (now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()));
+        const statusEl = container.querySelector('#photoUploadStatus');
+        const input = container.querySelector('#photoUploadInput');
+
+        const images = files.filter(function(f) { return /^image\//.test(f.type); });
+        const oversized = images.filter(function(f) { return f.size > MAX_MB * 1024 * 1024; });
+        const accepted = images.filter(function(f) { return f.size <= MAX_MB * 1024 * 1024; });
+        if (oversized.length) Utils.showToast(oversized.length + ' photo(s) skipped (over ' + MAX_MB + ' MB).', 'error');
+        if (!accepted.length) { Utils.showToast('No valid images to upload.', 'error'); if (input) input.value = ''; return; }
+
+        statusEl.textContent = 'Uploading ' + accepted.length + ' photo(s)…';
+
+        (async function() {
+            let done = 0, failed = 0;
+            for (let i = 0; i < accepted.length; i++) {
+                const file = accepted[i];
+                try {
+                    await AppData.savePhoto({
+                        id: AppData.generateId(),
+                        projectId: self._selectedProjectId,
+                        workerId: '',
+                        workerName: label || 'Admin Upload',
+                        submissionId: '',
+                        date: dateVal,
+                        filename: file.name || 'photo.jpg',
+                        blob: file,
+                        thumbnail: file,
+                        description: label
+                    });
+                    done++;
+                } catch (e) {
+                    failed++;
+                    console.warn('[AdminPhotos] upload failed:', e);
+                }
+                statusEl.textContent = 'Uploaded ' + done + '/' + accepted.length + (failed ? ' (' + failed + ' failed)' : '') + '…';
+            }
+            statusEl.textContent = done + ' photo(s) uploaded' + (failed ? ', ' + failed + ' failed' : '') + '.';
+            Utils.showToast(done + ' photo(s) uploaded to project.', failed ? 'error' : 'success');
+            if (input) input.value = '';
+            self._loadPhotos();
+        })();
     },
 
     _loadPhotos() {
