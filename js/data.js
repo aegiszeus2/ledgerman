@@ -665,6 +665,7 @@ function _normalizeWorker(w) {
     if (!w) return w;
     return Object.assign({}, w, {
         defaultRate:  w.defaultRate  !== undefined ? w.defaultRate  : (w.default_rate   || 0),
+        costRate:     w.costRate     !== undefined ? w.costRate     : (w.cost_rate      || 0),
         twoFAEnabled: w.twoFAEnabled !== undefined ? w.twoFAEnabled : !!(w.two_fa_enabled),
         totpSecret:   w.totpSecret   !== undefined ? w.totpSecret   : (w.totp_secret    || ''),
         createdAt:    w.createdAt    !== undefined ? w.createdAt    : (w.created_at      || ''),
