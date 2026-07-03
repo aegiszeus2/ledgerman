@@ -53,6 +53,7 @@ window.AdminApprovals = {
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <button class="btn-secondary btn-sm" id="approvalsExportCsvBtn">Export CSV</button>
                     <button class="btn-secondary btn-sm" id="approvalsPrintBtn">Print</button>
+                    <button class="btn-primary btn-sm" id="addTimecardBtn">+ Add Timecard</button>
                     <button class="btn-primary btn-sm" id="bulkApproveBtn">Bulk Approve</button>
                 </div>
             </div>
@@ -75,6 +76,13 @@ window.AdminApprovals = {
                 self._renderContent();
             });
         });
+
+        const addTcBtn = container.querySelector('#addTimecardBtn');
+        if (addTcBtn) {
+            addTcBtn.addEventListener('click', function() {
+                self._showEditModal(null);   // null id → create mode
+            });
+        }
 
         const bulkBtn = container.querySelector('#bulkApproveBtn');
         if (bulkBtn) {
@@ -459,7 +467,17 @@ window.AdminApprovals = {
 
     _showEditModal(subId) {
         const self = this;
-        const sub = AppData.getSubmission(subId);
+        const isCreate = !subId;
+        let sub;
+        if (isCreate) {
+            const _d = new Date();
+            const _today = _d.getFullYear() + '-' +
+                String(_d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(_d.getDate()).padStart(2, '0');
+            sub = { id: null, status: 'Pending', date: _today, rateType: 'Hourly', equipmentEntries: [] };
+        } else {
+            sub = AppData.getSubmission(subId);
+        }
         if (!sub) return;
 
         const isApproved = sub.status === 'Approved';
@@ -472,9 +490,10 @@ window.AdminApprovals = {
         const allEquipment = AppData.getEquipment ? AppData.getEquipment() : [];
 
         function buildWorkerOptions(selId) {
-            return allWorkers.map(function(w) {
+            const opts = allWorkers.map(function(w) {
                 return '<option value="' + Utils.escapeHtml(w.id) + '"' + (w.id === selId ? ' selected' : '') + '>' + Utils.escapeHtml(w.name) + '</option>';
             }).join('');
+            return isCreate ? '<option value="">— Select Worker —</option>' + opts : opts;
         }
         function buildProjectOptions(selId) {
             return '<option value="">— Select Project —</option>' +
@@ -693,9 +712,9 @@ window.AdminApprovals = {
             <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
         `;
 
-        const modal = UI.modal('Edit Submission', bodyHtml, {
+        const modal = UI.modal(isCreate ? 'Add Timecard' : 'Edit Submission', bodyHtml, {
             width: '580px',
-            submitLabel: 'Save Changes',
+            submitLabel: isCreate ? 'Create Timecard' : 'Save Changes',
             scrollBody: true,
         });
         const q = s => modal.q(s);
@@ -810,6 +829,31 @@ window.AdminApprovals = {
                 fields.endTime   = q('#editEndTime').value;
                 fields.hours     = parseFloat(q('#editHours').value) || 0;
                 fields.rate      = parseFloat(q('#editRate').value) || 0;
+            }
+
+            // ── Create mode: brand-new admin-entered timecard ───────────────
+            if (isCreate) {
+                if (!newWorkerId) { errEl.textContent = 'Worker is required.'; errEl.style.display = 'block'; return; }
+                const restoreC = UI.btnLoading(modal.submitBtn, 'Creating…');
+                try {
+                    const newSub = Object.assign({
+                        id:              AppData.generateId(),
+                        status:          'Pending',
+                        submittedAt:     new Date().toISOString(),
+                        entryMethod:     'Admin Entry',
+                        rejectionReason: null,
+                    }, fields);
+                    AppData.saveSubmission(newSub);
+                } catch (e) {
+                    errEl.textContent = 'Failed to create: ' + e.message;
+                    errEl.style.display = 'block';
+                    restoreC();
+                    return;
+                }
+                Utils.showToast('Timecard created — pending approval');
+                modal.close();
+                self._renderContent();
+                return;
             }
 
             // Remove linked expense client-side if re-approving
