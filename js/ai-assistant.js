@@ -287,6 +287,44 @@ window.AIAssistant = (function () {
                         results.push({ type: type, label: '✅ Expense added: $' + (exp.amount || '?') });
                     }
 
+                } else if (type === 'create_timecard') {
+                    // Timecards are NOT entities — write directly to the dedicated
+                    // /api/timecards endpoint (auth'd). Lands in status='pending' server-side.
+                    var tcToken = sessionStorage.getItem('ledgeman_jwt') || '';
+                    var tcApiBase = (window.AppData && AppData.API_BASE) ||
+                        (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://app.ledgerman.org');
+                    var tcBody = {
+                        workerId:     data.workerId,
+                        projectId:    data.projectId,
+                        date:         data.date || new Date().toISOString().slice(0, 10),
+                        regularHours: data.regularHours,
+                        otHours:      data.otHours || 0,
+                        dtHours:      data.dtHours || 0,
+                        shift:        data.shift || 'Day',
+                        costCode:     data.costCode || '',
+                        notes:        data.notes || ''
+                    };
+                    if (!tcBody.workerId || !tcBody.projectId || tcBody.regularHours == null) {
+                        results.push({ type: type, label: '⚠️ Timecard needs worker, project, and hours' });
+                    } else {
+                        var tcWho = data.workerName || tcBody.workerId;
+                        fetch(tcApiBase + '/api/timecards', {
+                            method:  'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tcToken },
+                            body:    JSON.stringify(tcBody)
+                        })
+                        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                        .then(function (res) {
+                            if (!res.ok) {
+                                console.error('[AIAssistant] create_timecard failed:', res.d);
+                            } else if (window.App && App.navigate && App.currentView) {
+                                setTimeout(function () { App.navigate(App.currentView); }, 300);
+                            }
+                        })
+                        .catch(function (e) { console.error('[AIAssistant] create_timecard error:', e); });
+                        results.push({ type: type, label: '✅ Timecard queued for approval: ' + tcWho + ' — ' + tcBody.regularHours + 'h' });
+                    }
+
                 } else if (type === 'navigate_to') {
                     var mod = data.module;
                     if (mod && window.App && App.navigate) {
