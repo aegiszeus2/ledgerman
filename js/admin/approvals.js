@@ -3,11 +3,14 @@ window.AdminApprovals = {
     _tab: 'pending',
     _impactCodes: [],  // cached impact code list
 
+    _pendingTimecards: [],  // pending timecards (separate table from submissions)
+
     render(container) {
         const self = this;
         self._container = container;
-        // Load impact codes in background (for display + editing)
-        self._loadImpactCodes().then(function() { self._renderContent(); });
+        // Load impact codes + pending timecards in background, then render
+        Promise.all([self._loadImpactCodes(), self._loadPendingTimecards()])
+            .then(function() { self._renderContent(); });
     },
 
     async _loadImpactCodes() {
@@ -18,6 +21,23 @@ window.AdminApprovals = {
                 headers: { 'Authorization': 'Bearer ' + jwt }
             });
             if (res.ok) self._impactCodes = await res.json();
+        } catch (e) { /* silent */ }
+    },
+
+    // Timecards live in their own table (created by AI/email/batch entry) and do NOT
+    // come through /api/sync's submissions collection — fetch them directly so they
+    // surface in the approvals queue.
+    async _loadPendingTimecards() {
+        const self = this;
+        try {
+            const jwt = AppData.getJwt ? AppData.getJwt() : '';
+            const res = await fetch(AppData.API_BASE + '/api/timecards?status=pending', {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                self._pendingTimecards = Array.isArray(data) ? data : [];
+            }
         } catch (e) { /* silent */ }
     },
 
@@ -46,6 +66,8 @@ window.AdminApprovals = {
         const pending = submissions.filter(function(s) { return s.status === 'Pending'; });
         const approved = submissions.filter(function(s) { return s.status === 'Approved'; });
         const rejected = submissions.filter(function(s) { return s.status === 'Rejected'; });
+        const pendingTc = Array.isArray(self._pendingTimecards) ? self._pendingTimecards : [];
+        const pendingTotal = pending.length + pendingTc.length;
 
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
@@ -60,7 +82,7 @@ window.AdminApprovals = {
 
             <div class="tabs" style="margin-bottom:16px">
                 <button class="tab-btn ${self._tab === 'pending' ? 'active' : ''}" data-tab="pending">
-                    Pending ${pending.length > 0 ? '<span class="badge-gold" style="margin-left:6px">' + pending.length + '</span>' : ''}
+                    Pending ${pendingTotal > 0 ? '<span class="badge-gold" style="margin-left:6px">' + pendingTotal + '</span>' : ''}
                 </button>
                 <button class="tab-btn ${self._tab === 'history' ? 'active' : ''}" data-tab="history">
                     History (${approved.length + rejected.length})
@@ -152,10 +174,126 @@ window.AdminApprovals = {
 
         const contentEl = container.querySelector('#approvalContent');
         if (self._tab === 'pending') {
-            self._renderPending(contentEl, pending);
+            contentEl.innerHTML = '<div id="tcPendingSection"></div><div id="subPendingSection"></div>';
+            self._renderPendingTimecards(contentEl.querySelector('#tcPendingSection'), pendingTc);
+            const subEl = contentEl.querySelector('#subPendingSection');
+            if (pending.length === 0 && pendingTc.length > 0) {
+                subEl.innerHTML = '';  // timecards already shown; skip duplicate empty-state
+            } else {
+                self._renderPending(subEl, pending);
+            }
         } else {
             self._renderHistory(contentEl, approved, rejected);
         }
+    },
+
+    // ── Pending timecards (separate store, own approve/reject endpoints) ─────────
+    _renderPendingTimecards(el, timecards) {
+        const self = this;
+        if (!el) return;
+        if (!timecards || timecards.length === 0) { el.innerHTML = ''; return; }
+
+        el.innerHTML = '<h3 style="margin:0 0 12px;font-size:1rem">Timecards Pending Review <span class="badge-gold" style="margin-left:6px">' + timecards.length + '</span></h3>' +
+            timecards.map(function(tc) {
+                const worker  = AppData.getWorker(tc.workerId);
+                const project = AppData.getProject(tc.projectId);
+                const workerName  = worker  ? worker.name  : (tc.workerId  || 'Unknown Worker');
+                const projectName = project ? project.name : (tc.projectId || 'Unknown Project');
+                const reg = parseFloat(tc.regularHours) || 0;
+                const ot  = parseFloat(tc.otHours) || 0;
+                const dt  = parseFloat(tc.dtHours) || 0;
+                const total = reg + ot + dt;
+                const breakdown = (ot || dt)
+                    ? ' (' + reg + ' reg' + (ot ? ' + ' + ot + ' OT' : '') + (dt ? ' + ' + dt + ' DT' : '') + ')'
+                    : '';
+                return '<div class="card" data-tc-id="' + tc.id + '" style="border-left:3px solid var(--accent,#3498db)">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">' +
+                        '<div style="flex:1;min-width:200px">' +
+                            '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+                                '<strong style="font-size:1.05rem">' + Utils.escapeHtml(workerName) + '</strong>' +
+                                '<span style="font-size:.7rem;padding:1px 8px;border-radius:10px;background:rgba(52,152,219,.15);color:#2980b9">Timecard</span>' +
+                                '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
+                                '<span style="font-size:.8rem;color:var(--text2)">' + Utils.formatDate(tc.date) + '</span>' +
+                            '</div>' +
+                            (tc.costCode ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Cost code:</strong> ' + Utils.escapeHtml(tc.costCode) + '</div>' : '') +
+                            '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(tc.notes || tc.workDescription || 'No description') + '</div>' +
+                            '<div style="font-size:.85rem;color:var(--text2)">' + total + ' hrs' + breakdown + '</div>' +
+                        '</div>' +
+                        '<div style="display:flex;gap:8px;align-items:flex-start">' +
+                            '<button class="btn btn-primary btn-sm tc-approve-btn" data-id="' + tc.id + '">Approve</button>' +
+                            '<button class="btn btn-danger btn-sm tc-reject-btn" data-id="' + tc.id + '">Reject</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+
+        el.querySelectorAll('.tc-approve-btn').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+                btn.disabled = true;
+                const ok = await self._timecardAction(btn.dataset.id, 'approve');
+                if (ok) {
+                    Utils.showToast('Timecard approved');
+                    await self._loadPendingTimecards();
+                    self._renderContent();
+                } else {
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        el.querySelectorAll('.tc-reject-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                self._showTimecardRejectModal(btn.dataset.id);
+            });
+        });
+    },
+
+    async _timecardAction(tcId, action, reason) {
+        try {
+            const jwt = AppData.getJwt ? AppData.getJwt() : '';
+            const res = await fetch(AppData.API_BASE + '/api/timecards/' + encodeURIComponent(tcId) + '/' + action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+                body: JSON.stringify(reason ? { reason: reason } : {})
+            });
+            if (!res.ok) {
+                let msg = 'HTTP ' + res.status;
+                try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) { /* ignore */ }
+                Utils.showToast('Failed: ' + msg, 'error');
+                return false;
+            }
+            return true;
+        } catch (e) {
+            Utils.showToast('Failed: ' + e.message, 'error');
+            return false;
+        }
+    },
+
+    _showTimecardRejectModal(tcId) {
+        const self = this;
+        const bodyHtml = `
+            <div class="form-group" style="margin-bottom:12px">
+                <label>Reason for rejection</label>
+                <textarea class="form-control" id="tcRejectReason" rows="3" placeholder="Enter reason..."></textarea>
+            </div>
+        `;
+        const modal = UI.modal('Reject Timecard', bodyHtml, {
+            width: '400px',
+            submitLabel: 'Reject',
+            danger: true,
+        });
+        const q = s => modal.q(s);
+
+        modal.submitBtn.addEventListener('click', async function() {
+            const reason = q('#tcRejectReason').value.trim();
+            const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
+            const ok = await self._timecardAction(tcId, 'reject', reason);
+            if (!ok) { restore(); return; }
+            Utils.showToast('Timecard rejected');
+            modal.close();
+            await self._loadPendingTimecards();
+            self._renderContent();
+        });
     },
 
     _renderPending(contentEl, pending) {
