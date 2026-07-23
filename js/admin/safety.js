@@ -27,6 +27,7 @@ window.AdminSafety = {
             { id: 'hazards',   label: 'Hazard Obs.' },
             { id: 'jha',       label: 'JHA / FLHA' },
             { id: 'toolbox',   label: 'Toolbox Talks' },
+            { id: 'templates', label: 'Safety Topics' },
         ];
         const at = self._activeTab;
 
@@ -61,7 +62,20 @@ window.AdminSafety = {
             case 'hazards':   self._renderHazards();   break;
             case 'jha':       self._renderJHA();       break;
             case 'toolbox':   self._renderToolbox();   break;
+            case 'templates': self._renderTemplates(); break;
         }
+    },
+
+    // ===================== API HELPERS (server-side THA template library) =====================
+    _apiBase() { return AppData.API_BASE; },
+    _headers() { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AppData.getJwt() }; },
+    async _api(method, path, body) {
+        const opts = { method, headers: this._headers() };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(this._apiBase() + path, opts);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || ('Request failed (' + res.status + ')'));
+        return json;
     },
 
     // ===================== METRICS =====================
@@ -1294,6 +1308,142 @@ window.AdminSafety = {
             AppData.save('toolbox_talks', record);
             Utils.showToast(isNew ? 'Toolbox talk logged' : 'Toolbox talk updated', 'success');
             self._renderToolbox();
+        };
+    },
+
+    // ===================== SAFETY TOPICS (THA template library) =====================
+    async _renderTemplates() {
+        const self = this;
+        const esc = Utils.escapeHtml;
+        const content = document.getElementById('safetyTabContent');
+        content.innerHTML = `<div style="padding:24px;color:var(--text2)">Loading safety topic library…</div>`;
+
+        let templates = [];
+        try {
+            const resp = await self._api('GET', '/api/admin/tha-templates');
+            templates = resp.tha_templates || [];
+        } catch (err) {
+            content.innerHTML = `<div style="padding:16px;background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);border-radius:6px;color:#dc3545;font-size:.9rem">
+                ⚠️ Could not load safety topics: ${esc(err.message)}</div>
+                <button id="ttplRetry" class="btn-secondary btn-sm" style="margin-top:12px">Retry</button>`;
+            const r = document.getElementById('ttplRetry');
+            if (r) r.onclick = () => self._renderTemplates();
+            return;
+        }
+
+        const active = templates.filter(t => t.active !== false);
+        const retired = templates.filter(t => t.active === false);
+
+        const card = (t) => {
+            const pts = Array.isArray(t.talkingPoints) ? t.talkingPoints : [];
+            const isActive = t.active !== false;
+            return `
+            <div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;background:var(--card);${isActive ? '' : 'opacity:.62'}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+                    <div style="min-width:0">
+                        <div style="font-weight:600;font-size:.95rem">${esc(t.title || 'Untitled')}
+                            ${t.category ? `<span style="font-weight:400;color:var(--text2);font-size:.82rem"> · ${esc(t.category)}</span>` : ''}
+                            ${isActive ? '' : '<span style="font-size:.72rem;font-weight:600;color:#dc3545;margin-left:6px">RETIRED</span>'}
+                        </div>
+                        <ul style="margin:6px 0 0;padding-left:18px">
+                            ${pts.map(p => `<li style="font-size:.84rem;color:var(--text2);margin-bottom:2px">${esc(p)}</li>`).join('') || '<li style="font-size:.84rem;color:var(--text2)">No talking points</li>'}
+                        </ul>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:6px;white-space:nowrap">
+                        <button class="btn-secondary btn-sm" data-action="edit-tpl" data-id="${esc(t.id)}" style="font-size:.75rem">Edit</button>
+                        <button class="btn-secondary btn-sm" data-action="toggle-tpl" data-id="${esc(t.id)}" data-active="${isActive ? '1' : '0'}" style="font-size:.75rem">${isActive ? 'Retire' : 'Reactivate'}</button>
+                    </div>
+                </div>
+            </div>`;
+        };
+
+        content.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                <p style="color:var(--text2);margin:0;font-size:.88rem;max-width:560px">Curated safety-topic templates supervisors can add to any JHA/FLHA. Retiring a topic hides it from the picker without deleting past usage.</p>
+                <button id="tplAddBtn" class="btn-primary btn-sm">+ New Safety Topic</button>
+            </div>
+            ${active.length ? active.map(card).join('') : '<div style="padding:16px;color:var(--text2);font-size:.9rem">No active safety topics yet. Create one to get started.</div>'}
+            ${retired.length ? `<div style="margin:18px 0 8px;font-size:.82rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Retired</div>${retired.map(card).join('')}` : ''}
+        `;
+
+        document.getElementById('tplAddBtn').onclick = () => self._showTemplateForm(null, templates);
+        content.querySelectorAll('[data-action="edit-tpl"]').forEach(btn => {
+            btn.onclick = () => self._showTemplateForm(btn.dataset.id, templates);
+        });
+        content.querySelectorAll('[data-action="toggle-tpl"]').forEach(btn => {
+            btn.onclick = async () => {
+                const nowActive = btn.dataset.active === '1';
+                btn.disabled = true;
+                try {
+                    await self._api('PATCH', '/api/admin/tha-templates/' + encodeURIComponent(btn.dataset.id), { active: !nowActive });
+                    Utils.showToast(nowActive ? 'Safety topic retired' : 'Safety topic reactivated', 'success');
+                    self._renderTemplates();
+                } catch (err) {
+                    btn.disabled = false;
+                    Utils.showToast('Failed: ' + err.message, 'error');
+                }
+            };
+        });
+    },
+
+    _showTemplateForm(tid, templates) {
+        const self = this;
+        const esc = Utils.escapeHtml;
+        const content = document.getElementById('safetyTabContent');
+        const tpl = tid ? (templates || []).find(t => t.id === tid) : null;
+        const isNew = !tpl;
+        const pointsText = tpl && Array.isArray(tpl.talkingPoints) ? tpl.talkingPoints.join('\n') : '';
+
+        content.innerHTML = `
+            <div style="max-width:640px;margin:0 auto">
+                <h3 style="margin-bottom:20px">${isNew ? 'New Safety Topic' : 'Edit Safety Topic'}</h3>
+                <form id="tplForm" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px">
+                    <div style="margin-bottom:14px">
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Title *</label>
+                        <input type="text" id="tplTitle" maxlength="200" value="${esc(tpl ? (tpl.title || '') : '')}" placeholder="e.g. Working at Heights"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem" required>
+                    </div>
+                    <div style="margin-bottom:14px">
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Category</label>
+                        <input type="text" id="tplCategory" value="${esc(tpl ? (tpl.category || '') : '')}" placeholder="e.g. Fall Protection (optional)"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem">
+                    </div>
+                    <div style="margin-bottom:18px">
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Talking Points * <span style="font-weight:400;color:var(--text2)">(one per line)</span></label>
+                        <textarea id="tplPoints" placeholder="Inspect harness and lanyard before use&#10;Anchor points rated 5000 lb&#10;100% tie-off above 3 m"
+                            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:130px;resize:vertical" required>${esc(pointsText)}</textarea>
+                    </div>
+                    <div style="display:flex;gap:10px">
+                        <button type="submit" id="tplSaveBtn" class="btn-primary">${isNew ? 'Create Topic' : 'Save Changes'}</button>
+                        <button type="button" id="tplCancelBtn" class="btn-secondary">Cancel</button>
+                    </div>
+                </form>
+            </div>`;
+
+        document.getElementById('tplCancelBtn').onclick = () => self._renderTemplates();
+        document.getElementById('tplForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('tplTitle').value.trim();
+            const category = document.getElementById('tplCategory').value.trim();
+            const points = document.getElementById('tplPoints').value.split('\n').map(s => s.trim()).filter(Boolean);
+            if (!title) { Utils.showToast('Title is required', 'error'); return; }
+            if (!points.length) { Utils.showToast('At least one talking point is required', 'error'); return; }
+
+            const saveBtn = document.getElementById('tplSaveBtn');
+            saveBtn.disabled = true;
+            const body = { title, category: category || null, talkingPoints: points };
+            try {
+                if (isNew) {
+                    await self._api('POST', '/api/admin/tha-templates', body);
+                } else {
+                    await self._api('PATCH', '/api/admin/tha-templates/' + encodeURIComponent(tid), body);
+                }
+                Utils.showToast(isNew ? 'Safety topic created' : 'Safety topic updated', 'success');
+                self._renderTemplates();
+            } catch (err) {
+                saveBtn.disabled = false;
+                Utils.showToast('Failed: ' + err.message, 'error');
+            }
         };
     }
 };

@@ -750,6 +750,18 @@ window.WorkerSafety = {
                             ${controlsArr.map(c => `<li style="font-size:.85rem;color:var(--text2);margin-bottom:2px">${esc(c)}</li>`).join('')}
                         </ul>
                     </div>` : ''}
+                    ${(Array.isArray(jha.safetyTopics) && jha.safetyTopics.length) ? `
+                    <div style="padding:10px;background:rgba(13,110,253,.05);border-radius:6px;margin-top:8px">
+                        <div style="font-size:.8rem;font-weight:600;color:#0d6efd;margin-bottom:4px">SAFETY TOPICS</div>
+                        ${jha.safetyTopics.map(st => `
+                            <div style="margin-bottom:6px">
+                                <div style="font-size:.83rem;font-weight:600;color:var(--text-primary)">${esc((st && st.title) || 'Topic')}</div>
+                                ${(Array.isArray(st && st.talkingPoints) && st.talkingPoints.length) ? `
+                                <ul style="margin:2px 0 0;padding-left:18px">
+                                    ${st.talkingPoints.map(p => `<li style="font-size:.83rem;color:var(--text2);margin-bottom:2px">${esc(p)}</li>`).join('')}
+                                </ul>` : ''}
+                            </div>`).join('')}
+                    </div>` : ''}
                     ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
                 `;
                 listEl.appendChild(card);
@@ -813,6 +825,11 @@ window.WorkerSafety = {
                             <span style="color:var(--text2);font-size:.75rem">${esc((a.acknowledgedAt || '').slice(0,10) || '—')}</span>
                         </div>`).join('')}
                     </div>` : (totalCount > 0 ? '<div style="font-size:.82rem;color:var(--text2);margin-top:4px">No signatures yet.</div>' : '')}
+                    ${(Array.isArray(jha.safetyTopics) && jha.safetyTopics.length) ? `
+                    <div style="padding:8px 10px;background:rgba(13,110,253,.05);border-radius:6px;margin-top:8px">
+                        <div style="font-size:.78rem;font-weight:600;color:#0d6efd;margin-bottom:3px">SAFETY TOPICS</div>
+                        ${jha.safetyTopics.map(st => `<div style="font-size:.82rem;color:var(--text-primary);font-weight:600">${esc((st && st.title) || 'Topic')}</div>${(Array.isArray(st && st.talkingPoints) && st.talkingPoints.length) ? st.talkingPoints.map(p => `<div style="font-size:.8rem;color:var(--text2);padding-left:10px">• ${esc(p)}</div>`).join('') : ''}`).join('')}
+                    </div>` : ''}
                     ${jha.notes ? `<div style="font-size:.83rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${esc(jha.notes)}</div>` : ''}
                     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                         ${jha._worker_acknowledged
@@ -880,6 +897,17 @@ window.WorkerSafety = {
             coworkers = resp.workers || [];
         } catch(_) { /* non-fatal — show empty picker */ }
 
+        // Fetch active THA safety-topic templates for the "Add Safety Topics" picker (additive; non-fatal)
+        let safetyTemplates = [];
+        try {
+            const tplResp = await self._api('GET', '/api/worker/safety/tha-templates');
+            safetyTemplates = (tplResp.tha_templates || []).filter(t => t && t.active !== false);
+        } catch(_) { /* non-fatal — hide picker if unavailable */ }
+        // Template ids already applied to this JHA (edit mode) — pre-check + avoid duplicate re-apply
+        const appliedTplIds = (isEdit && Array.isArray(jha.safetyTopics))
+            ? jha.safetyTopics.map(s => s && s.templateId).filter(Boolean)
+            : [];
+
         // Pre-fill values for edit mode
         const prefill = {
             date:            (jha && jha.date)        || today,
@@ -937,6 +965,32 @@ window.WorkerSafety = {
                         <textarea id="jfControls" placeholder="e.g.&#10;Install guardrails and safety nets&#10;Hard hats required&#10;LOTO procedures enforced"
                             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:.9rem;min-height:80px;resize:vertical">${esc(prefill.controls)}</textarea>
                     </div>
+
+                    ${safetyTemplates.length > 0 ? `
+                    <div>
+                        <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Add Safety Topics <span style="font-weight:400;color:var(--text2)">(curated talking points)</span></label>
+                        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg-primary);max-height:240px;overflow-y:auto">
+                            ${safetyTemplates.map(t => {
+                                const pts = Array.isArray(t.talkingPoints) ? t.talkingPoints : [];
+                                const already = appliedTplIds.includes(t.id);
+                                return `
+                                <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.88rem">
+                                    <input type="checkbox" name="jfTemplate" value="${esc(t.id)}"
+                                        ${already ? 'checked disabled' : ''}
+                                        style="width:15px;height:15px;cursor:pointer;flex-shrink:0;margin-top:2px" />
+                                    <span style="flex:1">
+                                        <span style="font-weight:600;color:var(--text-primary)">${esc(t.title || 'Untitled topic')}</span>
+                                        ${t.category ? `<span style="font-size:.73rem;color:var(--text2);margin-left:6px">${esc(t.category)}</span>` : ''}
+                                        ${already ? '<span style="font-size:.72rem;color:var(--text2);margin-left:6px">already added</span>' : ''}
+                                        ${pts.length ? `<div style="font-size:.78rem;color:var(--text2);margin-top:3px">${esc(pts.slice(0,2).join(' • '))}${pts.length > 2 ? ` (+${pts.length - 2} more)` : ''}</div>` : ''}
+                                    </span>
+                                </label>`;
+                            }).join('')}
+                        </div>
+                        <div style="font-size:.78rem;color:var(--text2);margin-top:4px">
+                            Selected topics add editable talking points to this JHA. Hazards and controls are untouched.
+                        </div>
+                    </div>` : ''}
 
                     <div>
                         <label style="display:block;font-weight:500;margin-bottom:6px;font-size:.9rem">Assign for Sign-Off</label>
@@ -999,13 +1053,32 @@ window.WorkerSafety = {
                 notes:           document.getElementById('jfNotes').value.trim(),
             };
 
+            // Newly-selected safety-topic templates to apply (skip disabled/already-applied ones)
+            const selectedTemplateIds = Array.from(
+                document.querySelectorAll('input[name="jfTemplate"]:checked:not(:disabled)')
+            ).map(cb => cb.value);
+
             try {
+                let jhaId;
                 if (isEdit) {
                     await self._api('PATCH', '/api/worker/safety/jha/' + jha.id, payload);
+                    jhaId = jha.id;
                     Utils.showToast('JHA updated', 'success');
                 } else {
-                    await self._api('POST', '/api/worker/safety/jha', payload);
+                    const created = await self._api('POST', '/api/worker/safety/jha', payload);
+                    jhaId = created && created.id;
                     Utils.showToast('JHA created', 'success');
+                }
+                // Additively apply each selected safety topic to the saved JHA
+                if (jhaId && selectedTemplateIds.length) {
+                    let applied = 0;
+                    for (const templateId of selectedTemplateIds) {
+                        try {
+                            await self._api('POST', '/api/worker/safety/jha/' + jhaId + '/apply-template', { templateId });
+                            applied++;
+                        } catch(applyErr) { /* keep going; report count below */ }
+                    }
+                    if (applied) Utils.showToast(applied + (applied === 1 ? ' safety topic added' : ' safety topics added'), 'success');
                 }
                 self._renderJHA();
             } catch(err) {
