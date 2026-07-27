@@ -84,8 +84,17 @@ window.WorkerHistory = {
 
                 // Hours display (no pay shown to worker)
                 var amountText = '';
-                if (sub.hours) {
-                    amountText = sub.hours + ' hours worked';
+                var _hrs = parseFloat(sub.hours) || 0;
+                if (!_hrs && sub.startTime && sub.endTime) {
+                    // Time-range submissions may not store an explicit hours field;
+                    // derive it so the card never shows a day with no hours.
+                    var _pt = function(t){ var m = String(t).split(':'); return (parseInt(m[0],10)||0) + (parseInt(m[1],10)||0)/60; };
+                    var _d2 = _pt(sub.endTime) - _pt(sub.startTime);
+                    if (_d2 < 0) _d2 += 24;
+                    _hrs = Math.round(_d2 * 100) / 100;
+                }
+                if (_hrs) {
+                    amountText = _hrs + ' hours worked';
                 }
 
                 var card = document.createElement('div');
@@ -157,6 +166,14 @@ window.WorkerHistory = {
                         '</div>';
                 }
 
+                // Pending entries: let the worker fix a mistake before approval
+                if (sub.status === 'Pending') {
+                    cardHTML +=
+                        '<div style="display:flex;gap:8px;margin-top:12px">' +
+                            '<button class="btn-secondary edit-pending-btn" style="flex:1;padding:12px 16px;font-size:.95rem" data-sub-id="' + esc(sub.id) + '">✏️ Edit Entry</button>' +
+                        '</div>';
+                }
+
                 card.innerHTML = cardHTML;
                 container.appendChild(card);
             });
@@ -181,6 +198,32 @@ window.WorkerHistory = {
                         hours: sub.hours,
                         rate: sub.rate,
                         flatRate: sub.flatRate,
+                        description: sub.description,
+                        unitsCompleted: sub.unitsCompleted
+                    });
+                });
+            }
+
+            // Bind edit buttons on pending entries (delete + re-open prefilled in time entry)
+            var editPendingBtns = container.querySelectorAll('.edit-pending-btn');
+            for (var k = 0; k < editPendingBtns.length; k++) {
+                editPendingBtns[k].addEventListener('click', function() {
+                    var subId = this.getAttribute('data-sub-id');
+                    var sub = AppData.getSubmission(subId);
+                    if (!sub) {
+                        Utils.showToast('Submission not found.', 'error');
+                        return;
+                    }
+                    AppData.deleteSubmission(subId);
+                    window.App.navigateWorker('timeentry', sub.projectId, {
+                        date: sub.date,
+                        subtaskId: sub.subtaskId,
+                        rateType: sub.rateType,
+                        hours: sub.hours,
+                        rate: sub.rate,
+                        flatRate: sub.flatRate,
+                        startTime: sub.startTime,
+                        endTime: sub.endTime,
                         description: sub.description,
                         unitsCompleted: sub.unitsCompleted
                     });

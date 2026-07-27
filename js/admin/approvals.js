@@ -316,8 +316,11 @@ window.AdminApprovals = {
             if (sub.rateType === 'Flat' || sub.rateType === 'flat') {
                 amountInfo = 'Flat rate: ' + Utils.formatCurrency(sub.flatRate || sub.flatAmount || sub.amount);
             } else {
+                // Worker time submissions don't carry a rate; fall back to the
+                // worker's master defaultRate so approvals never show $0/hr.
+                var effRate = (parseFloat(sub.rate) || 0) || (worker ? (parseFloat(worker.defaultRate) || 0) : 0);
                 var timeStr = (sub.startTime && sub.endTime) ? sub.startTime + ' → ' + sub.endTime + ' &nbsp;|&nbsp; ' : '';
-                amountInfo = timeStr + (parseFloat(sub.hours) || 0) + ' hrs @ ' + Utils.formatCurrency(sub.rate || 0) + '/hr = ' + Utils.formatCurrency((parseFloat(sub.hours) || 0) * (parseFloat(sub.rate) || 0));
+                amountInfo = timeStr + (parseFloat(sub.hours) || 0) + ' hrs @ ' + Utils.formatCurrency(effRate) + '/hr = ' + Utils.formatCurrency((parseFloat(sub.hours) || 0) * effRate);
             }
 
             const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
@@ -663,6 +666,10 @@ window.AdminApprovals = {
         // ── Computed HTML chunks (before template literal) ──────────────────
         const currentRateType   = sub.rateType || 'Hourly';
         const isInitiallyFlat   = currentRateType === 'Flat' || currentRateType === 'flat';
+        // Submissions carry no rate; seed the edit input from the worker's
+        // master defaultRate so the admin never edits from a $0 baseline.
+        const _editWorker       = (!isCreate && sub.workerId) ? AppData.getWorker(sub.workerId) : null;
+        const editRateValue     = (parseFloat(sub.rate) || 0) || (_editWorker ? (parseFloat(_editWorker.defaultRate) || 0) : 0);
         const existingEquip     = Array.isArray(sub.equipmentEntries) ? sub.equipmentEntries : [];
         const equipListHtml     = existingEquip.map(function(eq) { return equipRowHtml(eq); }).join('');
 
@@ -764,7 +771,7 @@ window.AdminApprovals = {
                         </div>
                         <div class="form-group" style="margin-bottom:0">
                             <label>Rate ($/hr)</label>
-                            <input type="number" class="form-control" id="editRate" value="${sub.rate || 0}" step="0.01" min="0">
+                            <input type="number" class="form-control" id="editRate" value="${editRateValue}" step="0.01" min="0">
                         </div>
                     </div>
                 </div>
