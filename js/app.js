@@ -84,6 +84,18 @@ window.LMIcons = {
                 return;
             }
 
+            // Session survival: an iOS camera capture can kill the page process and wipe
+            // sessionStorage mid-entry. If a fresh survival token was armed just before the
+            // camera opened, restore the session instead of dumping the worker to the login
+            // screen (which is what loses their in-progress time entry).
+            if (AppData.consumeSessionSurvival && AppData.consumeSessionSurvival()) {
+                const survivedJwt = AppData.getJwt();
+                if (survivedJwt && !AppData.isTokenExpired(survivedJwt)) {
+                    this._restoreFromActiveSession(survivedJwt);
+                    return;
+                }
+            }
+
             // Signup flow removed — invitations now use pre-filled login only
 
             // Always show the main login screen — clean slate every session.

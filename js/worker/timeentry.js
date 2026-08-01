@@ -274,6 +274,14 @@ window.WorkerTimeEntry = {
         var draftDirty = false;
         var draftSaveTimer = null;
 
+        // Expense/equipment lists live at render() scope so saveDraft() (below) can
+        // actually serialize them. Previously these were declared with `var` inside
+        // renderCompleteForm(), so saveDraft() threw a ReferenceError on selectedExpenses
+        // and the draft was never persisted at all — losing the entry on any reload.
+        // renderCompleteForm() resets these per form via reassignment (not re-declaration).
+        var selectedExpenses = [];
+        var selectedEquipment = [];
+
         function saveDraft() {
             try {
                 var f = document.getElementById('timeEntryForm');
@@ -319,8 +327,8 @@ window.WorkerTimeEntry = {
             // CRITICAL: Clear contentArea completely and atomically
             contentArea.innerHTML = '';
 
-            var selectedExpenses = []; // Reset expense list for this form
-            var selectedEquipment = []; // Reset equipment list for this form
+            selectedExpenses = []; // Reset expense list for this form (render-scope var)
+            selectedEquipment = []; // Reset equipment list for this form (render-scope var)
             var impactCodes = []; // Loaded async below
 
             // ── Draft restore ────────────────────────────────────────────
@@ -714,6 +722,11 @@ window.WorkerTimeEntry = {
 
             form.querySelector('#teExpenseFileBtn').addEventListener('click', function(e) {
                 e.preventDefault();
+                // Persist the in-progress entry and arm session survival BEFORE the camera
+                // opens — iOS may kill the page process while capturing, and this guarantees
+                // the typed data is in localStorage and the session can be restored on reload.
+                saveDraft();
+                if (window.AppData && AppData.armSessionSurvival) AppData.armSessionSurvival();
                 form.querySelector('#teExpenseInput').click();
             });
 
@@ -867,7 +880,12 @@ window.WorkerTimeEntry = {
             }
 
             // Photos — single input triggers iOS native sheet (Take Photo / Photo Library / Files)
-            form.querySelector('#teAddPhotosBtn').addEventListener('click', function() { form.querySelector('#tePhotoInput').click(); });
+            form.querySelector('#teAddPhotosBtn').addEventListener('click', function() {
+                // Persist entry + arm session survival before the camera opens (see expense handler).
+                saveDraft();
+                if (window.AppData && AppData.armSessionSurvival) AppData.armSessionSurvival();
+                form.querySelector('#tePhotoInput').click();
+            });
             form.querySelector('#tePhotoInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
 
             // Photo drag-and-drop zone (desktop enhancement — Add Photos button remains primary on mobile)

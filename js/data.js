@@ -52,6 +52,39 @@ function setCompanyId(id) {
 }
 function isApiMode() { return !!(getCompanyId()); }
 
+// ── Session survival across camera / file-picker page discard (iOS Safari) ──
+// iOS can terminate the web content process while the native camera is open (memory
+// pressure from a full-res capture), which wipes sessionStorage and logs the worker out
+// mid-entry. armSessionSurvival() stashes a SHORT-LIVED copy of the token in localStorage
+// right before the camera opens; consumeSessionSurvival() restores it once on the next
+// boot if it is still fresh and unexpired. This survives only the brief camera round-trip
+// and is one-shot + minutes-lived, so it does NOT weaken shared-device logout-on-close.
+var SESSION_SURVIVE_KEY = 'ledgeman_session_survive';
+var SESSION_SURVIVE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+function armSessionSurvival() {
+    try {
+        var jwt = getJwt();
+        var cid = getCompanyId();
+        if (jwt && cid) {
+            localStorage.setItem(SESSION_SURVIVE_KEY, JSON.stringify({ jwt: jwt, companyId: cid, ts: Date.now() }));
+        }
+    } catch (e) {}
+}
+function consumeSessionSurvival() {
+    try {
+        var raw = localStorage.getItem(SESSION_SURVIVE_KEY);
+        localStorage.removeItem(SESSION_SURVIVE_KEY); // one-shot, regardless of outcome
+        if (!raw) return false;
+        var s = JSON.parse(raw);
+        if (!s || !s.jwt || !s.companyId) return false;
+        if ((Date.now() - s.ts) > SESSION_SURVIVE_MAX_AGE_MS) return false;
+        if (isTokenExpired(s.jwt)) return false;
+        setJwt(s.jwt);
+        setCompanyId(s.companyId);
+        return true;
+    } catch (e) { return false; }
+}
+
 /**
  * isTokenExpired(token)
  * Decodes the JWT payload and checks whether the `exp` claim is in the past.
@@ -112,6 +145,7 @@ function clearAuthState() {
         sessionStorage.removeItem('ledgeman_jwt');
         sessionStorage.removeItem('ledgeman_companyId');
         localStorage.removeItem('ledgeman_persistent_login');
+        localStorage.removeItem(SESSION_SURVIVE_KEY);
         // Also clear entity data — prevents cross-company contamination on next login
         clearEntityCache();
     } catch (e) {
@@ -1348,6 +1382,7 @@ window.AppData = {
     // Auth / session
     getJwt, setJwt, getCompanyId, setCompanyId, isApiMode,
     isTokenExpired, clearAuthState, clearEntityCache,
+    armSessionSurvival, consumeSessionSurvival,
     getPersistentLogin, savePersistentLogin, clearPersistentLogin,
     apiRegister, apiLoginAdmin, apiLinkDevice, apiLoginWorker, apiLoginWorkerByName, apiLoginWorkerByNameAndPin,
     apiLoginWorkerByEmail, apiSendWorkerVerification, apiVerifyWorkerLogin,
