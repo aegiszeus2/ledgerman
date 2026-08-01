@@ -5,6 +5,25 @@ window.AdminApprovals = {
 
     _pendingTimecards: [],  // pending timecards (separate table from submissions)
 
+    // Date shown with the weekday name, e.g. "Monday, Jul 20, 2026".
+    // Used on approval cards so reviewers see the day of week at a glance.
+    _dayDate(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+        if (isNaN(d.getTime())) return (window.Utils ? Utils.formatDate(dateStr) : dateStr);
+        return d.toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+    },
+
+    // Clock in/out line for an approval card. Renders only when both times exist.
+    _clockLine(obj) {
+        if (obj && obj.startTime && obj.endTime) {
+            return '<div style="font-size:.85rem;color:var(--text2);margin-bottom:4px">' +
+                '<strong>Clock in:</strong> ' + Utils.escapeHtml(obj.startTime) +
+                ' &nbsp;•&nbsp; <strong>Clock out:</strong> ' + Utils.escapeHtml(obj.endTime) + '</div>';
+        }
+        return '';
+    },
+
     render(container) {
         const self = this;
         self._container = container;
@@ -213,8 +232,9 @@ window.AdminApprovals = {
                                 '<strong style="font-size:1.05rem">' + Utils.escapeHtml(workerName) + '</strong>' +
                                 '<span style="font-size:.7rem;padding:1px 8px;border-radius:10px;background:rgba(52,152,219,.15);color:#2980b9">Timecard</span>' +
                                 '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
-                                '<span style="font-size:.8rem;color:var(--text2)">' + Utils.formatDate(tc.date) + '</span>' +
+                                '<span style="font-size:.8rem;color:var(--text2)">' + self._dayDate(tc.date) + '</span>' +
                             '</div>' +
+                            self._clockLine(tc) +
                             (tc.costCode ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Cost code:</strong> ' + Utils.escapeHtml(tc.costCode) + '</div>' : '') +
                             '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(tc.notes || tc.workDescription || 'No description') + '</div>' +
                             '<div style="font-size:.85rem;color:var(--text2)">' + total + ' hrs' + breakdown + '</div>' +
@@ -348,8 +368,9 @@ window.AdminApprovals = {
                             editBadge +
                             impactBadge +
                             '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
-                            '<span style="font-size:.8rem;color:var(--text2)">' + Utils.formatDate(sub.date) + '</span>' +
+                            '<span style="font-size:.8rem;color:var(--text2)">' + self._dayDate(sub.date) + '</span>' +
                         '</div>' +
+                        self._clockLine(sub) +
                         (subtask ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Subtask:</strong> ' + Utils.escapeHtml(subtask.name) + '</div>' : '') +
                         '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(sub.description || 'No description') + '</div>' +
                         '<div style="font-size:.85rem;color:var(--text2)">' + amountInfo + '</div>' +
