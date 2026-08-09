@@ -37,6 +37,44 @@ window.WorkerTimeEntry = {
         // Default mode: clockin if active session, manual if resubmit, otherwise clockin by default
         var mode = hasPrefill ? 'manual' : (activeClock ? 'clockin' : 'clockin');
 
+        // ── Server-side clock-in persistence (durable backup for mobile) ──
+        // The active clock-in is mirrored to the server so it survives mobile
+        // browser storage eviction, private mode, and reopening the app from a
+        // different entry point. localStorage stays the fast path; the server is
+        // the durable backup + cross-device restore. All calls fail-soft: a
+        // network/server error never blocks the UI, the local copy is kept.
+        function _clockJwt() { return (AppData.getJwt ? AppData.getJwt() : ''); }
+        function syncClockInToServer(clock) {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) return;
+            fetch(AppData.API_BASE + '/api/clockins', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+                body: JSON.stringify({ projectId: projectId, time: clock.time, date: clock.date })
+            }).catch(function(e) { console.warn('[clockin] server sync failed (local kept):', e && e.message); });
+        }
+        function syncClockOutToServer() {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) return;
+            fetch(AppData.API_BASE + '/api/clockins/' + encodeURIComponent(projectId), {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            }).catch(function(e) { console.warn('[clockin] server clear failed:', e && e.message); });
+        }
+        function restoreClockInFromServer(cb) {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) { cb(null); return; }
+            fetch(AppData.API_BASE + '/api/clockins', {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            }).then(function(r) { return r.ok ? r.json() : null; })
+              .then(function(j) {
+                  if (!j || !j.clockins) { cb(null); return; }
+                  var match = j.clockins.filter(function(c) { return c.projectId === projectId; })[0];
+                  cb(match ? { time: match.time, date: match.date } : null);
+              })
+              .catch(function(e) { console.warn('[clockin] server restore failed:', e && e.message); cb(null); });
+        }
+
         // ── Helper: round minutes to nearest 15 ─────────────────────────
         function roundToNearest15(totalMinutes) {
             return Math.round(totalMinutes / 15) * 15;
@@ -192,6 +230,7 @@ window.WorkerTimeEntry = {
                     var d = Utils.today();
                     activeClock = { time: t, date: d };
                     AppData.setData(clockKey, activeClock);
+                    syncClockInToServer(activeClock);
                     clearInterval(clockTimer);
                     renderClockinMode();
                 });
@@ -244,6 +283,7 @@ window.WorkerTimeEntry = {
                     // Clear active clock
                     AppData.setData(clockKey, null);
                     activeClock = null;
+                    syncClockOutToServer();
 
                     // Switch to the complete-entry form pre-filled with clock times
                     renderCompleteForm(clockedDate, roundedStartStr, roundedEndStr);
@@ -1184,6 +1224,21 @@ window.WorkerTimeEntry = {
             }
         }
         renderContent();
+
+        // ── Restore active clock-in from server (mobile storage lost) ────
+        // If localStorage has no active clock-in (evicted, private mode, or the
+        // app was reopened from a different entry point) but the server still
+        // holds one for this worker+project, restore it so the crew's shift
+        // isn't lost. Only when we're not resubmitting a prior entry.
+        if (!activeClock && !hasPrefill) {
+            restoreClockInFromServer(function(found) {
+                if (found && !activeClock) {
+                    activeClock = found;
+                    AppData.setData(clockKey, activeClock);
+                    if (mode === 'clockin') renderClockinMode();
+                }
+            });
+        }
 
         // ── Draft save on app-switch / tab-hide (mobile critical) ────────
         // These fire when the worker switches apps, locks screen, or gets a call.
