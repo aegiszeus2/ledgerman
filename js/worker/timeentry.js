@@ -25,6 +25,9 @@ window.WorkerTimeEntry = {
         var selectedPhotos = [];
         var isWizardMode  = !AppData.getData('worker_wizard_done_' + worker.id);
         var defaults      = prefillData || {};
+        // Supervisors/Approvers: the hours form doubles as the daily field report,
+        // so they also declare who was on site today (multi-select below NOTES).
+        var isSupervisor  = !!(worker && (worker.role === 'Supervisor' || worker.role === 'Approver'));
 
         // Only treat as a real resubmit/prefill if it has actual time/description data
         // (params always contains projectId, so we can't use plain truthiness)
@@ -451,6 +454,34 @@ window.WorkerTimeEntry = {
                     '<label class="form-label eyebrow" for="teDescription">NOTES <span style="font-weight:400;color:var(--text2);text-transform:none;letter-spacing:0">(required)</span></label>' +
                     '<textarea class="form-control" id="teDescription" name="description" rows="4" placeholder="Describe the work you performed today…" style="resize:vertical" required>' + esc(defaults.description || '') + '</textarea>' +
                 '</div>';
+
+            // On-site employees (Supervisors/Approvers only) — the hours form doubles
+            // as the daily field report, so the supervisor declares who was on site.
+            if (isSupervisor) {
+                var activeTeam = (AppData.getWorkers ? AppData.getWorkers() : []).filter(function(w) {
+                    return (w.status || 'Active') === 'Active';
+                });
+                var preSel = {};
+                (defaults.employeesPresent || []).forEach(function(x) {
+                    preSel[(x && x.id) ? x.id : x] = true;
+                });
+                var teamOpts = activeTeam.map(function(w) {
+                    var checked   = preSel[w.id] ? ' checked' : '';
+                    var roleBadge = (w.role && w.role !== 'Worker')
+                        ? '<span style="font-size:.72rem;color:var(--text2);margin-left:auto">' + esc(w.role) + '</span>' : '';
+                    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);cursor:pointer">' +
+                               '<input type="checkbox" class="teEmpChk" value="' + esc(w.id) + '"' + checked + ' style="width:18px;height:18px;flex:none">' +
+                               '<span>' + esc(w.name) + '</span>' + roleBadge +
+                           '</label>';
+                }).join('');
+                formHTML +=
+                    '<div class="form-group" id="teEmployeesPresentGroup">' +
+                        '<label class="form-label eyebrow">ON-SITE EMPLOYEES <span style="font-weight:400;color:var(--text2);text-transform:none;letter-spacing:0">(who was on site today — daily report)</span></label>' +
+                        (activeTeam.length
+                            ? '<div id="teEmployeesPresent" style="max-height:230px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0 10px">' + teamOpts + '</div>'
+                            : '<div style="color:var(--text2);font-size:.85rem">No active employees to select.</div>') +
+                    '</div>';
+            }
 
             // Impact Code (optional — loaded async)
             formHTML +=
@@ -1012,6 +1043,13 @@ window.WorkerTimeEntry = {
                     unitOfMeasure = selOpt ? (selOpt.getAttribute('data-unit') || '') : '';
                 }
 
+                // On-site employees (supervisors only) — feeds the auto daily report
+                var employeesPresent = [];
+                if (isSupervisor) {
+                    var empChks = form.querySelectorAll('.teEmpChk:checked');
+                    for (var _ci = 0; _ci < empChks.length; _ci++) employeesPresent.push(empChks[_ci].value);
+                }
+
                 var impactCodeId      = form.querySelector('#teImpactCode').value;
                 var impactHours       = impactCodeId ? parseFloat(form.querySelector('#teImpactHours').value) : 0;
                 var impactBillable    = impactCodeId ? form.querySelector('#teImpactBillable').value : '';
@@ -1123,6 +1161,9 @@ window.WorkerTimeEntry = {
                         impactDescription:    impactCodeId ? impactDescription : null,
                         // Equipment note — admin-facing only; no equipment record created
                         equipmentNote:        (form.querySelector('#teEquipmentNote') || {}).value ? form.querySelector('#teEquipmentNote').value.trim() : '',
+                        // On-site employees for the daily field report (supervisors only;
+                        // omitted for regular workers so their submission is unchanged)
+                        employeesPresent:     isSupervisor ? employeesPresent : undefined,
                     };
 
                     AppData.saveSubmission(submission);
