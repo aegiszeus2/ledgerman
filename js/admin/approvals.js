@@ -85,7 +85,17 @@ window.AdminApprovals = {
         const pending = submissions.filter(function(s) { return s.status === 'Pending'; });
         const approved = submissions.filter(function(s) { return s.status === 'Approved'; });
         const rejected = submissions.filter(function(s) { return s.status === 'Rejected'; });
-        const pendingTc = Array.isArray(self._pendingTimecards) ? self._pendingTimecards : [];
+        // Every worker submission auto-mirrors to a timecard that shares the SAME id
+        // (backend upsert_timecard_from_submission keys the timecard on the submission id).
+        // That made each shift show TWICE on this tab: once as a submission card (has Edit,
+        // and approving it syncs the mirrored timecard) and once as a bare timecard card
+        // (no Edit, and approving it does NOT write back to the submission → stuck Pending).
+        // Keep the submission card, hide only the timecard that is a mirror of a still-pending
+        // submission. Standalone timecards (admin/AI-created, no matching submission) stay shown.
+        const pendingSubIds = {};
+        pending.forEach(function(s) { pendingSubIds[String(s.id)] = true; });
+        const allPendingTc = Array.isArray(self._pendingTimecards) ? self._pendingTimecards : [];
+        const pendingTc = allPendingTc.filter(function(tc) { return !pendingSubIds[String(tc.id)]; });
         const pendingTotal = pending.length + pendingTc.length;
 
         container.innerHTML = `
