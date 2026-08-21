@@ -4,8 +4,195 @@ window.WorkerHistory = {
         var esc = Utils.escapeHtml;
         var allSubmissions = AppData.getWorkerSubmissions(worker.id);
         var currentFilter = 'All';
+        // Period for the hours summary. Kept out here so it survives the
+        // wholesale re-render that a status-tab click triggers.
+        var currentPeriod = 'thisWeek';
+
+        // ── Hours summary helpers ──────────────────────────────────────────
+        // Dates are 'YYYY-MM-DD' strings. Parse them as LOCAL dates: bare
+        // new Date('2026-08-21') is UTC and rolls back a day west of Greenwich,
+        // which would put Monday's work in the previous week.
+        function parseLocalDate(ymd) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || '');
+            if (!m) return null;
+            return new Date(+m[1], +m[2] - 1, +m[3]);
+        }
+
+        function toYmd(d) {
+            return d.getFullYear() + '-' +
+                   String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                   String(d.getDate()).padStart(2, '0');
+        }
+
+        // Weeks run Monday to Sunday, the standard construction timesheet week.
+        function startOfWeek(d) {
+            var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            var dow = (x.getDay() + 6) % 7; // Mon = 0
+            x.setDate(x.getDate() - dow);
+            return x;
+        }
+
+        function addDays(d, n) {
+            var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            x.setDate(x.getDate() + n);
+            return x;
+        }
+
+        // Hours on a submission, deriving from the time range when the explicit
+        // hours field is absent. Same fallback the entry rows already use, so
+        // the summary can never disagree with the list below it.
+        function submissionHours(sub) {
+            var hrs = parseFloat(sub.hours) || 0;
+            if (!hrs && sub.startTime && sub.endTime) {
+                var pt = function(t) {
+                    var m = String(t).split(':');
+                    return (parseInt(m[0], 10) || 0) + (parseInt(m[1], 10) || 0) / 60;
+                };
+                var d = pt(sub.endTime) - pt(sub.startTime);
+                if (d < 0) d += 24;
+                hrs = Math.round(d * 100) / 100;
+            }
+            return hrs;
+        }
+
+        // 8 not 8.00, 21.5 not 21.50 — reads like a timesheet, not an invoice.
+        function fmtHours(h) {
+            return String(Math.round(h * 100) / 100);
+        }
+
+        function shortDate(d) {
+            return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+
+        // Inclusive [from, to] window for the chosen period; null = everything.
+        function periodRange(period) {
+            var today = new Date();
+            var tw    = startOfWeek(today);
+            if (period === 'thisWeek')  return { from: tw, to: addDays(tw, 6), label: 'This week' };
+            if (period === 'lastWeek')  { var lw = addDays(tw, -7); return { from: lw, to: addDays(lw, 6), label: 'Last week' }; }
+            if (period === 'last2Weeks'){ var l2 = addDays(tw, -7); return { from: l2, to: addDays(tw, 6), label: 'Last 2 weeks' }; }
+            if (period === 'thisMonth') {
+                var ms = new Date(today.getFullYear(), today.getMonth(), 1);
+                return { from: ms, to: new Date(today.getFullYear(), today.getMonth() + 1, 0), label: 'This month' };
+            }
+            if (period === 'lastMonth') {
+                var ls = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                return { from: ls, to: new Date(today.getFullYear(), today.getMonth(), 0), label: 'Last month' };
+            }
+            return null; // allTime
+        }
+
+        var PERIODS = [
+            { value: 'thisWeek',   label: 'This week' },
+            { value: 'lastWeek',   label: 'Last week' },
+            { value: 'last2Weeks', label: 'Last 2 weeks' },
+            { value: 'thisMonth',  label: 'This month' },
+            { value: 'lastMonth',  label: 'Last month' },
+            { value: 'allTime',    label: 'All time' }
+        ];
 
         renderPage();
+
+        function renderSummary() {
+            var range = periodRange(currentPeriod);
+
+            // Period selector — a native select so it inherits the worker
+            // portal's 48px / 16px touch sizing on a phone.
+            var picker = document.createElement('div');
+            picker.className = 'form-group';
+            picker.style.cssText = 'margin-bottom:12px';
+            picker.innerHTML =
+                '<label class="form-label" for="histPeriod">Hours summary</label>' +
+                '<select class="form-control" id="histPeriod">' +
+                PERIODS.map(function(p) {
+                    return '<option value="' + p.value + '"' +
+                           (p.value === currentPeriod ? ' selected' : '') + '>' +
+                           esc(p.label) + '</option>';
+                }).join('') +
+                '</select>';
+            container.appendChild(picker);
+            picker.querySelector('#histPeriod').addEventListener('change', function() {
+                currentPeriod = this.value;
+                renderPage();
+            });
+
+            // Entries inside the window (by work date, not submitted date).
+            var inRange = allSubmissions.filter(function(s) {
+                var d = parseLocalDate(s.date);
+                if (!d) return false;
+                if (!range) return true;
+                return d >= range.from && d <= range.to;
+            });
+
+            var totalHours    = 0, approvedHours = 0, pendingHours = 0;
+            var daysWorked    = {};
+            inRange.forEach(function(s) {
+                var h = submissionHours(s);
+                // Rejected entries are not hours worked — they were sent back.
+                if (s.status === 'Rejected') return;
+                totalHours += h;
+                if (s.status === 'Approved') approvedHours += h;
+                else                          pendingHours  += h;
+                if (s.date) daysWorked[s.date] = true;
+            });
+
+            var tiles = document.createElement('div');
+            tiles.className = 'worker-summary';
+            tiles.innerHTML =
+                '<div class="stat-card"><div class="stat-value">' + fmtHours(totalHours) + '</div>' +
+                    '<div class="stat-label">Total hours</div></div>' +
+                '<div class="stat-card"><div class="stat-value">' + Object.keys(daysWorked).length + '</div>' +
+                    '<div class="stat-label">Days worked</div></div>' +
+                '<div class="stat-card"><div class="stat-value" style="color:var(--success)">' + fmtHours(approvedHours) + '</div>' +
+                    '<div class="stat-label">Approved</div></div>' +
+                '<div class="stat-card"><div class="stat-value" style="color:var(--warn)">' + fmtHours(pendingHours) + '</div>' +
+                    '<div class="stat-label">Awaiting approval</div></div>';
+            container.appendChild(tiles);
+
+            // Week-by-week breakdown, newest week first.
+            var byWeek = {};
+            inRange.forEach(function(s) {
+                if (s.status === 'Rejected') return;
+                var d = parseLocalDate(s.date);
+                if (!d) return;
+                var key = toYmd(startOfWeek(d));
+                if (!byWeek[key]) byWeek[key] = { hours: 0, days: {} };
+                byWeek[key].hours += submissionHours(s);
+                byWeek[key].days[s.date] = true;
+            });
+            var weekKeys = Object.keys(byWeek).sort().reverse();
+
+            var breakdown = document.createElement('div');
+            breakdown.className = 'card';
+            breakdown.style.cssText = 'padding:14px 16px;margin-bottom:16px';
+            var rangeLabel = range
+                ? shortDate(range.from) + ' \u2013 ' + shortDate(range.to)
+                : 'All time';
+            var rows = '<div style="font-size:.8rem;color:var(--text2);margin-bottom:10px">' +
+                       esc(rangeLabel) + '</div>';
+            if (weekKeys.length === 0) {
+                rows += '<div style="font-size:.9rem;color:var(--text2)">No hours recorded in this period.</div>';
+            } else {
+                rows += weekKeys.map(function(k) {
+                    var wStart = parseLocalDate(k);
+                    var wEnd   = addDays(wStart, 6);
+                    var w      = byWeek[k];
+                    var nDays  = Object.keys(w.days).length;
+                    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;' +
+                                'padding:8px 0;border-top:1px solid var(--border)">' +
+                             '<div><div style="font-size:.9rem">Week of ' + esc(shortDate(wStart)) + '</div>' +
+                               '<div style="font-size:.75rem;color:var(--text2)">' +
+                                 esc(shortDate(wStart)) + ' \u2013 ' + esc(shortDate(wEnd)) +
+                                 ' \u00b7 ' + nDays + (nDays === 1 ? ' day' : ' days') +
+                               '</div></div>' +
+                             '<div class="hours" style="font-size:1.05rem;font-weight:600;white-space:nowrap">' +
+                               fmtHours(w.hours) + ' hrs</div>' +
+                           '</div>';
+                }).join('');
+            }
+            breakdown.innerHTML = rows;
+            container.appendChild(breakdown);
+        }
 
         function renderPage() {
             container.innerHTML = '';
@@ -21,6 +208,9 @@ window.WorkerHistory = {
             header.querySelector('#histBack').addEventListener('click', function() {
                 window.App.navigateWorker('home');
             });
+
+            // ── Hours summary ────────────────────────────────────────────
+            renderSummary();
 
             // Filter tabs
             var tabBar = document.createElement('div');

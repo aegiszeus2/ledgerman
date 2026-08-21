@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--
+  harness.html — isolated test bed for the worker portal modules.
+
+  Loads a worker module against stub AppData/Utils so its behaviour can be
+  driven directly, with no login, no network, and no real company data.
+  Used by timeentry-draft.spec.js and worker-hours-summary.spec.js.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/worker.css">
+</head>
+<body>
+<div class="worker-content" id="workerContent"></div>
+
+<script>
+// ── Stub storage-backed AppData ────────────────────────────────────────────
+window.__apiCalls = [];
+window.__serverDrafts = {};   // "projectId|date" -> payload
+window.__storageBlocked = false;
+
+window.AppData = {
+    API_BASE: 'http://api.test',
+    getJwt: function() { return 'test-jwt'; },
+    getData: function(key) {
+        try {
+            var raw = localStorage.getItem('ledgeman_' + key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    },
+    setData: function(key, value) {
+        if (window.__storageBlocked) {
+            var err = new Error('QuotaExceededError');
+            err.name = 'QuotaExceededError';
+            throw err;
+        }
+        localStorage.setItem('ledgeman_' + key, JSON.stringify(value));
+    },
+    getProject: function(id) { return { id: id, name: 'Test Project', unitOfMeasure: 'ea' }; },
+    getSubtasks: function() { return []; },
+    getWorkerSubmissions: function() { return window.__submissions || []; },
+    saveSubmission: function(s) { (window.__submissions = window.__submissions || []).push(s); },
+    getEquipment: function() { return []; },
+    getProjectEquipment: function() { return []; },
+    saveNotification: function() {},
+    getSettings: function() { return {}; }
+};
+
+window.Utils = {
+    escapeHtml: function(t) {
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    },
+    today: function() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+               '-' + String(d.getDate()).padStart(2, '0');
+    },
+    formatDate: function(d) { return String(d); },
+    formatDateTime: function(d) { return String(d); },
+    formatCurrency: function(n) { return '$' + Number(n || 0).toFixed(2); },
+    showToast: function(msg, kind) { (window.__toasts = window.__toasts || []).push({ msg: msg, kind: kind }); }
+};
+
+window.App = { navigateWorker: function(r) { window.__nav = r; } };
+window.LMIcons = new Proxy({}, { get: function() { return ''; } });
+
+// ── Fake API ───────────────────────────────────────────────────────────────
+// Mirrors the real /api/timeentry-drafts contract so the client's server-mirror
+// path is exercised end to end without touching production.
+var _realFetch = window.fetch;
+window.fetch = function(url, opts) {
+    opts = opts || {};
+    var method = (opts.method || 'GET').toUpperCase();
+    window.__apiCalls.push({ url: String(url), method: method, body: opts.body });
+
+    var u = String(url);
+    if (u.indexOf('/api/timeentry-drafts') !== -1) {
+        if (method === 'PUT') {
+            var b = JSON.parse(opts.body);
+            window.__serverDrafts[b.projectId + '|' + b.date] = b.payload;
+            return Promise.resolve(new Response(JSON.stringify({ draft: b }), { status: 200 }));
+        }
+        if (method === 'DELETE') {
+            var parts = u.split('/api/timeentry-drafts/')[1].split('/');
+            delete window.__serverDrafts[decodeURIComponent(parts[0]) + '|' + decodeURIComponent(parts[1])];
+            return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        }
+        var q = new URLSearchParams(u.split('?')[1] || '');
+        var key = q.get('projectId') + '|' + q.get('date');
+        var hit = window.__serverDrafts[key];
+        return Promise.resolve(new Response(JSON.stringify({
+            drafts: hit ? [{ projectId: q.get('projectId'), date: q.get('date'), payload: hit }] : []
+        }), { status: 200 }));
+    }
+    if (u.indexOf('/api/clockins') !== -1) {
+        return Promise.resolve(new Response(JSON.stringify({ clockins: [] }), { status: 200 }));
+    }
+    if (u.indexOf('/api/impact-codes') !== -1) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+};
+
+window.__worker = { id: 'w1', name: 'Test Worker', role: 'Worker' };
+
+window.renderTimeEntry = function(prefill) {
+    document.getElementById('workerContent').innerHTML = '';
+    window.WorkerTimeEntry.render(document.getElementById('workerContent'),
+                                  window.__worker, 'proj-1', prefill || {});
+};
+window.renderHistory = function() {
+    document.getElementById('workerContent').innerHTML = '';
+    window.WorkerHistory.render(document.getElementById('workerContent'), window.__worker);
+};
+</script>
+<script src="../js/worker/timeentry.js"></script>
+<script src="../js/worker/history.js"></script>
+</body>
+</html>

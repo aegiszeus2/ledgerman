@@ -309,17 +309,154 @@ window.WorkerTimeEntry = {
         }
 
         // ── Draft persistence helpers ────────────────────────────────────
-        // Draft key scoped per worker + project to prevent cross-contamination.
+        // A draft is keyed by worker + project + DATE. The date used to be
+        // missing from the key, so two different days on the same project
+        // overwrote each other and a day's entry was silently lost.
+        //
+        // Drafts no longer expire on a timer. The old age window meant a worker
+        // who started an entry in the morning and came back after lunch could
+        // find an empty form. A draft is now held until the entry is submitted
+        // or explicitly discarded, and only pruned after DRAFT_KEEP_DAYS.
+        //
+        // Every draft is also mirrored to the server (same durability pattern as
+        // the active clock-in above), so it survives mobile storage eviction,
+        // private mode, a lost or wiped phone, and switching devices.
+        //
+        // Save failures are surfaced to the worker instead of being swallowed.
+        //
         // File blobs cannot be serialized; only metadata (name) is preserved.
         // Workers are informed they need to re-attach receipt files.
-        var draftKey = 'timeentry_draft_' + worker.id + '_' + projectId;
-        // Hold the draft for a full working day. The old 4h window silently
-        // expired mid-shift (morning entry + lunch = blank form on return),
-        // which was a real source of the crew's "lost my entry" reports.
-        var DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours (holds the day)
+        var DRAFT_KEY_PREFIX = 'timeentry_draft_' + worker.id + '_' + projectId + '_';
+        var LEGACY_DRAFT_KEY = 'timeentry_draft_' + worker.id + '_' + projectId;
+        var DRAFT_KEEP_DAYS  = 45;
         var draftDirty = false;
         var draftSaveTimer = null;
         var draftSaveWarned = false; // throttle the "couldn't save" warning
+        var draftSaveFailed = false; // latched: local storage is refusing writes
+        var draftServerOk   = null;  // null = untried, true/false = last result
+        var draftLastSavedAt = null;
+
+        function draftKeyFor(date) { return DRAFT_KEY_PREFIX + date; }
+
+        function _todayStr() {
+            return (window.Utils && Utils.today) ? Utils.today() : new Date().toISOString().slice(0, 10);
+        }
+
+        function _isDateStr(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v || ''); }
+
+        // Which date is the form currently for? Falls back to today.
+        function currentDraftDate() {
+            var el = document.getElementById('teDate');
+            var v  = el && el.value ? el.value : '';
+            return _isDateStr(v) ? v : _todayStr();
+        }
+
+        function readDraft(date) {
+            try { return AppData.getData(draftKeyFor(date)); } catch (e) { return null; }
+        }
+
+        function removeDraftLocal(date) {
+            try { AppData.setData(draftKeyFor(date), null); } catch (e) {}
+        }
+
+        // ── One-time migration off the old date-less key ─────────────────
+        // A worker mid-entry when this ships must not lose what they typed.
+        (function migrateLegacyDraft() {
+            try {
+                var legacy = AppData.getData(LEGACY_DRAFT_KEY);
+                if (!legacy || !legacy.draftSavedAt) return;
+                var d = _isDateStr(legacy.date) ? legacy.date : _todayStr();
+                if (!readDraft(d)) AppData.setData(draftKeyFor(d), legacy);
+                AppData.setData(LEGACY_DRAFT_KEY, null);
+            } catch (e) { /* migration is best-effort */ }
+        })();
+
+        // ── Prune drafts older than DRAFT_KEEP_DAYS ──────────────────────
+        // Replaces the old age-based expiry: nothing is dropped while it could
+        // still matter, and stale keys don't accumulate against the quota.
+        (function pruneOldDrafts() {
+            try {
+                var cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - DRAFT_KEEP_DAYS);
+                var cutoffStr = cutoff.toISOString().slice(0, 10);
+                var storePrefix = 'ledgeman_' + DRAFT_KEY_PREFIX;
+                var doomed = [];
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf(storePrefix) === 0) {
+                        var dpart = k.slice(storePrefix.length);
+                        if (_isDateStr(dpart) && dpart < cutoffStr) doomed.push(k);
+                    }
+                }
+                doomed.forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+            } catch (e) { /* pruning is best-effort */ }
+        })();
+
+        // ── Server mirror ────────────────────────────────────────────────
+        // localStorage stays the fast path; the server is the durable backup and
+        // the cross-device restore. All calls fail soft — a network error never
+        // blocks the form, the local copy is kept.
+        function syncDraftToServer(date, draft) {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) return;
+            fetch(AppData.API_BASE + '/api/timeentry-drafts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+                body: JSON.stringify({ projectId: projectId, date: date, payload: draft })
+            }).then(function(r) {
+                draftServerOk = !!(r && r.ok);
+                if (!r.ok) console.warn('[draft] server save rejected:', r.status);
+                updateDraftStatus();
+            }).catch(function(e) {
+                draftServerOk = false;
+                console.warn('[draft] server save failed (local kept):', e && e.message);
+                updateDraftStatus();
+            });
+        }
+
+        function clearDraftOnServer(date) {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) return;
+            fetch(AppData.API_BASE + '/api/timeentry-drafts/' +
+                  encodeURIComponent(projectId) + '/' + encodeURIComponent(date), {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            }).catch(function(e) { console.warn('[draft] server clear failed:', e && e.message); });
+        }
+
+        function fetchDraftFromServer(date, cb) {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) { cb(null); return; }
+            fetch(AppData.API_BASE + '/api/timeentry-drafts?projectId=' +
+                  encodeURIComponent(projectId) + '&date=' + encodeURIComponent(date), {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            }).then(function(r) { return r.ok ? r.json() : null; })
+              .then(function(j) {
+                  var d = (j && j.drafts && j.drafts.length) ? j.drafts[0] : null;
+                  cb(d && d.payload ? d.payload : null);
+              })
+              .catch(function(e) { console.warn('[draft] server restore failed:', e && e.message); cb(null); });
+        }
+
+        // ── Save-state indicator ─────────────────────────────────────────
+        // Silence was the problem: a worker could type all day into storage that
+        // was refusing every write and only find out at submit. The form now
+        // always says where the entry stands.
+        function updateDraftStatus() {
+            var el = document.getElementById('teDraftStatus');
+            if (!el) return;
+            if (draftSaveFailed) {
+                el.style.color = 'var(--danger, #f87171)';
+                el.textContent = '\u26a0 This phone is not letting your entry save. Do not close this page before you submit.';
+                return;
+            }
+            if (!draftLastSavedAt) { el.textContent = ''; return; }
+            var t = new Date(draftLastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            el.style.color = 'var(--text2)';
+            el.textContent = (draftServerOk === false)
+                ? '\u2713 Saved on this phone at ' + t + ' (not backed up yet \u2014 no connection)'
+                : '\u2713 Saved at ' + t;
+        }
 
         // Expense/equipment lists live at render() scope so saveDraft() (below) can
         // actually serialize them. Previously these were declared with `var` inside
@@ -329,11 +466,10 @@ window.WorkerTimeEntry = {
         var selectedExpenses = [];
         var selectedEquipment = [];
 
-        function saveDraft() {
-            try {
-                var f = document.getElementById('timeEntryForm');
-                if (!f) return;
-                var draft = {
+        // Build the draft object from the live form. Shared by the normal save
+        // path and the storage-failure path (which still tries the server).
+        function _collectDraft(f) {
+                return {
                     date:              (f.querySelector('#teDate')         || {}).value || '',
                     startTime:         (f.querySelector('#teStartTime')    || {}).value || '',
                     endTime:           (f.querySelector('#teEndTime')      || {}).value || '',
@@ -354,28 +490,60 @@ window.WorkerTimeEntry = {
                     }),
                     draftSavedAt: new Date().toISOString()
                 };
-                AppData.setData(draftKey, draft);
+        }
+
+        function saveDraft() {
+            try {
+                var f = document.getElementById('timeEntryForm');
+                if (!f) return;
+                var draft = _collectDraft(f);
+                // Key by the date the form is actually for, so two days on the
+                // same project can never overwrite each other.
+                var dkey = _isDateStr(draft.date) ? draft.date : _todayStr();
+                AppData.setData(draftKeyFor(dkey), draft);
                 draftDirty = false;
+                draftSaveFailed = false;
                 draftSaveWarned = false; // recovered — allow a future warning
+                draftLastSavedAt = draft.draftSavedAt;
+                updateDraftStatus();
+                // Durable backup: survives storage eviction and a lost phone.
+                syncDraftToServer(dkey, draft);
             } catch(err) {
                 // A save failure (full storage quota, private-browsing mode) used
                 // to be swallowed silently, so the worker kept typing believing the
-                // draft was safe and then lost everything. Surface it once instead.
+                // draft was safe and then lost everything. Surface it instead — once
+                // as a toast, and permanently on the form itself.
+                draftSaveFailed = true;
+                updateDraftStatus();
                 if (!draftSaveWarned) {
                     draftSaveWarned = true;
                     try {
                         Utils.showToast('⚠️ Could not auto-save your draft — device storage may be full or in private mode. Submit soon so nothing is lost.', 'error');
                     } catch(e) {}
                 }
+                // Even if this phone refuses to store it, try the server so the
+                // entry is not lost with the device.
+                try {
+                    var f2 = document.getElementById('timeEntryForm');
+                    if (f2) syncDraftToServer(currentDraftDate(), _collectDraft(f2));
+                } catch(e2) {}
             }
         }
 
-        function clearDraft() {
-            try { AppData.setData(draftKey, null); } catch(e) {}
+        function clearDraft(dateOverride) {
+            var d = _isDateStr(dateOverride) ? dateOverride : currentDraftDate();
+            removeDraftLocal(d);
+            clearDraftOnServer(d);
+            draftLastSavedAt = null;
+            updateDraftStatus();
         }
+
+        var userTouchedForm = false;
+        var serverRestoreTried = false;
 
         function scheduleDraftSave() {
             draftDirty = true;
+            userTouchedForm = true;
             clearTimeout(draftSaveTimer);
             draftSaveTimer = setTimeout(saveDraft, 600);
         }
@@ -390,33 +558,32 @@ window.WorkerTimeEntry = {
             var impactCodes = []; // Loaded async below
 
             // ── Draft restore ────────────────────────────────────────────
-            var existingDraft = AppData.getData(draftKey);
+            // Read the draft for the date this form is for. No age check: the
+            // draft is held until the entry is submitted or discarded.
+            var draftDate = _isDateStr(defaultDate) ? defaultDate : _todayStr();
+            var existingDraft = readDraft(draftDate);
             var restoredFromDraft = false;
             var draftHadFiles = false;
             if (existingDraft && existingDraft.draftSavedAt) {
-                var age = Date.now() - new Date(existingDraft.draftSavedAt).getTime();
-                if (age < DRAFT_MAX_AGE_MS) {
-                    // Use draft values as defaults (overrides clock-out prefill only when
-                    // the draft has actual content — avoids empty draft clobbering clock data)
-                    if (existingDraft.date)      defaultDate  = existingDraft.date;
-                    if (existingDraft.startTime) defaultStart = existingDraft.startTime;
-                    if (existingDraft.endTime)   defaultEnd   = existingDraft.endTime;
-                    // Restore in-memory expense/equipment lists (without file blobs)
-                    if (existingDraft.expenses && existingDraft.expenses.length > 0) {
-                        existingDraft.expenses.forEach(function(e) {
-                            selectedExpenses.push({ description: e.description, amount: e.amount, file: null });
-                            if (e.fileName) draftHadFiles = true;
-                        });
-                    }
-                    if (existingDraft.equipment && existingDraft.equipment.length > 0) {
-                        existingDraft.equipment.forEach(function(e) {
-                            selectedEquipment.push({ equipmentId: e.equipmentId, equipmentName: e.equipmentName, hours: e.hours });
-                        });
-                    }
-                    restoredFromDraft = true;
-                } else {
-                    clearDraft(); // Stale draft — discard
+                // Use draft values as defaults (overrides clock-out prefill only when
+                // the draft has actual content — avoids empty draft clobbering clock data)
+                if (existingDraft.date)      defaultDate  = existingDraft.date;
+                if (existingDraft.startTime) defaultStart = existingDraft.startTime;
+                if (existingDraft.endTime)   defaultEnd   = existingDraft.endTime;
+                // Restore in-memory expense/equipment lists (without file blobs)
+                if (existingDraft.expenses && existingDraft.expenses.length > 0) {
+                    existingDraft.expenses.forEach(function(e) {
+                        selectedExpenses.push({ description: e.description, amount: e.amount, file: null });
+                        if (e.fileName) draftHadFiles = true;
+                    });
                 }
+                if (existingDraft.equipment && existingDraft.equipment.length > 0) {
+                    existingDraft.equipment.forEach(function(e) {
+                        selectedEquipment.push({ equipmentId: e.equipmentId, equipmentName: e.equipmentName, hours: e.hours });
+                    });
+                }
+                restoredFromDraft = true;
+                draftLastSavedAt  = existingDraft.draftSavedAt;
             }
 
             var form = document.createElement('form');
@@ -604,6 +771,40 @@ window.WorkerTimeEntry = {
             contentArea.innerHTML = ''; // Double-clear before appending
             contentArea.appendChild(form);
 
+            // ── Save-state line ──────────────────────────────────────────
+            // The worker can always see whether their entry is being held.
+            var statusLine = document.createElement('div');
+            statusLine.id = 'teDraftStatus';
+            statusLine.setAttribute('role', 'status');
+            statusLine.setAttribute('aria-live', 'polite');
+            statusLine.style.cssText = 'font-size:.8rem;color:var(--text2);min-height:1.1em;margin-bottom:10px';
+            form.insertBefore(statusLine, form.firstChild);
+            updateDraftStatus();
+
+            // ── Cross-device restore ─────────────────────────────────────
+            // Nothing held on this phone? The server may still have the entry
+            // (storage evicted, phone replaced, started on another device).
+            // Only applied while the form is still untouched, so a slow network
+            // response can never overwrite what the worker is typing.
+            if (!restoredFromDraft && !serverRestoreTried) {
+                serverRestoreTried = true;
+                (function(dateAtRender, startAtRender, endAtRender) {
+                    fetchDraftFromServer(dateAtRender, function(serverDraft) {
+                        if (!serverDraft || !serverDraft.draftSavedAt) return;
+                        if (userTouchedForm) return;
+                        if (!document.getElementById('timeEntryForm')) return;
+                        if (currentDraftDate() !== dateAtRender) return;
+                        try {
+                            AppData.setData(draftKeyFor(dateAtRender), serverDraft);
+                        } catch (e) { /* can't cache it locally; still restore below */ }
+                        renderCompleteForm(dateAtRender, startAtRender, endAtRender);
+                        try {
+                            Utils.showToast('Your saved entry was restored from your account.', 'info');
+                        } catch (e) {}
+                    });
+                })(draftDate, defaultStart, defaultEnd);
+            }
+
             // ── Draft restore banner ─────────────────────────────────────
             if (restoredFromDraft) {
                 var banner = document.createElement('div');
@@ -695,6 +896,17 @@ window.WorkerTimeEntry = {
                     }
                 } catch (e2) { /* silent — impact code is optional */ }
             })();
+
+            // ── Re-key on date change ────────────────────────────────────
+            // Each date holds its own draft. Changing the date saves the current
+            // content under the new date and leaves the other day's draft intact.
+            var dateEl = form.querySelector('#teDate');
+            if (dateEl) {
+                dateEl.addEventListener('change', function() {
+                    userTouchedForm = true;
+                    saveDraft();
+                });
+            }
 
             // ── Draft auto-save: wire blur on key fields ─────────────────
             ['#teDate','#teStartTime','#teEndTime','#teDescription','#teSubtask',
