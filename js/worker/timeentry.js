@@ -313,9 +313,13 @@ window.WorkerTimeEntry = {
         // File blobs cannot be serialized; only metadata (name) is preserved.
         // Workers are informed they need to re-attach receipt files.
         var draftKey = 'timeentry_draft_' + worker.id + '_' + projectId;
-        var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+        // Hold the draft for a full working day. The old 4h window silently
+        // expired mid-shift (morning entry + lunch = blank form on return),
+        // which was a real source of the crew's "lost my entry" reports.
+        var DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours (holds the day)
         var draftDirty = false;
         var draftSaveTimer = null;
+        var draftSaveWarned = false; // throttle the "couldn't save" warning
 
         // Expense/equipment lists live at render() scope so saveDraft() (below) can
         // actually serialize them. Previously these were declared with `var` inside
@@ -352,7 +356,18 @@ window.WorkerTimeEntry = {
                 };
                 AppData.setData(draftKey, draft);
                 draftDirty = false;
-            } catch(err) { /* silent — draft save is best-effort */ }
+                draftSaveWarned = false; // recovered — allow a future warning
+            } catch(err) {
+                // A save failure (full storage quota, private-browsing mode) used
+                // to be swallowed silently, so the worker kept typing believing the
+                // draft was safe and then lost everything. Surface it once instead.
+                if (!draftSaveWarned) {
+                    draftSaveWarned = true;
+                    try {
+                        Utils.showToast('⚠️ Could not auto-save your draft — device storage may be full or in private mode. Submit soon so nothing is lost.', 'error');
+                    } catch(e) {}
+                }
+            }
         }
 
         function clearDraft() {
