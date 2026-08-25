@@ -843,10 +843,32 @@ function deleteEquipment(id) { remove('equipment', id); }
 // ─── Equipment Logs ────────────────────────────────────────────────────────
 // Each log entry records equipment used during a time submission.
 // Fields: submissionId, equipmentId, equipmentName, projectId, workerId, date, hours, costRate, chargeOutRate, cost, revenue
+//
+// Workers log equipment HOURS only. They never enter rates or cost. Rates are
+// the responsibility of the equipment master record (costRate / chargeOutRate).
+// This resolver defaults every log's rate/cost/revenue from the master so the
+// costing reports produce real dollars. Master is authoritative; a rate stored
+// on the log is only honoured if the master has no rate. Returns enriched copies
+// (the underlying store is never mutated).
+function _resolveEquipmentLogRates(l) {
+    var master = getEquipmentItem(l.equipmentId) || {};
+    var hrs = parseFloat(l.hours) || 0;
+    var masterCost   = parseFloat(master.costRate);
+    var masterCharge = parseFloat(master.chargeOutRate);
+    var costRate   = !isNaN(masterCost)   ? masterCost   : (parseFloat(l.costRate) || 0);
+    var chargeRate = !isNaN(masterCharge) ? masterCharge : (parseFloat(l.chargeOutRate) || 0);
+    return Object.assign({}, l, {
+        costRate:      costRate,
+        chargeOutRate: chargeRate,
+        cost:          hrs * costRate,
+        revenue:       hrs * chargeRate
+    });
+}
 function getEquipmentLogs(projectId) {
-    return projectId
+    var logs = projectId
         ? getAll('equipmentLogs').filter(function(l) { return l.projectId === projectId; })
         : getAll('equipmentLogs');
+    return logs.map(_resolveEquipmentLogRates);
 }
 function getEquipmentLog(id) { return getById('equipmentLogs', id); }
 function saveEquipmentLog(l) { return save('equipmentLogs', l); }
