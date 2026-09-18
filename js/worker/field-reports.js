@@ -133,7 +133,7 @@ window.WorkerFieldReports = {
         const self = this;
         self._view = 'create';
         const projects = AppData.getProjects().filter(p => p.status === 'Active');
-        const today = new Date().toISOString().slice(0, 10);
+        const today = Utils.today();
 
         self._container.innerHTML = `
             <div style="padding:0 0 80px">

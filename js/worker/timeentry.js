@@ -31,7 +31,11 @@ window.WorkerTimeEntry = {
 
         // Only treat as a real resubmit/prefill if it has actual time/description data
         // (params always contains projectId, so we can't use plain truthiness)
-        var hasPrefill    = !!(prefillData && (prefillData.startTime || prefillData.description || prefillData.subtaskId));
+        var hasPrefill    = !!(prefillData && (prefillData.editOf || prefillData.startTime || prefillData.description || prefillData.subtaskId));
+        // Editing an existing entry: the form reopens with every section filled in
+        // and saving UPDATES that entry (same id) instead of creating a new one.
+        var editOf        = (prefillData && prefillData.editOf) || null;
+        var originalPhotoIds = (editOf && Array.isArray(prefillData.photoIds)) ? prefillData.photoIds.slice() : [];
 
         // Detect active clock-in session for this worker+project
         var clockKey      = 'clockin_' + worker.id + '_' + projectId;
@@ -493,6 +497,9 @@ window.WorkerTimeEntry = {
         }
 
         function saveDraft() {
+            // An edit of a saved entry is not a draft: holding it as one would
+            // leak its contents into the next new entry for that date.
+            if (editOf) return;
             try {
                 var f = document.getElementById('timeEntryForm');
                 if (!f) return;
@@ -561,7 +568,17 @@ window.WorkerTimeEntry = {
             // Read the draft for the date this form is for. No age check: the
             // draft is held until the entry is submitted or discarded.
             var draftDate = _isDateStr(defaultDate) ? defaultDate : _todayStr();
-            var existingDraft = readDraft(draftDate);
+            // When editing an existing entry, the entry itself is the source of truth,
+            // not a draft that may belong to other work on that day.
+            var existingDraft = editOf ? null : readDraft(draftDate);
+            if (editOf) {
+                (defaults.equipmentEntries || []).forEach(function(e) {
+                    selectedEquipment.push({ equipmentId: e.equipmentId, equipmentName: e.equipmentName, hours: e.hours });
+                });
+                (defaults.expenses || []).forEach(function(e) {
+                    selectedExpenses.push({ description: e.description, amount: parseFloat(e.amount) || 0, file: null, attachmentId: e.attachmentId || null });
+                });
+            }
             var restoredFromDraft = false;
             var draftHadFiles = false;
             if (existingDraft && existingDraft.draftSavedAt) {
@@ -786,7 +803,7 @@ window.WorkerTimeEntry = {
             // (storage evicted, phone replaced, started on another device).
             // Only applied while the form is still untouched, so a slow network
             // response can never overwrite what the worker is typing.
-            if (!restoredFromDraft && !serverRestoreTried) {
+            if (!editOf && !restoredFromDraft && !serverRestoreTried) {
                 serverRestoreTried = true;
                 (function(dateAtRender, startAtRender, endAtRender) {
                     fetchDraftFromServer(dateAtRender, function(serverDraft) {
@@ -848,6 +865,45 @@ window.WorkerTimeEntry = {
                     });
                     Utils.showToast('Draft discarded', 'info');
                 };
+            }
+
+            // ── Edit restore: note, impact code, existing photos ─────────
+            if (editOf) {
+                var eqNoteEl = form.querySelector('#teEquipmentNote');
+                if (eqNoteEl && defaults.equipmentNote) eqNoteEl.value = defaults.equipmentNote;
+                if (defaults.impactCodeId) {
+                    form.dataset.restoreImpactCode     = defaults.impactCodeId;
+                    form.dataset.restoreImpactHours    = (defaults.impactHours != null) ? String(defaults.impactHours) : '';
+                    form.dataset.restoreImpactBillable = defaults.impactBillableStatus || '';
+                    form.dataset.restoreImpactDesc     = defaults.impactDescription || '';
+                }
+                selectedPhotos = [];
+                originalPhotoIds.forEach(function(pid) {
+                    selectedPhotos.push({ id: pid, existing: true, file: null, thumbnailUrl: '' });
+                });
+                // Thumbnails load in the background: this device first, then the server.
+                originalPhotoIds.forEach(function(pid) {
+                    (async function() {
+                        var url = '';
+                        try {
+                            var local = AppData.getPhoto ? await AppData.getPhoto(pid) : null;
+                            if (local && local.blob) url = (typeof local.blob === 'string') ? local.blob : URL.createObjectURL(local.blob);
+                        } catch (e) {}
+                        if (!url) {
+                            try {
+                                var jwt = AppData.getJwt ? AppData.getJwt() : '';
+                                var r = await fetch(AppData.API_BASE + '/api/photos/' + encodeURIComponent(pid), { headers: { 'Authorization': 'Bearer ' + jwt } });
+                                if (r.ok) {
+                                    var pj = await r.json();
+                                    var b = pj.thumbnailB64 || pj.blobB64 || '';
+                                    if (b) url = b.indexOf('data:') === 0 ? b : 'data:image/jpeg;base64,' + b;
+                                }
+                            } catch (e) {}
+                        }
+                        var ph = selectedPhotos.filter(function(x) { return x.id === pid; })[0];
+                        if (ph && url) { ph.thumbnailUrl = url; if (form.querySelector('#photoPreviewArea')) renderPreviews(); }
+                    })();
+                });
             }
 
             // ── Wire events ──────────────────────────────────────────────
@@ -920,10 +976,11 @@ window.WorkerTimeEntry = {
             if (descEl) descEl.addEventListener('input', scheduleDraftSave);
 
             // ── Render lists from restored draft data ────────────────────
-            if (restoredFromDraft) {
+            if (restoredFromDraft || editOf) {
                 renderExpenseList();
                 renderEquipmentList();
             }
+            if (editOf) renderPreviews();
 
             // Impact code toggle
             form.querySelector('#teImpactCode').addEventListener('change', function() {
@@ -1103,7 +1160,7 @@ window.WorkerTimeEntry = {
                     item.style.cssText = 'padding:8px;background:rgba(245,158,11,.1);border-radius:6px;margin-bottom:6px';
 
                     var itemContent = '<div style="display:flex;justify-content:space-between;align-items:center">' +
-                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + (exp.file ? ' 📎' : '') + '</span>' +
+                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + ((exp.file || exp.attachmentId) ? ' 📎' : '') + '</span>' +
                         '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>' +
                         '</div>';
 
@@ -1242,7 +1299,7 @@ window.WorkerTimeEntry = {
                     var item = document.createElement('div');
                     item.className = 'photo-preview-item';
                     item.innerHTML =
-                        '<img src="' + photo.thumbnailUrl + '" alt="Photo">' +
+                        (photo.thumbnailUrl ? '<img src="' + photo.thumbnailUrl + '" alt="Photo">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:.75rem;color:var(--text2)">&#128247; saved</div>') +
                         '<button type="button" class="remove-photo" data-idx="' + idx + '">&times;</button>';
                     item.querySelector('.remove-photo').addEventListener('click', function() {
                         selectedPhotos.splice(parseInt(this.dataset.idx, 10), 1);
@@ -1308,12 +1365,13 @@ window.WorkerTimeEntry = {
                 submitBtn.textContent = 'Submitting…';
 
                 try {
-                    var submissionId = AppData.generateId();
+                    var submissionId = editOf || AppData.generateId();
                     var photoIds = [];
 
                     // Upload photos
                     for (var p = 0; p < selectedPhotos.length; p++) {
                         var photo = selectedPhotos[p];
+                        if (photo.existing) { photoIds.push(photo.id); continue; } // already stored, linked to this entry
                         await AppData.savePhoto({
                             id: photo.id,
                             projectId: projectId,
@@ -1331,7 +1389,7 @@ window.WorkerTimeEntry = {
                     var processedExpenses = [];
                     for (var e = 0; e < selectedExpenses.length; e++) {
                         var exp = selectedExpenses[e];
-                        var expObj = { description: exp.description, amount: exp.amount, attachmentId: null };
+                        var expObj = { description: exp.description, amount: exp.amount, attachmentId: exp.attachmentId || null };
 
                         // Upload expense attachment if present
                         if (exp.file) {
@@ -1394,6 +1452,22 @@ window.WorkerTimeEntry = {
                     };
 
                     AppData.saveSubmission(submission);
+
+                    if (editOf) {
+                        // Replace, not add: the entry's previous equipment logs are removed
+                        // and rewritten below from the edited list.
+                        if (AppData.getEquipmentLogs && AppData.deleteEquipmentLog) {
+                            AppData.getEquipmentLogs()
+                                .filter(function(l) { return l.submissionId === editOf; })
+                                .forEach(function(l) { AppData.deleteEquipmentLog(l.id); });
+                        }
+                        // Photos the worker removed during the edit
+                        if (AppData.deletePhoto) {
+                            originalPhotoIds
+                                .filter(function(pid) { return photoIds.indexOf(pid) === -1; })
+                                .forEach(function(pid) { AppData.deletePhoto(pid).catch(function() {}); });
+                        }
+                    }
 
                     // Save individual equipment log records (for project costing rollup)
                     if (AppData.saveEquipmentLog && selectedEquipment.length > 0) {
@@ -1471,7 +1545,7 @@ window.WorkerTimeEntry = {
                     }
 
                     if (isWizardMode) AppData.setData('worker_wizard_done_' + worker.id, true);
-                    clearDraft(); // Clear draft on successful submit
+                    if (!editOf) clearDraft(); // Clear draft on successful submit (an edit never held one)
                     showSuccess();
 
                 } catch (err) {

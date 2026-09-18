@@ -22,9 +22,11 @@ const Utils = {
             ' ' + d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
     },
 
-    // Get today's date in YYYY-MM-DD
+    // Get today's date in YYYY-MM-DD, in the device's LOCAL time zone.
+    // toISOString() is UTC, so from 8 PM EDT onward it returned tomorrow's date.
     today() {
-        return new Date().toISOString().split('T')[0];
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     },
 
     // Escape HTML to prevent XSS

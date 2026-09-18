@@ -368,6 +368,36 @@ window.WorkerHistory = {
                 container.appendChild(card);
             });
 
+            // Full prefill for editing an existing entry. Every section of the
+            // form is carried over (equipment, equipment note, photos, expenses,
+            // impact code, on-site employees), and the entry keeps its own id so
+            // the edit UPDATES it. It is no longer deleted before the edit form
+            // opens, so backing out of an edit can never lose the entry.
+            function _editPrefill(sub) {
+                return {
+                    editOf:               sub.id,
+                    date:                 sub.date,
+                    subtaskId:            sub.subtaskId,
+                    rateType:             sub.rateType,
+                    hours:                sub.hours,
+                    rate:                 sub.rate,
+                    flatRate:             sub.flatRate,
+                    startTime:            sub.startTime,
+                    endTime:              sub.endTime,
+                    description:          sub.description,
+                    unitsCompleted:       sub.unitsCompleted,
+                    equipmentEntries:     sub.equipmentEntries || [],
+                    equipmentNote:        sub.equipmentNote || '',
+                    photoIds:             sub.photoIds || [],
+                    expenses:             sub.expenses || [],
+                    impactCodeId:         sub.impactCodeId || null,
+                    impactHours:          sub.impactHours,
+                    impactBillableStatus: sub.impactBillableStatus || '',
+                    impactDescription:    sub.impactDescription || '',
+                    employeesPresent:     sub.employeesPresent || []
+                };
+            }
+
             // Bind resubmit buttons
             var resubmitBtns = container.querySelectorAll('.resubmit-btn');
             for (var i = 0; i < resubmitBtns.length; i++) {
@@ -378,23 +408,12 @@ window.WorkerHistory = {
                         Utils.showToast('Submission not found.', 'error');
                         return;
                     }
-                    // Delete the rejected submission
-                    AppData.deleteSubmission(subId);
-                    // Navigate to time entry pre-filled with submission data (minus photos)
-                    window.App.navigateWorker('timeentry', sub.projectId, {
-                        date: sub.date,
-                        subtaskId: sub.subtaskId,
-                        rateType: sub.rateType,
-                        hours: sub.hours,
-                        rate: sub.rate,
-                        flatRate: sub.flatRate,
-                        description: sub.description,
-                        unitsCompleted: sub.unitsCompleted
-                    });
+                    // Re-open the entry with every section filled in; saving updates it in place
+                    window.App.navigateWorker('timeentry', sub.projectId, _editPrefill(sub));
                 });
             }
 
-            // Bind edit buttons on pending entries (delete + re-open prefilled in time entry)
+            // Bind edit buttons on pending entries (re-open fully prefilled; save updates in place)
             var editPendingBtns = container.querySelectorAll('.edit-pending-btn');
             for (var k = 0; k < editPendingBtns.length; k++) {
                 editPendingBtns[k].addEventListener('click', function() {
@@ -404,19 +423,7 @@ window.WorkerHistory = {
                         Utils.showToast('Submission not found.', 'error');
                         return;
                     }
-                    AppData.deleteSubmission(subId);
-                    window.App.navigateWorker('timeentry', sub.projectId, {
-                        date: sub.date,
-                        subtaskId: sub.subtaskId,
-                        rateType: sub.rateType,
-                        hours: sub.hours,
-                        rate: sub.rate,
-                        flatRate: sub.flatRate,
-                        startTime: sub.startTime,
-                        endTime: sub.endTime,
-                        description: sub.description,
-                        unitsCompleted: sub.unitsCompleted
-                    });
+                    window.App.navigateWorker('timeentry', sub.projectId, _editPrefill(sub));
                 });
             }
 
