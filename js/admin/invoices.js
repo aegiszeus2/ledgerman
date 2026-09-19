@@ -159,6 +159,60 @@ window.AdminInvoices = {
         });
     },
 
+    // ============ T&M BILLING SOURCE ============
+    // Every expense on a job, matched on either key. Timecard-synced expenses
+    // (equipment, other) are written by the backend with snake_case project_id,
+    // so a projectId-only filter hid them from the invoice entirely.
+    _projectExpenses(projectId) {
+        return AppData.getExpenses().filter(function(e) {
+            return !projectId || e.projectId === projectId || e.project_id === projectId;
+        });
+    },
+
+    // Invoice-ready copies. The stored expense is never modified here.
+    //  Labour, hourly: hours x the worker's client billing rate (the worker
+    //    "Cost Rate" field, the same value the job cost view bills at).
+    //    Never the pay rate, never the $0 left on the expense at approval.
+    //  Timecard equipment/other: the billable (charge-out) amount, not cost.
+    _toBillable(e) {
+        var c = Object.assign({}, e);
+        c.projectId = e.projectId || e.project_id || '';
+        c.workerId  = e.workerId  || e.worker_id  || '';
+        c.vendor    = e.vendor || e.vendorName || '';
+        var hours = parseFloat(e.hours) || 0;
+        var flat  = String(e.rateType || '').toLowerCase() === 'flat';
+        var r2 = function(n) { return Math.round(n * 100) / 100; };
+        if (c.category === 'Labor') {
+            if (!flat && hours > 0) {
+                var w = c.workerId ? AppData.getWorker(c.workerId) : null;
+                var bill = w ? (parseFloat(w.costRate) || 0) : 0;
+                if (!bill) bill = parseFloat(e.rate) || 0;
+                c.rate = bill;
+                c.rateType = 'hourly';
+                c.amount = r2(hours * bill);
+            }
+        } else if (e.source_type || e.billable_amount !== undefined || e.charge_out_rate !== undefined) {
+            var chargeRate = parseFloat(e.charge_out_rate) || parseFloat(e.billable_rate) || 0;
+            var billAmt = parseFloat(e.billable_amount) || 0;
+            if (!billAmt && chargeRate && hours) billAmt = r2(hours * chargeRate);
+            c.amount = billAmt > 0 ? billAmt : (parseFloat(e.amount) || 0);
+            if (c.category === 'Equipment' && hours > 0) {
+                c.rate = chargeRate;
+                c.rateType = 'hourly';
+            } else {
+                c.rate = c.amount;
+                c.rateType = 'flat';
+                c.hours = null;
+            }
+        }
+        return c;
+    },
+
+    _invoiceExpenses(projectId) {
+        var self = this;
+        return self._projectExpenses(projectId).map(function(e) { return self._toBillable(e); });
+    },
+
     // ============ CREATE INVOICE WIZARD ============
 
     renderCreate(container, params) {
@@ -168,13 +222,13 @@ window.AdminInvoices = {
         // Find projects with billable ready-to-invoice expenses
         var projects = AppData.getProjects();
         var eligible = projects.filter(function(p) {
-            var expenses = AppData.getExpenses(p.id);
+            var expenses = AdminInvoices._invoiceExpenses(p.id);
             return expenses.some(function(e) { return e.billable !== false && !e.invoiced; });
         });
 
         // Also treat expenses without a billable flag as billable (backwards compat)
         var eligible2 = projects.filter(function(p) {
-            var expenses = AppData.getExpenses(p.id);
+            var expenses = AdminInvoices._invoiceExpenses(p.id);
             return expenses.some(function(e) { return e.billable !== false && !e.invoiced; });
         });
 
@@ -207,7 +261,7 @@ window.AdminInvoices = {
 
         // If a project was pre-selected, pre-select all its expenses
         if (self._wizardData.projectId) {
-            var expenses = AppData.getExpenses(self._wizardData.projectId).filter(function(e) {
+            var expenses = AdminInvoices._invoiceExpenses(self._wizardData.projectId).filter(function(e) {
                 return e.billable !== false && !e.invoiced;
             });
             self._wizardData.selectedExpenseIds = expenses.map(function(e) { return e.id; });
@@ -262,7 +316,7 @@ window.AdminInvoices = {
         stepEl.innerHTML = '<h3 class="section-title">Select a Project</h3>' +
             '<p style="color:var(--text2);margin-bottom:12px">Choose a project that has billable expenses ready to invoice.</p>' +
             wd.eligibleProjects.map(function(p) {
-                var expenses = AppData.getExpenses(p.id).filter(function(e) { return e.billable !== false && !e.invoiced; });
+                var expenses = AdminInvoices._invoiceExpenses(p.id).filter(function(e) { return e.billable !== false && !e.invoiced; });
                 var total = expenses.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
                 var selected = wd.projectId === p.id ? 'border-color:var(--accent);background:rgba(233,69,96,.05)' : '';
                 return '<div class="project-option" data-id="' + p.id + '" style="padding:16px;border:2px solid var(--border);border-radius:var(--radius);margin-bottom:8px;cursor:pointer;' + selected + '">' +
@@ -281,7 +335,7 @@ window.AdminInvoices = {
                 el.style.background = 'rgba(233,69,96,.05)';
                 wd.projectId = el.dataset.id;
                 // Pre-select all expenses
-                var expenses = AppData.getExpenses(wd.projectId).filter(function(e) {
+                var expenses = AdminInvoices._invoiceExpenses(wd.projectId).filter(function(e) {
                     return e.billable !== false && !e.invoiced;
                 });
                 wd.selectedExpenseIds = expenses.map(function(e) { return e.id; });
@@ -299,7 +353,7 @@ window.AdminInvoices = {
     _renderWizardStep1(stepEl, navEl, wd, settings) {
         var self = this;
         var esc = Utils.escapeHtml;
-        var expenses = AppData.getExpenses(wd.projectId).filter(function(e) {
+        var expenses = AdminInvoices._invoiceExpenses(wd.projectId).filter(function(e) {
             return e.billable !== false && !e.invoiced;
         });
 
@@ -403,7 +457,7 @@ window.AdminInvoices = {
             }
 
             // Auto-compute billing period from selected expenses
-            var selectedExpenses = AppData.getExpenses(wd.projectId).filter(function(e) {
+            var selectedExpenses = AdminInvoices._invoiceExpenses(wd.projectId).filter(function(e) {
                 return wd.selectedExpenseIds.indexOf(e.id) !== -1;
             });
             var dates = selectedExpenses.map(function(e) { return e.date; }).filter(Boolean).sort();
@@ -433,7 +487,7 @@ window.AdminInvoices = {
         var project = AppData.getProject(wd.projectId);
 
         // Build line items preview from selected expenses
-        var selectedExpenses = AppData.getExpenses(wd.projectId).filter(function(e) {
+        var selectedExpenses = AdminInvoices._invoiceExpenses(wd.projectId).filter(function(e) {
             return wd.selectedExpenseIds.indexOf(e.id) !== -1;
         });
 
@@ -887,7 +941,7 @@ window.AdminInvoices = {
         var self = this;
         if (!settings) settings = AppData.getSettings();
         var project = AppData.getProject(wd.projectId) || {};
-        var allExpenses = AppData.getExpenses(wd.projectId);
+        var allExpenses = AdminInvoices._invoiceExpenses(wd.projectId);
         var selectedExpenses = allExpenses.filter(function(e) { return wd.selectedExpenseIds.indexOf(e.id) !== -1; });
 
         var subtotal = selectedExpenses.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
@@ -972,7 +1026,7 @@ window.AdminInvoices = {
         var self = this;
         var wd = self._wizardData;
         var project = AppData.getProject(wd.projectId);
-        var allExpenses = AppData.getExpenses(wd.projectId);
+        var allExpenses = AdminInvoices._invoiceExpenses(wd.projectId);
         var selectedExpenses = allExpenses.filter(function(e) { return wd.selectedExpenseIds.indexOf(e.id) !== -1; });
         var settings = AppData.getSettings();
 
@@ -1077,8 +1131,13 @@ window.AdminInvoices = {
         }
 
         // Mark expenses as invoiced
+        // Mark the STORED records, not the billable copies (copies carry the
+        // billing extension in .amount and must never overwrite the cost record).
+        var _origById = {};
+        self._projectExpenses(wd.projectId).forEach(function(o) { _origById[o.id] = o; });
         for (var _ei = 0; _ei < selectedExpenses.length; _ei++) {
-            var _exp = selectedExpenses[_ei];
+            var _exp = _origById[selectedExpenses[_ei].id];
+            if (!_exp) continue;
             _exp.invoiced = true;
             _exp.invoiceId = invoice.id;
             try { await AppData.saveEntityAsync('expenses', _exp); } catch (e) { /* non-critical */ }
@@ -1427,7 +1486,7 @@ window.AdminInvoices = {
 
         function getAvailableExpenses() {
             if (!currentProjectId) return [];
-            var expenses = AppData.getExpenses(currentProjectId);
+            var expenses = AdminInvoices._invoiceExpenses(currentProjectId);
             var currentExpenseIds = editItems.map(function(i) { return i.expenseId || i.id || null; }).filter(Boolean);
             return expenses.filter(function(e) {
                 if (currentExpenseIds.indexOf(e.id) !== -1) return false;
@@ -1473,7 +1532,7 @@ window.AdminInvoices = {
             el.querySelectorAll('.add-exp-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     var expId = btn.dataset.id;
-                    var exps = AppData.getExpenses(currentProjectId);
+                    var exps = AdminInvoices._invoiceExpenses(currentProjectId);
                     var exp = null;
                     for (var i = 0; i < exps.length; i++) { if (exps[i].id === expId) { exp = exps[i]; break; } }
                     if (!exp) return;
@@ -1555,7 +1614,7 @@ window.AdminInvoices = {
             for (var _ai = 0; _ai < newExpenseIds.length; _ai++) {
                 var _aeid = newExpenseIds[_ai];
                 if (originalExpenseIds.indexOf(_aeid) === -1) {
-                    var _aexps = AppData.getExpenses(currentProjectId);
+                    var _aexps = AdminInvoices._projectExpenses(currentProjectId);
                     for (var _aj = 0; _aj < _aexps.length; _aj++) {
                         if (_aexps[_aj].id === _aeid) {
                             _aexps[_aj].invoiced = true;
