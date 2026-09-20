@@ -424,11 +424,19 @@ window.AdminEstimates = (function () {
         try {
             const est = _currentEstimate;
             const totals = est.totals || {};
+            // The server refuses a project with no scope. Carry the estimate's own
+            // scope text across; fall back to a factual line naming the estimate.
+            const estScope = (est.scope || est.description || est.notes || '').trim()
+                || ('Scope as per estimate "' + (est.title || 'untitled')
+                    + '". Imported from the estimate on '
+                    + new Date().toISOString().slice(0, 10) + '.');
             const newProject = {
                 id: AppData.generateId(),
                 name: esc(est.title || 'Project from Estimate'),
                 status: 'Active',
                 budget: totals.grandTotal || 0,
+                description: estScope,
+                scopeSource: 'estimate',
                 created_at: new Date().toISOString()
             };
             AppData.saveProject(newProject);

@@ -262,8 +262,10 @@ window.AdminProjects = {
                 </div>
 
                 <div class="form-group" style="margin-bottom:12px">
-                    <label>Description / Scope</label>
-                    <textarea name="description" rows="3">${esc(project ? project.description : '')}</textarea>
+                    <label>Scope of Work <span style="color:var(--danger,#c0392b)">*</span></label>
+                    <textarea name="description" rows="3" required
+                        placeholder="What this project covers. On a time and material job with no estimate, this is the scope of record."
+                        >${esc(project ? project.description : '')}</textarea>
                 </div>
 
                 ${workers.length > 0 ? `
@@ -326,6 +328,12 @@ window.AdminProjects = {
                 Utils.showToast('Project name is required', 'error');
                 return;
             }
+            // Scope of work is the thing an entry gets audited against. The server
+            // refuses a create without it; catch it here so the user sees why.
+            if (!isEdit && (fd.description || '').trim().length < 10) {
+                Utils.showToast('Scope of work is required (at least 10 characters)', 'error');
+                return;
+            }
             const workerIds = [];
             modal.overlay.querySelectorAll('.worker-checkbox:checked').forEach(function(cb) {
                 workerIds.push(cb.value);
@@ -356,6 +364,7 @@ window.AdminProjects = {
                 endDate: fd.endDate || '',
                 status: fd.status || 'Active',
                 description: (fd.description || '').trim(),
+                scopeSource: (project && project.scopeSource) || 'written',
                 assignedWorkers: workerIds,
                 budget: parseFloat(fd.budget) || 0,
             };
