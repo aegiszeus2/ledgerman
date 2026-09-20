@@ -180,6 +180,13 @@ window.AdminProjects = {
         const workers = AppData.getWorkers().filter(function(w) { return w.status === 'Active'; });
         const assignedWorkers = (project && project.assignedWorkers) || [];
         const esc = Utils.escapeHtml;
+        // A markup that is not set renders BLANK, never 0. A blank means nobody
+        // has decided; a zero means somebody decided zero, and a project that
+        // quietly bills at cost because a blank became a zero is a real loss.
+        const mk = function(key) {
+            const v = project && project.markup ? project.markup[key] : null;
+            return (v === null || v === undefined || v === '') ? '' : esc(String(v));
+        };
 
         const bodyHtml = `
             <form id="projectModalForm" novalidate>
@@ -268,6 +275,33 @@ window.AdminProjects = {
                         >${esc(project ? project.description : '')}</textarea>
                 </div>
 
+                <div class="form-group" style="margin-bottom:12px">
+                    <label>Billing Markup (%)</label>
+                    <div style="font-size:.85rem;color:var(--text2);margin-bottom:6px">
+                        Leave blank for no markup. A blank is not a zero: zero percent means
+                        somebody decided zero. Nothing bills off these yet.
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label style="font-size:.85rem">Labour</label>
+                            <input type="number" name="markupLabourPct" step="0.1" min="0" max="1000"
+                                placeholder="not set" value="${mk('labourPct')}">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:.85rem">Equipment</label>
+                            <input type="number" name="markupEquipmentPct" step="0.1" min="0" max="1000"
+                                placeholder="not set" value="${mk('equipmentPct')}">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:.85rem">Material</label>
+                            <input type="number" name="markupMaterialPct" step="0.1" min="0" max="1000"
+                                placeholder="not set" value="${mk('materialPct')}">
+                        </div>
+                    </div>
+                    <input type="text" name="markupNote" placeholder="Why this rate, e.g. emergency at full rate"
+                        value="${esc((project && project.markup && project.markup.note) || '')}">
+                </div>
+
                 ${workers.length > 0 ? `
                 <div class="form-group" style="margin-bottom:12px">
                     <label>Assign Workers</label>
@@ -334,6 +368,14 @@ window.AdminProjects = {
                 Utils.showToast('Scope of work is required (at least 10 characters)', 'error');
                 return;
             }
+            // '' -> null (not set), '0' -> 0 (deliberately zero). parseFloat('')
+            // is NaN and Number('') is 0, and either one silently turns "nobody
+            // decided" into "bills at cost".
+            const numOrNull = function(v) {
+                if (v === undefined || v === null || String(v).trim() === '') return null;
+                const n = parseFloat(v);
+                return isNaN(n) ? null : n;
+            };
             const workerIds = [];
             modal.overlay.querySelectorAll('.worker-checkbox:checked').forEach(function(cb) {
                 workerIds.push(cb.value);
@@ -365,6 +407,12 @@ window.AdminProjects = {
                 status: fd.status || 'Active',
                 description: (fd.description || '').trim(),
                 scopeSource: (project && project.scopeSource) || 'written',
+                markup: {
+                    labourPct:    numOrNull(fd.markupLabourPct),
+                    equipmentPct: numOrNull(fd.markupEquipmentPct),
+                    materialPct:  numOrNull(fd.markupMaterialPct),
+                    note:         (fd.markupNote || '').trim(),
+                },
                 assignedWorkers: workerIds,
                 budget: parseFloat(fd.budget) || 0,
             };
