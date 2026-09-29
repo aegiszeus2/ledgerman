@@ -3,6 +3,67 @@ window.AdminApprovals = {
     _tab: 'pending',
     _impactCodes: [],  // cached impact code list
 
+    // Employee + date range filter. Applies to both the Pending and History tabs.
+    _filter: { workerId: '', from: '', to: '' },
+
+    _filterActive() {
+        const f = this._filter;
+        return !!(f.workerId || f.from || f.to);
+    },
+
+    // Keep entries whose worker and date match the filter. Dates compare as ISO
+    // yyyy-mm-dd strings so no timezone shift can move an entry across a boundary.
+    _applyFilter(list) {
+        const f = this._filter;
+        if (!this._filterActive()) return list;
+        return (list || []).filter(function(x) {
+            if (f.workerId && String(x.workerId) !== String(f.workerId)) return false;
+            const d = String(x.date || '').slice(0, 10);
+            if (f.from && d < f.from) return false;
+            if (f.to && d > f.to) return false;
+            return true;
+        });
+    },
+
+    _filterBarHtml() {
+        const f = this._filter;
+        const workers = (AppData.getWorkers ? AppData.getWorkers() : []).slice()
+            .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+        const opts = workers.map(function(w) {
+            return '<option value="' + Utils.escapeHtml(w.id) + '"' + (String(w.id) === String(f.workerId) ? ' selected' : '') + '>' + Utils.escapeHtml(w.name || w.id) + '</option>';
+        }).join('');
+        return '<div class="card" id="approvalsFilterBar" style="padding:10px 14px;margin-bottom:14px">' +
+            '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
+                '<div class="form-group" style="margin:0;min-width:180px;flex:1"><label style="font-size:.78rem">Employee</label>' +
+                    '<select class="form-control" id="apprFilterWorker"><option value="">All employees</option>' + opts + '</select></div>' +
+                '<div class="form-group" style="margin:0"><label style="font-size:.78rem">From</label>' +
+                    '<input type="date" class="form-control" id="apprFilterFrom" value="' + Utils.escapeHtml(f.from) + '"></div>' +
+                '<div class="form-group" style="margin:0"><label style="font-size:.78rem">To</label>' +
+                    '<input type="date" class="form-control" id="apprFilterTo" value="' + Utils.escapeHtml(f.to) + '"></div>' +
+                '<button class="btn-secondary btn-sm" id="apprFilterClear" type="button"' + (this._filterActive() ? '' : ' disabled') + '>Clear</button>' +
+            '</div>' +
+        '</div>';
+    },
+
+    _bindFilterBar(container) {
+        const self = this;
+        const sel  = container.querySelector('#apprFilterWorker');
+        const from = container.querySelector('#apprFilterFrom');
+        const to   = container.querySelector('#apprFilterTo');
+        const clr  = container.querySelector('#apprFilterClear');
+        function apply() {
+            self._filter = { workerId: sel.value || '', from: from.value || '', to: to.value || '' };
+            self._renderContent();
+        }
+        if (sel)  sel.addEventListener('change', apply);
+        if (from) from.addEventListener('change', apply);
+        if (to)   to.addEventListener('change', apply);
+        if (clr)  clr.addEventListener('click', function() {
+            self._filter = { workerId: '', from: '', to: '' };
+            self._renderContent();
+        });
+    },
+
     _pendingTimecards: [],  // pending timecards (separate table from submissions)
 
     // Date shown with the weekday name, e.g. "Monday, Jul 20, 2026".
@@ -82,9 +143,12 @@ window.AdminApprovals = {
         const self = this;
         const container = self._container;
         const submissions = AppData.getSubmissions();
-        const pending = submissions.filter(function(s) { return s.status === 'Pending'; });
-        const approved = submissions.filter(function(s) { return s.status === 'Approved'; });
-        const rejected = submissions.filter(function(s) { return s.status === 'Rejected'; });
+        const filterOn = self._filterActive();
+        const pendingAll = submissions.filter(function(s) { return s.status === 'Pending'; });
+        const pending = self._applyFilter(pendingAll);
+        const approved = self._applyFilter(submissions.filter(function(s) { return s.status === 'Approved'; }));
+        const rejected = self._applyFilter(submissions.filter(function(s) { return s.status === 'Rejected'; }));
+        const historyAllCount = submissions.filter(function(s) { return s.status === 'Approved' || s.status === 'Rejected'; }).length;
         // Every worker submission auto-mirrors to a timecard that shares the SAME id
         // (backend upsert_timecard_from_submission keys the timecard on the submission id).
         // That made each shift show TWICE on this tab: once as a submission card (has Edit,
@@ -93,10 +157,14 @@ window.AdminApprovals = {
         // Keep the submission card, hide only the timecard that is a mirror of a still-pending
         // submission. Standalone timecards (admin/AI-created, no matching submission) stay shown.
         const pendingSubIds = {};
-        pending.forEach(function(s) { pendingSubIds[String(s.id)] = true; });
+        pendingAll.forEach(function(s) { pendingSubIds[String(s.id)] = true; });
         const allPendingTc = Array.isArray(self._pendingTimecards) ? self._pendingTimecards : [];
-        const pendingTc = allPendingTc.filter(function(tc) { return !pendingSubIds[String(tc.id)]; });
+        const pendingTcAll = allPendingTc.filter(function(tc) { return !pendingSubIds[String(tc.id)]; });
+        const pendingTc = self._applyFilter(pendingTcAll);
+        const pendingTotalAll = pendingAll.length + pendingTcAll.length;
         const pendingTotal = pending.length + pendingTc.length;
+        const pendingBadge = filterOn ? (pendingTotal + ' of ' + pendingTotalAll) : String(pendingTotal);
+        const historyCount = filterOn ? ((approved.length + rejected.length) + ' of ' + historyAllCount) : String(approved.length + rejected.length);
 
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
@@ -111,12 +179,14 @@ window.AdminApprovals = {
 
             <div class="tabs" style="margin-bottom:16px">
                 <button class="tab-btn ${self._tab === 'pending' ? 'active' : ''}" data-tab="pending">
-                    Pending ${pendingTotal > 0 ? '<span class="badge-gold" style="margin-left:6px">' + pendingTotal + '</span>' : ''}
+                    Pending ${(pendingTotal > 0 || filterOn) ? '<span class="badge-gold" style="margin-left:6px">' + pendingBadge + '</span>' : ''}
                 </button>
                 <button class="tab-btn ${self._tab === 'history' ? 'active' : ''}" data-tab="history">
-                    History (${approved.length + rejected.length})
+                    History (${historyCount})
                 </button>
             </div>
+
+            ${self._filterBarHtml()}
 
             <div id="approvalContent"></div>
         `;
@@ -128,6 +198,8 @@ window.AdminApprovals = {
             });
         });
 
+        self._bindFilterBar(container);
+
         const addTcBtn = container.querySelector('#addTimecardBtn');
         if (addTcBtn) {
             addTcBtn.addEventListener('click', function() {
@@ -138,7 +210,8 @@ window.AdminApprovals = {
         const bulkBtn = container.querySelector('#bulkApproveBtn');
         if (bulkBtn) {
             bulkBtn.addEventListener('click', async function() {
-                const confirmed = await Utils.confirm('Approve all ' + pending.length + ' pending submissions? Each will be converted to a labor expense.');
+                if (pending.length === 0) { Utils.showToast('No pending submissions' + (filterOn ? ' match the filter' : ''), 'error'); return; }
+                const confirmed = await Utils.confirm('Approve all ' + pending.length + ' pending submissions' + (filterOn ? ' matching the current filter' : '') + '? Each will be converted to a labor expense.');
                 if (!confirmed) return;
                 for (const sub of pending) {
                     await self._approveSubmission(sub);
@@ -170,7 +243,7 @@ window.AdminApprovals = {
         var exportCsvBtn = container.querySelector('#approvalsExportCsvBtn');
         if (exportCsvBtn) {
             exportCsvBtn.addEventListener('click', function() {
-                var allSubs = AppData.getSubmissions();
+                var allSubs = self._applyFilter(AppData.getSubmissions());
                 var rows = [csvRow(['Worker','Project','Date','Hours','Status','Notes'])];
                 allSubs.forEach(function(sub) {
                     var worker = AppData.getWorker(sub.workerId);
@@ -329,7 +402,9 @@ window.AdminApprovals = {
     _renderPending(contentEl, pending) {
         const self = this;
         if (pending.length === 0) {
-            contentEl.innerHTML = '<div class="card"><div class="empty"><h3>No Pending Approvals</h3><p>All worker submissions have been reviewed. Check back later.</p></div></div>';
+            contentEl.innerHTML = self._filterActive()
+                ? '<div class="card"><div class="empty"><h3>No Pending Entries Match</h3><p>Nothing pending for this employee and date range. Clear the filter to see everything.</p></div></div>'
+                : '<div class="card"><div class="empty"><h3>No Pending Approvals</h3><p>All worker submissions have been reviewed. Check back later.</p></div></div>';
             return;
         }
 
@@ -450,7 +525,9 @@ window.AdminApprovals = {
         });
 
         if (all.length === 0) {
-            contentEl.innerHTML = '<div class="card"><div class="empty"><h3>No History</h3><p>Approved and rejected submissions will appear here.</p></div></div>';
+            contentEl.innerHTML = self._filterActive()
+                ? '<div class="card"><div class="empty"><h3>No History Matches</h3><p>No approved or rejected entries for this employee and date range. Clear the filter to see everything.</p></div></div>'
+                : '<div class="card"><div class="empty"><h3>No History</h3><p>Approved and rejected submissions will appear here.</p></div></div>';
             return;
         }
 

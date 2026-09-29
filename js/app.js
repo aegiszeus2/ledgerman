@@ -1325,6 +1325,7 @@ window.LMIcons = {
                 // ── Back office ────────────────────────────────────────────
                 group('Back office'),
                 item('reports',       'chart', 'Reports',      'Reports — cost, labour & invoice summaries'),
+                item('payroll',       'money', 'Payroll',      'Payroll — record pay runs and employee deductions'),
                 item('impact-codes',  'flag',  'Impact Codes', 'Impact Codes — track non-productive time causes'),
 
                 // ── Module-gated Tier 3 ────────────────────────────────────
@@ -1648,6 +1649,9 @@ window.LMIcons = {
                     break;
                 case 'reports':
                     if (window.AdminReports) AdminReports.render(content);
+                    break;
+                case 'payroll':
+                    if (window.AdminPayroll) AdminPayroll.render(content, params);
                     break;
                 case 'impact-codes':
                     if (window.AdminImpactCodes) AdminImpactCodes.render(content);
