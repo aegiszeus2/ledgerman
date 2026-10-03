@@ -122,6 +122,20 @@ test.describe('Time Approvals list', () => {
         expect(await page.inputValue('#apprFilterWorker')).toBe('');
     });
 
+    test('an entry with no date sits at the bottom whichever way the list runs', async ({ page }) => {
+        const subs = [
+            SUB('nodate', { date: '', status: 'Rejected', workerId: 'zz', description: 'junk' }),
+            SUB('d1', { date: '2026-09-01', status: 'Approved' }),
+            SUB('d2', { date: '2026-09-05', status: 'Approved' }),
+        ];
+        await open(page, subs, []);
+        await page.click('.tab-btn[data-tab="history"]'); await page.waitForSelector('#approvalContent .card');
+        expect(await cardIds(page)).toEqual(['d2', 'd1', 'nodate']);
+        await page.selectOption('#apprFilterSort', 'asc');
+        await page.waitForSelector('#approvalContent .card');
+        expect(await cardIds(page)).toEqual(['d1', 'd2', 'nodate']);
+    });
+
     test('empty history still shows the empty state', async ({ page }) => {
         await open(page, [SUB('p1only')], []);
         await page.click('.tab-btn[data-tab="history"]');

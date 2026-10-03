@@ -35,6 +35,9 @@ window.AdminApprovals = {
             return String(x.date || '').slice(0, 10) + '|' + String(x.startTime || '') + '|' + String(x.createdAt || '');
         }
         return (list || []).slice().sort(function(a, b) {
+            // An entry with no date at all goes to the bottom whichever way the list runs.
+            const da = !!a.date, db = !!b.date;
+            if (da !== db) return da ? -1 : 1;
             const ka = key(a), kb = key(b);
             if (ka < kb) return -1 * dir;
             if (ka > kb) return 1 * dir;
