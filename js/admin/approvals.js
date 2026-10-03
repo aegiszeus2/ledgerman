@@ -240,12 +240,17 @@ window.AdminApprovals = {
         if (bulkBtn) {
             bulkBtn.addEventListener('click', async function() {
                 if (pending.length === 0) { Utils.showToast('No pending submissions' + (filterOn ? ' match the filter' : ''), 'error'); return; }
-                const confirmed = await Utils.confirm('Approve all ' + pending.length + ' pending submissions' + (filterOn ? ' matching the current filter' : '') + '? Each will be converted to a labor expense.');
+                // Cards flagged for an overlap never go through in a batch (Damiano, 3 October)
+                const clean = pending.filter(function(s) { return !self._overlapInfo(s).flagged; });
+                const skipped = pending.length - clean.length;
+                if (clean.length === 0) { Utils.showToast('All ' + pending.length + ' pending cards are flagged for an overlap. Approve those one at a time.', 'error'); return; }
+                const confirmed = await Utils.confirm('Approve ' + clean.length + ' pending submissions' + (filterOn ? ' matching the current filter' : '') + '?' +
+                    (skipped ? ' ' + skipped + ' flagged for an overlap will be skipped, approve those one at a time.' : '') + ' Each will be converted to a labor expense.');
                 if (!confirmed) return;
-                for (const sub of pending) {
+                for (const sub of clean) {
                     await self._approveSubmission(sub);
                 }
-                Utils.showToast(pending.length + ' submissions approved');
+                Utils.showToast(clean.length + ' submissions approved' + (skipped ? ', ' + skipped + ' skipped for overlap' : ''));
                 self._renderContent();
             });
         }
@@ -433,6 +438,56 @@ window.AdminApprovals = {
     // out in the header, clock in and out, description, hours and amount, then the method
     // badge and photos. 'pending' adds Approve / Reject / Edit; 'history' adds the status
     // badge, who reviewed it and when, the rejection reason, and Unapprove / Edit.
+    // ── Overlap flags (Damiano, 3 October: nothing flagged two cards for the same day) ──
+    // The server stamps a card that collides with another (overlapsWith, overlapKind,
+    // overlapReason). The card it collides with carries no stamp of its own, so the index
+    // is built both ways: a card is flagged if it points at others or others point at it.
+    _overlapIndex() {
+        const all = (AppData.getSubmissions ? AppData.getSubmissions() : []) || [];
+        const by = {};
+        all.forEach(function(s) {
+            (Array.isArray(s.overlapsWith) ? s.overlapsWith : []).forEach(function(oid) {
+                (by[oid] = by[oid] || []).push(s);
+            });
+        });
+        return by;
+    },
+    _overlapInfo(sub) {
+        const mine = Array.isArray(sub.overlapsWith) ? sub.overlapsWith : [];
+        const byOthers = this._overlapIndex()[sub.id] || [];
+        return { flagged: mine.length > 0 || byOthers.length > 0, mine: mine, byOthers: byOthers };
+    },
+    _overlapBandHtml(sub) {
+        const self = this;
+        const info = self._overlapInfo(sub);
+        if (!info.flagged) return '';
+        function firstName(w) { return w && w.name ? w.name.split(' ')[0] : 'this worker'; }
+        function projName(pid) { const p = AppData.getProject(pid); return p ? p.name : 'another job'; }
+        function timesOf(c) { return (c.startTime && c.endTime) ? c.startTime + ' to ' + c.endTime + ' card' : ((parseFloat(c.hours) || 0) + ' hour card, hours only'); }
+        const worker = AppData.getWorker(sub.workerId);
+        const lines = [];
+        info.mine.forEach(function(oid) {
+            const other = AppData.getSubmission(oid);
+            if (!other) { lines.push('Overlaps another card for the same day (id ' + oid + ')'); return; }
+            if (sub.overlapKind === 'same_job_day') {
+                lines.push('Second card on ' + projName(other.projectId) + ' this day, hours only. Check it is not a double of the ' + timesOf(other) + '.');
+            } else if (sub.overlapKind === 'long_day') {
+                const total = (parseFloat(sub.hours) || 0) + (parseFloat(other.hours) || 0);
+                lines.push('Long day: ' + total.toFixed(2).replace(/\.?0+$/, '') + ' hours logged this day with the ' + timesOf(other) + ' on ' + projName(other.projectId) + '.');
+            } else {
+                lines.push('Overlaps ' + firstName(worker) + "'s " + timesOf(other) + ' on ' + projName(other.projectId) + '.');
+            }
+        });
+        info.byOthers.forEach(function(o) {
+            lines.push('Overlapped by the ' + timesOf(o) + ' on ' + projName(o.projectId) + (o.overlapReason ? '. Reason given: ' + o.overlapReason : '') + '.');
+        });
+        const reason = sub.overlapReason ? '<div class="appr-overlap-reason" style="margin-top:3px"><strong>Reason given:</strong> ' + Utils.escapeHtml(sub.overlapReason) + '</div>' : '';
+        return '<div class="appr-overlap" style="margin:-4px 0 10px;padding:8px 10px;border-left:4px solid #f39c12;background:rgba(243,156,18,.14);border-radius:6px;font-size:.84rem;line-height:1.4">' +
+            '<strong style="color:#b8860b">Overlapping entry</strong>' +
+            lines.map(function(l) { return '<div>' + Utils.escapeHtml(l) + '</div>'; }).join('') + reason +
+        '</div>';
+    },
+
     _subCardHtml(sub, mode) {
         const self = this;
         const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
@@ -506,6 +561,7 @@ window.AdminApprovals = {
                         '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
                         '<span class="appr-date" style="font-size:.8rem;color:var(--text2)">' + self._dayDate(sub.date) + '</span>' +
                     '</div>' +
+                    self._overlapBandHtml(sub) +
                     self._clockLine(sub) +
                     (subtask ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Subtask:</strong> ' + Utils.escapeHtml(subtask.name) + '</div>' : '') +
                     '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(sub.description || 'No description') + '</div>' +
@@ -563,6 +619,11 @@ window.AdminApprovals = {
             btn.addEventListener('click', async function() {
                 const sub = AppData.getSubmission(btn.dataset.id);
                 if (!sub) return;
+                if (self._overlapInfo(sub).flagged) {
+                    const worker = AppData.getWorker(sub.workerId);
+                    const go = await Utils.confirm('This card overlaps another entry ' + (worker ? worker.name : 'this worker') + ' has for the same day. Approve it anyway?');
+                    if (!go) return;
+                }
                 await self._approveSubmission(sub);
                 Utils.showToast('Submission approved');
                 self._renderContent();
@@ -999,6 +1060,10 @@ window.AdminApprovals = {
                 ` : ''}
             </fieldset>
 
+            <div class="form-group" id="editOverlapRow" style="${sub.overlapReason ? '' : 'display:none;'}margin-top:6px;padding:8px 10px;border-left:4px solid #f39c12;background:rgba(243,156,18,.12);border-radius:6px">
+                <label style="font-size:.85rem">Why the overlap with the worker's other card this day is correct</label>
+                <input type="text" class="form-control" id="editOverlapReason" maxlength="200" value="${Utils.escapeHtml(sub.overlapReason || '')}" placeholder="One line, required to save an overlapping card">
+            </div>
             <div id="editErrMsg" style="color:var(--accent);font-size:.85rem;margin-bottom:8px;display:none"></div>
         `;
 
@@ -1240,6 +1305,18 @@ window.AdminApprovals = {
                 impactDescription:       newImpactCode ? q('#editImpactDesc').value.trim() : null,
             };
 
+            const ovRow = q('#editOverlapRow');
+            if (ovRow && ovRow.style.display !== 'none') {
+                fields.overlapReason = q('#editOverlapReason').value.trim();
+            }
+            // A server refusal for an overlap reveals the reason row; the admin fills it and saves again.
+            function surfaceOverlap(msg) {
+                if (/already have an entry|already in:|overlap/i.test(msg) && ovRow) {
+                    ovRow.style.display = 'block';
+                    if (!/already in:/i.test(msg)) q('#editOverlapReason').focus();
+                }
+            }
+
             if (newIsFlat) {
                 const flatAmt    = parseFloat(q('#editFlatAmount').value) || 0;
                 fields.flatAmount = flatAmt;
@@ -1291,10 +1368,15 @@ window.AdminApprovals = {
                         rejectionReason: null,
                         photoIds:        newPhotoIds,
                     }, fields);
-                    AppData.saveSubmission(newSub);
+                    if (typeof AppData.saveEntityAsync === 'function') {
+                        await AppData.saveEntityAsync('submissions', newSub);
+                    } else {
+                        AppData.saveSubmission(newSub);
+                    }
                 } catch (e) {
                     errEl.textContent = 'Failed to create: ' + e.message;
                     errEl.style.display = 'block';
+                    surfaceOverlap(e.message || '');
                     restoreC();
                     return;
                 }
@@ -1334,6 +1416,7 @@ window.AdminApprovals = {
             } catch (e) {
                 errEl.textContent = 'Failed to save: ' + e.message;
                 errEl.style.display = 'block';
+                surfaceOverlap(e.message || '');
                 restore();
                 return;
             }

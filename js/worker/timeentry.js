@@ -879,6 +879,20 @@ window.WorkerTimeEntry = {
                     '<div class="photo-preview-days" id="photoPreviewArea"></div>' +
                 '</div>';
 
+            // Overlap warning (Damiano, 3 October: two entries for the same day with
+            // overlapping hours went through unflagged). Hidden until the check fires.
+            formHTML +=
+                '<div id="teOverlapWarn" class="overlap-warn" style="display:none;margin:0 0 12px;padding:10px 12px;border-left:4px solid #f39c12;background:rgba(243,156,18,.12);border-radius:6px">' +
+                    '<div id="teOverlapMsg" style="font-size:.92rem;line-height:1.4"></div>' +
+                    '<div id="teOverlapOverride" style="margin-top:8px">' +
+                        '<label style="display:flex;gap:8px;align-items:flex-start;font-size:.9rem;cursor:pointer">' +
+                            '<input type="checkbox" id="teOverlapOk" style="margin-top:3px;width:18px;height:18px">' +
+                            '<span>This is correct, both entries are real work</span>' +
+                        '</label>' +
+                        '<input type="text" class="form-control" id="teOverlapReason" maxlength="200" placeholder="One line on why, required" style="margin-top:6px">' +
+                    '</div>' +
+                '</div>';
+
             // Submit
             formHTML +=
                 '<button type="submit" class="btn-primary btn-tap btn-block" id="teSubmitBtn" style="min-height:56px">&#10003; Submit for Approval</button>';
@@ -1529,6 +1543,78 @@ window.WorkerTimeEntry = {
             }
 
             // ── Submit ───────────────────────────────────────────────────
+            // ── Overlap check against this worker's other cards for the day ──────────
+            var OVERLAP_TOLERANCE_MIN = 5;
+            function teMins(t) {
+                if (!t) return null;
+                var parts = String(t).split(':');
+                var h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+                if (isNaN(h) || isNaN(m)) return null;
+                return h * 60 + m;
+            }
+            function teSpan(st, en) {
+                var a = teMins(st), b = teMins(en);
+                if (a === null || b === null) return null;
+                if (b <= a) b += 24 * 60;
+                return [a, b];
+            }
+            function teHm(m) { m = ((m % 1440) + 1440) % 1440; return (m < 600 ? '0' : '') + Math.floor(m / 60) + ':' + (m % 60 < 10 ? '0' : '') + (m % 60); }
+            function teDayWords(ds) {
+                var d = new Date(ds + 'T12:00:00');
+                if (isNaN(d.getTime())) return ds;
+                var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                return days[d.getDay()] + ' ' + d.getDate() + ' ' + months[d.getMonth()];
+            }
+            function teProjectName(pid) {
+                var pr = pid && AppData.getProject ? AppData.getProject(pid) : null;
+                return (pr && pr.name) ? pr.name : 'another job';
+            }
+            // Returns null, or { kind: 'duplicate'|'overlap', other: sub, message: text }
+            function findOverlap(workerId, dateValue, st, en, pid, excludeId) {
+                var mine = teSpan(st, en);
+                if (!mine) return null;
+                var cards = (AppData.getWorkerSubmissions ? AppData.getWorkerSubmissions(workerId) : []) || [];
+                var hit = null;
+                for (var i = 0; i < cards.length; i++) {
+                    var c = cards[i];
+                    if (!c || c.id === excludeId || c.date !== dateValue || c.status === 'Rejected') continue;
+                    var o = teSpan(c.startTime, c.endTime);
+                    if (!o) continue;
+                    if (o[0] === mine[0] && o[1] === mine[1] && (c.projectId || '') === (pid || '')) {
+                        return { kind: 'duplicate', other: c,
+                                 message: 'This entry is already in: ' + teDayWords(dateValue) + ', ' + c.startTime + ' to ' + c.endTime +
+                                          ' on ' + teProjectName(c.projectId) + '. A second copy of the same card is not allowed.' };
+                    }
+                    var inter = Math.min(mine[1], o[1]) - Math.max(mine[0], o[0]);
+                    if (inter > OVERLAP_TOLERANCE_MIN && !hit) {
+                        hit = { kind: 'overlap', other: c,
+                                message: 'You already have an entry for ' + teDayWords(dateValue) + ' from ' + c.startTime + ' to ' + c.endTime +
+                                         ' on ' + teProjectName(c.projectId) + '. This one overlaps it from ' +
+                                         teHm(Math.max(mine[0], o[0])) + ' to ' + teHm(Math.min(mine[1], o[1])) + '.' };
+                    }
+                }
+                return hit;
+            }
+            function showOverlap(hit) {
+                var warn = form.querySelector('#teOverlapWarn');
+                if (!warn) return;
+                warn.style.display = 'block';
+                warn.setAttribute('data-kind', hit.kind);
+                warn.querySelector('#teOverlapMsg').textContent = hit.message +
+                    (hit.kind === 'duplicate' ? '' : ' If both are right, tick the box and say why, or fix the times.');
+                warn.querySelector('#teOverlapOverride').style.display = hit.kind === 'duplicate' ? 'none' : 'block';
+                warn.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+            function hideOverlap() {
+                var warn = form.querySelector('#teOverlapWarn');
+                if (warn) { warn.style.display = 'none'; warn.removeAttribute('data-kind'); }
+            }
+            // Times or date change: the warning is about the old numbers, clear it
+            [startInput, endInput, form.querySelector('#teDate')].forEach(function(inp) {
+                if (inp) inp.addEventListener('input', hideOverlap);
+            });
+
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
 
@@ -1577,6 +1663,30 @@ window.WorkerTimeEntry = {
                         Utils.showToast('Impact description is required for Billable or Disputed status.', 'error');
                         form.querySelector('#teImpactDesc').focus(); return;
                     }
+                }
+
+                // Same worker, same day, overlapping hours (Damiano, 3 October)
+                var overlapReason = '';
+                var overlapHit = findOverlap(worker.id, dateValue, startTime, endTime, projectId, editOf);
+                if (overlapHit) showOverlap(overlapHit);
+                // The warning may also be up because the SERVER refused the last send (a card
+                // this phone has not synced). Either way, once it is showing for an overlap the
+                // tick and the reason are required and the reason travels with the card.
+                var warnUp = form.querySelector('#teOverlapWarn');
+                var warnKind = (warnUp && warnUp.style.display !== 'none') ? warnUp.getAttribute('data-kind') : '';
+                if (overlapHit && overlapHit.kind === 'duplicate') {
+                    Utils.showToast('This entry is already in. A second copy is not allowed.', 'error');
+                    return;
+                }
+                if (overlapHit || warnKind === 'overlap') {
+                    var okChk = form.querySelector('#teOverlapOk');
+                    var reasonIn = form.querySelector('#teOverlapReason');
+                    if (!okChk.checked || !reasonIn.value.trim()) {
+                        Utils.showToast('Tick that this is correct and say why, or fix the times.', 'error');
+                        (okChk.checked ? reasonIn : okChk).focus();
+                        return;
+                    }
+                    overlapReason = reasonIn.value.trim();
                 }
 
                 var submitBtn = form.querySelector('#teSubmitBtn');
@@ -1671,9 +1781,31 @@ window.WorkerTimeEntry = {
                         // On-site employees for the daily field report (supervisors only;
                         // omitted for regular workers so their submission is unchanged)
                         employeesPresent:     isSupervisor ? employeesPresent : undefined,
+                        // Why an overlap with another card on the same day is correct ('' when none)
+                        overlapReason:        overlapReason,
                     };
 
-                    AppData.saveSubmission(submission);
+                    // Server first. The server runs the same overlap rule against every card it
+                    // holds, including ones this phone has not synced, and refuses a duplicate or
+                    // an unexplained overlap. The old fire-and-forget save would have kept a ghost
+                    // copy on the phone after such a refusal.
+                    if (typeof AppData.saveEntityAsync === 'function') {
+                        try {
+                            await AppData.saveEntityAsync('submissions', submission);
+                        } catch (saveErr) {
+                            var msg = (saveErr && saveErr.message) || 'Could not save the entry.';
+                            var refused = /already have an entry|already in:|overlap/i.test(msg);
+                            if (refused) {
+                                showOverlap({ kind: /already in:/i.test(msg) ? 'duplicate' : 'overlap', message: msg });
+                            }
+                            Utils.showToast(msg, 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '&#10003; Submit for Approval';
+                            return;
+                        }
+                    } else {
+                        AppData.saveSubmission(submission);
+                    }
 
                     if (editOf) {
                         // Replace, not add: the entry's previous equipment logs are removed
