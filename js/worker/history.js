@@ -318,8 +318,11 @@ window.WorkerHistory = {
                     var expenseList = '';
                     sub.expenses.forEach(function(exp) {
                         expenseTotal += parseFloat(exp.amount) || 0;
+                        var payNote = (exp.paymentType === 'payable')
+                            ? (exp.paidDate ? 'Payable, paid ' + esc(exp.paidDate) : 'Payable' + (exp.dueDate ? ', due ' + esc(exp.dueDate) : ''))
+                            : (exp.paymentType === 'paid' ? 'Paid' : '');
                         expenseList += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.8rem">' +
-                            '<span>' + esc(exp.description) + '</span>' +
+                            '<span>' + esc(exp.description) + (payNote ? ' <span style="color:var(--text2);font-size:.75rem">' + payNote + '</span>' : '') + '</span>' +
                             '<span>' + Utils.formatCurrency(exp.amount) + '</span>' +
                         '</div>';
                     });

@@ -102,14 +102,21 @@ window.AdminExpenses = {
         }
 
         const expenses = AppData.getExpenses(self._projectId);
-        const ready = expenses.filter(function(e) { return e.billable && e.invoiceStatus !== 'Already Invoiced'; });
-        const invoiced = expenses.filter(function(e) { return e.invoiceStatus === 'Already Invoiced'; });
-        const nonBillable = expenses.filter(function(e) { return !e.billable; });
+        // Billed state is derived by the server from invoice line items (uid 1122); the old
+        // invoiceStatus string is a fallback for rows the cache has not refreshed yet.
+        const isBilled = function(e) { return AppData.expenseIsBilled(e) || e.invoiceStatus === 'Already Invoiced'; };
+        const ready = expenses.filter(function(e) { return e.billable !== false && !isBilled(e) && !e.excludeFromInvoice; });
+        const invoiced = expenses.filter(function(e) { return isBilled(e); });
+        const nonBillable = expenses.filter(function(e) { return e.billable === false; });
+        const payableOpen = expenses.filter(function(e) { return AppData.expensePaymentType(e) === 'payable' && !AppData.expenseIsPaid(e); });
+        const payableOpenTotal = payableOpen.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+        const overdueTotal = payableOpen.filter(function(e) { return AppData.expensePaymentState(e) === 'overdue'; }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
 
         const tabs = [
             { key: 'ready', label: 'Ready to Invoice', count: ready.length },
             { key: 'invoiced', label: 'Already Invoiced', count: invoiced.length },
             { key: 'nonbillable', label: 'Non-Billable', count: nonBillable.length },
+            { key: 'payable', label: 'Payable, open', count: payableOpen.length },
             { key: 'all', label: 'All Expenses', count: expenses.length }
         ];
 
@@ -118,6 +125,7 @@ window.AdminExpenses = {
             case 'ready': displayExpenses = ready; break;
             case 'invoiced': displayExpenses = invoiced; break;
             case 'nonbillable': displayExpenses = nonBillable; break;
+            case 'payable': displayExpenses = payableOpen; break;
             default: displayExpenses = expenses; break;
         }
 
@@ -140,14 +148,17 @@ window.AdminExpenses = {
                     <option value="Labor" ${self._categoryFilter === 'Labor' ? 'selected' : ''}>Labor</option>
                     <option value="Equipment" ${self._categoryFilter === 'Equipment' ? 'selected' : ''}>Equipment</option>
                     <option value="Material" ${self._categoryFilter === 'Material' ? 'selected' : ''}>Material</option>
+                    <option value="Other" ${self._categoryFilter === 'Other' ? 'selected' : ''}>Other</option>
+                    <option value="Subcontractor" ${self._categoryFilter === 'Subcontractor' ? 'selected' : ''}>Subcontractor</option>
                 </select>
+                <span id="expPayableSummary" style="font-size:.85rem;color:var(--text2);margin-left:auto">Payable open: <strong>${Utils.formatCurrency(payableOpenTotal)}</strong>${overdueTotal > 0 ? ' <span style="color:var(--accent)">(overdue ' + Utils.formatCurrency(overdueTotal) + ')</span>' : ''}</span>
             </div>
 
             <div class="card">
                 ${displayExpenses.length === 0
                     ? '<div class="empty"><h3>No Expenses</h3><p>No expenses match the current filters.</p></div>'
                     : `<table>
-                        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="amount">Amount</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="amount">Amount</th><th>Payment</th><th>Billed</th><th>Actions</th></tr></thead>
                         <tbody>${displayExpenses.map(function(e) {
                             const source = e.source === 'Worker Submission' ? '<br><span style="font-size:.7rem;color:var(--text2)">(Worker Submission)</span>' : '';
                             const changeOrder = e.changeOrder ? ' <span style="color:var(--warn);font-size:.7rem;font-weight:700">CO</span>' : '';
@@ -156,19 +167,23 @@ window.AdminExpenses = {
                                 '<td><span class="cat-badge cat-' + (e.category || 'material').toLowerCase() + '">' + Utils.escapeHtml(e.category || 'Material') + '</span></td>' +
                                 '<td>' + Utils.escapeHtml(e.description) + changeOrder + source + '</td>' +
                                 '<td class="amount">' + Utils.formatCurrency(e.amount) + '</td>' +
-                                '<td style="font-size:.8rem">' + Utils.escapeHtml(e.billable ? (e.invoiceStatus || 'Ready to Invoice') : 'Non-Billable') + '</td>' +
+                                '<td style="font-size:.8rem;white-space:nowrap" class="exp-pay exp-pay-' + AppData.expensePaymentState(e) + '">' + Utils.escapeHtml(AppData.expensePaymentLabel(e)) + '</td>' +
+                                '<td style="font-size:.8rem;white-space:nowrap" class="exp-billed exp-billed-' + AppData.expenseBilledState(e) + '">' +
+                                    Utils.escapeHtml(e.billable === false ? 'Non-billable' : (e.excludeFromInvoice ? 'Excluded' : AppData.expenseBilledLabel(e))) + '</td>' +
                                 '<td style="white-space:nowrap">' +
-                                    (e.invoiceStatus !== 'Already Invoiced'
+                                    (AppData.expensePaymentType(e) === 'payable' && !AppData.expenseIsPaid(e)
+                                        ? '<button class="btn-ghost btn-sm mark-paid-expense" data-id="' + e.id + '">Mark paid</button>' : '') +
+                                    (!isBilled(e) && e.status !== 'approved'
                                         ? '<button class="btn-ghost btn-sm edit-expense" data-id="' + e.id + '">Edit</button>' +
                                           '<button class="btn-ghost btn-sm delete-expense" data-id="' + e.id + '" style="color:var(--accent)">Del</button>'
-                                        : '<span style="font-size:.8rem;color:var(--text2)">Locked</span>') +
+                                        : '<span style="font-size:.8rem;color:var(--text2)">' + (isBilled(e) ? 'Locked' : 'Approved') + '</span>') +
                                 '</td>' +
                             '</tr>';
                         }).join('')}</tbody>
                         <tfoot><tr>
                             <td colspan="3" style="font-weight:700">Total</td>
                             <td class="amount" style="font-weight:700;border-top:2px solid var(--border)">${Utils.formatCurrency(displayExpenses.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))}</td>
-                            <td colspan="2"></td>
+                            <td colspan="3"></td>
                         </tr></tfoot>
                     </table>`
                 }
@@ -186,6 +201,13 @@ window.AdminExpenses = {
             self._categoryFilter = this.value;
             self._renderExpenses();
         });
+
+        contentEl.querySelectorAll('.mark-paid-expense').forEach(function(btn) {
+
+            btn.addEventListener('click', function() { self._markPaid(btn.dataset.id); });
+
+        });
+
 
         contentEl.querySelectorAll('.edit-expense').forEach(function(btn) {
             btn.addEventListener('click', function() {
@@ -205,6 +227,25 @@ window.AdminExpenses = {
                 self._renderExpenses();
             });
         });
+    },
+
+    // Payable → paid later. Goes through the payment route so it works on approved rows too.
+    async _markPaid(id) {
+        var self = this;
+        var e = AppData.getExpense(id);
+        if (!e) return;
+        var paidDate = window.prompt('Paid on (YYYY-MM-DD)', Utils.today());
+        if (!paidDate) return;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(paidDate)) { Utils.showToast('Enter the date as YYYY-MM-DD', 'error'); return; }
+        try {
+            await AppData.updateExpensePayment(id, { paidDate: paidDate });
+            var username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
+            AppData.addAuditLog(username, 'Expense Paid', e.description + ' - ' + Utils.formatCurrency(e.amount) + ' paid ' + paidDate);
+            Utils.showToast('Marked paid ' + paidDate);
+            self._renderContent();
+        } catch (err) {
+            Utils.showToast('Could not mark paid: ' + err.message, 'error');
+        }
     },
 
     _showTypeSelector() {
@@ -341,9 +382,32 @@ window.AdminExpenses = {
             `;
         }
 
+        const payType = existing ? AppData.expensePaymentType(existing) : (isLabor ? 'paid' : 'payable');
+        const payDue  = existing ? (existing.dueDate || AppData.expenseDueDate(existing)) : '';
+        const payPaid = existing ? (existing.paidDate || '') : '';
+        const paymentHtml = `
+                <div class="form-row" id="expPaymentRow">
+                    <div class="form-group">
+                        <label>Payment *</label>
+                        <select class="form-control" name="paymentType">
+                            <option value="paid" ${payType === 'paid' ? 'selected' : ''}>Paid</option>
+                            <option value="payable" ${payType === 'payable' ? 'selected' : ''}>Payable</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="expDueGroup" style="${payType === 'payable' ? '' : 'display:none'}">
+                        <label>Due date</label>
+                        <input class="form-control" type="date" name="dueDate" value="${payDue}">
+                        <div style="font-size:.75rem;color:var(--text2)">Defaults to 30 days after the expense date</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Paid date</label>
+                        <input class="form-control" type="date" name="paidDate" value="${payPaid}">
+                    </div>
+                </div>`;
         const bodyHtml = `
             <form id="expenseFormModal" novalidate>
                 ${formFields}
+                ${paymentHtml}
                 <div class="form-row">
                     <div class="form-group">
                         <div class="toggle-wrap">
@@ -373,6 +437,20 @@ window.AdminExpenses = {
             { width: '550px', submitLabel: (isEdit ? 'Update' : 'Add') + ' Expense' }
         );
         const q = s => modal.q(s);
+        // Due date applies to payables only; default it to 30 days after the expense date
+        (function() {
+            var ptEl = q('[name="paymentType"]'), dueGroup = q('#expDueGroup'), dueEl = q('[name="dueDate"]'), dateEl = q('[name="date"]');
+            function syncDue() {
+                var payable = ptEl.value === 'payable';
+                dueGroup.style.display = payable ? '' : 'none';
+                if (payable && !dueEl.value) {
+                    var base = (dateEl && dateEl.value) || Utils.today();
+                    var d = new Date(base + 'T00:00:00'); d.setDate(d.getDate() + 30);
+                    dueEl.value = d.toISOString().slice(0, 10);
+                }
+            }
+            if (ptEl) { ptEl.addEventListener('change', syncDue); syncDue(); }
+        })();
 
         // Labor rate type toggle
         if (isLabor) {
@@ -423,6 +501,9 @@ window.AdminExpenses = {
 
             const billable = !!q('[name="billable"]').checked;
             const changeOrder = !!q('[name="changeOrder"]').checked;
+            const paymentType = q('[name="paymentType"]').value === 'payable' ? 'payable' : 'paid';
+            const dueDateVal  = (q('[name="dueDate"]').value || '').trim();
+            const paidDateVal = (q('[name="paidDate"]').value || '').trim();
 
             const expenseData = {
                 id: isEdit ? existing.id : AppData.generateId(),
@@ -435,8 +516,19 @@ window.AdminExpenses = {
                 changeOrder: changeOrder,
                 invoiceStatus: billable ? (isEdit && existing.invoiceStatus === 'Already Invoiced' ? 'Already Invoiced' : 'Ready to Invoice') : 'N/A',
                 subtaskId: fd.subtaskId || '',
-                source: isEdit ? (existing.source || '') : ''
+                source: isEdit ? (existing.source || '') : '',
+                paymentType: paymentType,
+                dueDate: paymentType === 'payable' ? dueDateVal : '',
+                paidDate: paidDateVal
             };
+            if (isEdit) {
+                // Keep state the server owns on this row (billing linkage, exclusion, status, source)
+                ['invoiced', 'invoiceId', 'excludeFromInvoice', 'excludeReason', 'status',
+                 'project_id', 'source_type', 'source_timecard_id', 'source_equipment_id', 'source_line_key',
+                 'billable_amount', 'charge_out_rate', 'cost_rate', 'worker_id'].forEach(function(k) {
+                    if (existing[k] !== undefined && expenseData[k] === undefined) expenseData[k] = existing[k];
+                });
+            }
 
             if (isLabor) {
                 expenseData.workerId = fd.workerId || '';

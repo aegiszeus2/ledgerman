@@ -616,6 +616,7 @@ window.AdminApprovals = {
             Utils.showToast('Failed to unapprove: ' + e.message, 'error');
             return;
         }
+        try { await AppData.syncFromServer(); } catch (e) { /* voided cost rows drop off at next login */ }
 
         const worker = AppData.getWorker(sub.workerId);
         const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
@@ -666,6 +667,9 @@ window.AdminApprovals = {
             Utils.showToast('Failed to mark submission approved: ' + e.message, 'error');
             return;
         }
+        // The server posts the card's equipment, material and receipt lines as expense rows
+        // on approval; pull them into the cache so the Expenses and Invoice screens show them now.
+        try { await AppData.syncFromServer(); } catch (e) { /* next login syncs */ }
 
         const worker = AppData.getWorker(sub.workerId);
         const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
