@@ -216,6 +216,7 @@ window.AdminApprovals = {
             </div>
 
             ${self._filterBarHtml()}
+            ${self._legendHtml()}
 
             <div id="approvalContent"></div>
         `;
@@ -228,6 +229,7 @@ window.AdminApprovals = {
         });
 
         self._bindFilterBar(container);
+        self._bindLegend(container);
 
         const addTcBtn = container.querySelector('#addTimecardBtn');
         if (addTcBtn) {
@@ -343,7 +345,7 @@ window.AdminApprovals = {
                 const breakdown = (ot || dt)
                     ? ' (' + reg + ' reg' + (ot ? ' + ' + ot + ' OT' : '') + (dt ? ' + ' + dt + ' DT' : '') + ')'
                     : '';
-                return '<div class="card" data-tc-id="' + tc.id + '" style="border-left:3px solid var(--accent,#3498db)">' +
+                return '<div class="card" data-tc-id="' + tc.id + '" style="border-left:3px solid #3498db">' +
                     '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">' +
                         '<div style="flex:1;min-width:200px">' +
                             '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
@@ -488,6 +490,88 @@ window.AdminApprovals = {
         '</div>';
     },
 
+    // ── Who was on site (Damiano, 3 October) ──────────────────────────────────────
+    // A supervisor's hours form doubles as the daily field report: they tick who was on
+    // site with them and the card carries those worker ids as employeesPresent. Show the
+    // names on the card, on both tabs, so the day's crew reads off the entry itself.
+    _crewLineHtml(sub) {
+        const ids = Array.isArray(sub && sub.employeesPresent) ? sub.employeesPresent : [];
+        if (!ids.length) return '';
+        const me = AppData.getWorker(sub.workerId);
+        const meFirst = me && me.name ? me.name.split(' ')[0] : 'the supervisor';
+        const seen = {};
+        const names = [];
+        let unknown = 0;
+        ids.forEach(function(raw) {
+            const wid = (raw && raw.id) ? raw.id : raw;
+            if (!wid || seen[wid]) return;
+            seen[wid] = true;
+            if (String(wid) === String(sub.workerId)) return;          // the card's own worker is the header
+            const w = AppData.getWorker(wid);
+            if (w && w.name) names.push(w.name);
+            else if (raw && raw.name) names.push(raw.name);
+            else unknown++;                                             // id no longer on the crew list
+        });
+        names.sort(function(a, b) { return a.localeCompare(b); });
+        for (let u = 0; u < unknown; u++) names.push('a worker no longer on the crew');
+        const chip = function(n) { return '<span class="appr-crew-name" style="display:inline-block;padding:1px 8px;border-radius:10px;background:rgba(122,162,255,.14);color:var(--info,#7aa2ff);margin:2px 4px 2px 0;font-size:.8rem">' + Utils.escapeHtml(n) + '</span>'; };
+        const body = names.length
+            ? '<strong>On site with ' + Utils.escapeHtml(meFirst) + ':</strong> ' + names.map(chip).join('')
+            : '<strong>On site:</strong> ' + Utils.escapeHtml(meFirst) + ' only, no one else selected';
+        return '<div class="appr-crew" style="font-size:.85rem;color:var(--text2);margin:2px 0 6px;line-height:1.7">' + body + '</div>';
+    },
+
+    // ── Colour legend (Damiano, 3 October) ────────────────────────────────────────
+    // One line per colour used on this screen. Collapsed by default, the open state is
+    // kept while the screen is in use so refreshing the list never snaps it shut.
+    _legendOpen: false,
+    _legendItems() {
+        const edge = function(c) { return '<span class="appr-legend-swatch" style="display:inline-block;width:6px;height:22px;border-radius:2px;background:' + c + ';flex:none"></span>'; };
+        const pill = function(bg, fg, txt) { return '<span class="appr-legend-swatch" style="display:inline-block;padding:1px 8px;border-radius:10px;background:' + bg + ';color:' + fg + ';font-size:.72rem;white-space:nowrap;flex:none">' + txt + '</span>'; };
+        const band = '<span class="appr-legend-swatch" style="display:inline-block;width:26px;height:16px;border-left:4px solid #f39c12;background:rgba(243,156,18,.14);border-radius:3px;flex:none"></span>';
+        return [
+            [edge('var(--warn,#f39c12)'), 'Amber edge: pending, waiting for review.'],
+            [edge('var(--accent,#e74c3c)'), 'Red edge on a pending card: it carries an impact code, non productive time, so look closer before approving.'],
+            [edge('var(--success,#2ecc71)') + pill('rgba(46,204,113,.2)', 'var(--success)', 'Approved'), 'Green edge and badge: approved. The card says who approved it and when.'],
+            [edge('var(--accent,#e74c3c)') + pill('rgba(233,69,96,.2)', 'var(--accent)', 'Rejected'), 'Red edge and badge: rejected. The reason is on the card.'],
+            [edge('#3498db') + pill('rgba(52,152,219,.15)', '#2980b9', 'Timecard'), 'Blue edge and chip: a timecard entered directly, by admin or by email, not a worker\'s own submission.'],
+            [band, 'Amber band, Overlapping entry: the same worker has another card for that day whose times collide with this one. Any reason given travels with it. Approve asks first, Bulk Approve skips it.'],
+            [pill('rgba(255,165,0,.18)', '#b8860b', '&#9998; edited'), 'Edited badge: the card was changed after it came in. Hover for who changed it and why.'],
+            [pill('#e74c3c22', '#e74c3c', '&#9889; Impact'), 'Impact badge: non productive time coded on the card. Red is Billable, orange Disputed, amber To Be Reviewed, grey anything else.'],
+            [pill('rgba(46,204,113,.15)', 'var(--success)', 'Clock In/Out') + pill('rgba(200,200,200,.15)', 'var(--text2)', 'Manual Entry'), 'Entry method: green means the times came from the clock, grey means they were typed in.'],
+            [pill('rgba(122,162,255,.14)', 'var(--info,#7aa2ff)', 'Name'), 'Blue name chips, On site with: the crew the supervisor ticked as present that day.'],
+            ['<span class="appr-legend-swatch badge-gold" style="flex:none">3</span>', 'Gold number on the Pending tab: how many entries are waiting.'],
+        ];
+    },
+    _legendHtml() {
+        const open = !!this._legendOpen;
+        const rows = this._legendItems().map(function(it) {
+            return '<div class="appr-legend-row" style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">' +
+                '<span style="display:inline-flex;gap:4px;align-items:center;min-width:92px;flex:none">' + it[0] + '</span>' +
+                '<span style="font-size:.83rem;line-height:1.4">' + it[1] + '</span>' +
+            '</div>';
+        }).join('');
+        return '<div class="card" id="approvalsLegend" style="padding:8px 14px;margin-bottom:14px">' +
+            '<button type="button" id="approvalsLegendToggle" class="btn-secondary btn-sm" aria-expanded="' + (open ? 'true' : 'false') + '" style="display:flex;align-items:center;gap:8px">' +
+                '<span>' + (open ? '&#9662;' : '&#9656;') + '</span><span>Legend, what the colours mean</span>' +
+            '</button>' +
+            '<div id="approvalsLegendBody" style="margin-top:8px;' + (open ? '' : 'display:none') + '">' + rows + '</div>' +
+        '</div>';
+    },
+    _bindLegend(container) {
+        const self = this;
+        const btn = container.querySelector('#approvalsLegendToggle');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            self._legendOpen = !self._legendOpen;
+            const body = container.querySelector('#approvalsLegendBody');
+            if (body) body.style.display = self._legendOpen ? '' : 'none';
+            btn.setAttribute('aria-expanded', self._legendOpen ? 'true' : 'false');
+            const arrow = btn.querySelector('span');
+            if (arrow) arrow.innerHTML = self._legendOpen ? '&#9662;' : '&#9656;';
+        });
+    },
+
     _subCardHtml(sub, mode) {
         const self = this;
         const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
@@ -563,6 +647,7 @@ window.AdminApprovals = {
                     '</div>' +
                     self._overlapBandHtml(sub) +
                     self._clockLine(sub) +
+                    self._crewLineHtml(sub) +
                     (subtask ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Subtask:</strong> ' + Utils.escapeHtml(subtask.name) + '</div>' : '') +
                     '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(sub.description || 'No description') + '</div>' +
                     '<div style="font-size:.85rem;color:var(--text2)">' + amountInfo + '</div>' +
