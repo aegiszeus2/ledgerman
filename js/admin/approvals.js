@@ -4,7 +4,7 @@ window.AdminApprovals = {
     _impactCodes: [],  // cached impact code list
 
     // Employee + date range filter. Applies to both the Pending and History tabs.
-    _filter: { workerId: '', from: '', to: '' },
+    _filter: { workerId: '', from: '', to: '', sort: 'desc' },
 
     _filterActive() {
         const f = this._filter;
@@ -25,6 +25,23 @@ window.AdminApprovals = {
         });
     },
 
+    // Order entries by the day they were worked (newest first unless the Sort menu says
+    // oldest first), then by clock in time, then by when the card was created. Dates and
+    // times compare as strings (yyyy-mm-dd, hh:mm) so no timezone shift can reorder them.
+    // Applies to both tabs, to standalone timecards and to the CSV export.
+    _sortList(list) {
+        const dir = this._filter.sort === 'asc' ? 1 : -1;
+        function key(x) {
+            return String(x.date || '').slice(0, 10) + '|' + String(x.startTime || '') + '|' + String(x.createdAt || '');
+        }
+        return (list || []).slice().sort(function(a, b) {
+            const ka = key(a), kb = key(b);
+            if (ka < kb) return -1 * dir;
+            if (ka > kb) return 1 * dir;
+            return 0;
+        });
+    },
+
     _filterBarHtml() {
         const f = this._filter;
         const workers = (AppData.getWorkers ? AppData.getWorkers() : []).slice()
@@ -40,6 +57,11 @@ window.AdminApprovals = {
                     '<input type="date" class="form-control" id="apprFilterFrom" value="' + Utils.escapeHtml(f.from) + '"></div>' +
                 '<div class="form-group" style="margin:0"><label style="font-size:.78rem">To</label>' +
                     '<input type="date" class="form-control" id="apprFilterTo" value="' + Utils.escapeHtml(f.to) + '"></div>' +
+                '<div class="form-group" style="margin:0"><label style="font-size:.78rem">Sort</label>' +
+                    '<select class="form-control" id="apprFilterSort">' +
+                        '<option value="desc"' + (f.sort === 'asc' ? '' : ' selected') + '>Newest first</option>' +
+                        '<option value="asc"' + (f.sort === 'asc' ? ' selected' : '') + '>Oldest first</option>' +
+                    '</select></div>' +
                 '<button class="btn-secondary btn-sm" id="apprFilterClear" type="button"' + (this._filterActive() ? '' : ' disabled') + '>Clear</button>' +
             '</div>' +
         '</div>';
@@ -51,15 +73,19 @@ window.AdminApprovals = {
         const from = container.querySelector('#apprFilterFrom');
         const to   = container.querySelector('#apprFilterTo');
         const clr  = container.querySelector('#apprFilterClear');
+        const srt  = container.querySelector('#apprFilterSort');
         function apply() {
-            self._filter = { workerId: sel.value || '', from: from.value || '', to: to.value || '' };
+            self._filter = { workerId: sel.value || '', from: from.value || '', to: to.value || '',
+                             sort: (srt && srt.value === 'asc') ? 'asc' : 'desc' };
             self._renderContent();
         }
         if (sel)  sel.addEventListener('change', apply);
         if (from) from.addEventListener('change', apply);
         if (to)   to.addEventListener('change', apply);
+        if (srt)  srt.addEventListener('change', apply);
         if (clr)  clr.addEventListener('click', function() {
-            self._filter = { workerId: '', from: '', to: '' };
+            // Clear drops the employee and date filter; the sort order is a view setting and stays.
+            self._filter = { workerId: '', from: '', to: '', sort: self._filter.sort };
             self._renderContent();
         });
     },
@@ -243,7 +269,7 @@ window.AdminApprovals = {
         var exportCsvBtn = container.querySelector('#approvalsExportCsvBtn');
         if (exportCsvBtn) {
             exportCsvBtn.addEventListener('click', function() {
-                var allSubs = self._applyFilter(AppData.getSubmissions());
+                var allSubs = self._sortList(self._applyFilter(AppData.getSubmissions()));
                 var rows = [csvRow(['Worker','Project','Date','Hours','Status','Notes'])];
                 allSubs.forEach(function(sub) {
                     var worker = AppData.getWorker(sub.workerId);
@@ -294,6 +320,7 @@ window.AdminApprovals = {
         const self = this;
         if (!el) return;
         if (!timecards || timecards.length === 0) { el.innerHTML = ''; return; }
+        timecards = self._sortList(timecards);
 
         el.innerHTML = '<h3 style="margin:0 0 12px;font-size:1rem">Timecards Pending Review <span class="badge-gold" style="margin-left:6px">' + timecards.length + '</span></h3>' +
             timecards.map(function(tc) {
@@ -399,85 +426,107 @@ window.AdminApprovals = {
         });
     },
 
-    _renderPending(contentEl, pending) {
+    // One card per entry, the same shape on both tabs: worker, project and the day written
+    // out in the header, clock in and out, description, hours and amount, then the method
+    // badge and photos. 'pending' adds Approve / Reject / Edit; 'history' adds the status
+    // badge, who reviewed it and when, the rejection reason, and Unapprove / Edit.
+    _subCardHtml(sub, mode) {
         const self = this;
-        if (pending.length === 0) {
-            contentEl.innerHTML = self._filterActive()
-                ? '<div class="card"><div class="empty"><h3>No Pending Entries Match</h3><p>Nothing pending for this employee and date range. Clear the filter to see everything.</p></div></div>'
-                : '<div class="card"><div class="empty"><h3>No Pending Approvals</h3><p>All worker submissions have been reviewed. Check back later.</p></div></div>';
-            return;
+        const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
+        const worker = AppData.getWorker(sub.workerId);
+        const project = AppData.getProject(sub.projectId);
+        const subtask = (sub.subtaskId && AppData.getSubtask) ? AppData.getSubtask(sub.subtaskId) : null;
+        const workerName = worker ? worker.name : 'Unknown Worker';
+        const projectName = project ? project.name : 'Unknown Project';
+
+        let amountInfo = '';
+        if (sub.rateType === 'Flat' || sub.rateType === 'flat') {
+            amountInfo = 'Flat rate: ' + Utils.formatCurrency(sub.flatRate || sub.flatAmount || sub.amount);
+        } else {
+            // Worker time submissions don't carry a rate; fall back to the
+            // worker's master defaultRate so approvals never show $0/hr.
+            var effRate = (parseFloat(sub.rate) || 0) || (worker ? (parseFloat(worker.defaultRate) || 0) : 0);
+            var timeStr = (sub.startTime && sub.endTime) ? sub.startTime + ' → ' + sub.endTime + ' &nbsp;|&nbsp; ' : '';
+            amountInfo = timeStr + (parseFloat(sub.hours) || 0) + ' hrs @ ' + Utils.formatCurrency(effRate) + '/hr = ' + Utils.formatCurrency((parseFloat(sub.hours) || 0) * effRate);
         }
 
-        const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
+        const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
+        const editBadge = editHistory.length > 0
+            ? '<span style="font-size:.72rem;padding:1px 7px;border-radius:10px;background:rgba(255,165,0,.18);color:#b8860b;margin-left:6px" title="' + Utils.escapeHtml(editHistory.map(function(e){ return 'Edited by ' + e.modifiedBy + (e.reason ? ': ' + e.reason : ''); }).join(' | ')) + '">✏ edited ' + editHistory.length + 'x</span>'
+            : '';
 
-        contentEl.innerHTML = pending.map(function(sub) {
-            const worker = AppData.getWorker(sub.workerId);
-            const project = AppData.getProject(sub.projectId);
-            const subtask = sub.subtaskId ? AppData.getSubtask(sub.subtaskId) : null;
-            const workerName = worker ? worker.name : 'Unknown Worker';
-            const projectName = project ? project.name : 'Unknown Project';
-
-            let amountInfo = '';
-            if (sub.rateType === 'Flat' || sub.rateType === 'flat') {
-                amountInfo = 'Flat rate: ' + Utils.formatCurrency(sub.flatRate || sub.flatAmount || sub.amount);
-            } else {
-                // Worker time submissions don't carry a rate; fall back to the
-                // worker's master defaultRate so approvals never show $0/hr.
-                var effRate = (parseFloat(sub.rate) || 0) || (worker ? (parseFloat(worker.defaultRate) || 0) : 0);
-                var timeStr = (sub.startTime && sub.endTime) ? sub.startTime + ' → ' + sub.endTime + ' &nbsp;|&nbsp; ' : '';
-                amountInfo = timeStr + (parseFloat(sub.hours) || 0) + ' hrs @ ' + Utils.formatCurrency(effRate) + '/hr = ' + Utils.formatCurrency((parseFloat(sub.hours) || 0) * effRate);
-            }
-
-            const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
-            const editBadge = editHistory.length > 0
-                ? '<span style="font-size:.72rem;padding:1px 7px;border-radius:10px;background:rgba(255,165,0,.18);color:#b8860b;margin-left:6px" title="' + Utils.escapeHtml(editHistory.map(function(e){ return 'Edited by ' + e.modifiedBy + (e.reason ? ': ' + e.reason : ''); }).join(' | ')) + '">✏ edited ' + editHistory.length + 'x</span>'
-                : '';
-
-            const impactBadge     = self._impactBadgeHtml(sub);
-            const cardBorderColor = sub.impactCodeId ? 'var(--accent,#e74c3c)' : 'var(--warn,#f39c12)';
-            const impactDetail    = sub.impactCodeId ? (function() {
-                const icName = self._impactCodeName(sub.impactCodeId);
-                return '<div style="margin-top:8px;padding:8px 10px;background:rgba(231,76,60,.07);border-radius:6px;font-size:.82rem">' +
-                    '<strong>Impact:</strong> ' + Utils.escapeHtml(icName) +
-                    (sub.impactHours ? ' &nbsp;|&nbsp; <strong>Hours:</strong> ' + sub.impactHours : '') +
-                    (sub.impactBillableStatus ? ' &nbsp;|&nbsp; <strong>Billable:</strong> ' + Utils.escapeHtml(sub.impactBillableStatus) : '') +
-                    (sub.impactDescription ? '<br><span style="color:var(--text2)">' + Utils.escapeHtml(sub.impactDescription) + '</span>' : '') +
-                '</div>';
-            })() : '';
-
-            return '<div class="card" data-sub-id="' + sub.id + '" style="border-left:3px solid ' + cardBorderColor + '">' +
-                '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">' +
-                    '<div style="flex:1;min-width:200px">' +
-                        '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
-                            '<strong style="font-size:1.05rem">' + Utils.escapeHtml(workerName) + '</strong>' +
-                            editBadge +
-                            impactBadge +
-                            '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
-                            '<span style="font-size:.8rem;color:var(--text2)">' + self._dayDate(sub.date) + '</span>' +
-                        '</div>' +
-                        self._clockLine(sub) +
-                        (subtask ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Subtask:</strong> ' + Utils.escapeHtml(subtask.name) + '</div>' : '') +
-                        '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(sub.description || 'No description') + '</div>' +
-                        '<div style="font-size:.85rem;color:var(--text2)">' + amountInfo + '</div>' +
-                        (sub.entryMethod ? '<div style="font-size:.78rem;margin-top:3px"><span style="padding:2px 7px;border-radius:10px;background:' + (sub.entryMethod === 'Clock In/Out' ? 'rgba(46,204,113,.15);color:var(--success)' : 'rgba(200,200,200,.15);color:var(--text2)') + '">' + sub.entryMethod + '</span></div>' : '') +
-                        (sub.unitsCompleted ? '<div style="font-size:.85rem;color:var(--text2)">Units completed: ' + sub.unitsCompleted + '</div>' : '') +
-                        impactDetail +
-                        '<div class="photo-thumbs" data-sub-id="' + sub.id + '" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px"></div>' +
-                    '</div>' +
-                    '<div style="display:flex;gap:8px;align-items:flex-start">' +
-                        '<button class="btn btn-primary btn-sm approve-btn" data-id="' + sub.id + '">Approve</button>' +
-                        '<button class="btn btn-danger btn-sm reject-btn" data-id="' + sub.id + '">Reject</button>' +
-                        (isAdmin ? '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '">Edit</button>' : '') +
-                    '</div>' +
-                '</div>' +
+        const impactBadge     = self._impactBadgeHtml(sub);
+        const impactDetail    = sub.impactCodeId ? (function() {
+            const icName = self._impactCodeName(sub.impactCodeId);
+            return '<div style="margin-top:8px;padding:8px 10px;background:rgba(231,76,60,.07);border-radius:6px;font-size:.82rem">' +
+                '<strong>Impact:</strong> ' + Utils.escapeHtml(icName) +
+                (sub.impactHours ? ' &nbsp;|&nbsp; <strong>Hours:</strong> ' + sub.impactHours : '') +
+                (sub.impactBillableStatus ? ' &nbsp;|&nbsp; <strong>Billable:</strong> ' + Utils.escapeHtml(sub.impactBillableStatus) : '') +
+                (sub.impactDescription ? '<br><span style="color:var(--text2)">' + Utils.escapeHtml(sub.impactDescription) + '</span>' : '') +
             '</div>';
-        }).join('');
+        })() : '';
 
-        // Load photo thumbnails
-        pending.forEach(function(sub) {
+        const isHistory = mode === 'history';
+        let cardBorderColor, statusBadge = '', reviewLine = '', reasonLine = '', buttons = '';
+        if (isHistory) {
+            const approvedCard = sub.status === 'Approved';
+            cardBorderColor = approvedCard ? 'var(--success,#2ecc71)' : 'var(--accent,#e74c3c)';
+            statusBadge = '<span class="appr-status" style="font-size:.72rem;padding:2px 8px;border-radius:12px;' +
+                (approvedCard ? 'background:rgba(46,204,113,.2);color:var(--success)' : 'background:rgba(233,69,96,.2);color:var(--accent)') + '">' +
+                Utils.escapeHtml(sub.status || '') + '</span>';
+            if (sub.reviewedBy || sub.reviewedAt) {
+                reviewLine = '<div class="appr-reviewed" style="font-size:.78rem;color:var(--text2);margin-top:3px">' +
+                    (approvedCard ? 'Approved' : 'Rejected') +
+                    (sub.reviewedBy ? ' by ' + Utils.escapeHtml(sub.reviewedBy) : '') +
+                    (sub.reviewedAt ? ' on ' + Utils.escapeHtml(Utils.formatDateTime(sub.reviewedAt)) : '') + '</div>';
+            }
+            if (sub.rejectionReason) {
+                reasonLine = '<div class="appr-reason" style="font-size:.82rem;color:var(--accent);margin-top:3px"><strong>Reason:</strong> ' + Utils.escapeHtml(sub.rejectionReason) + '</div>';
+            }
+            if (approvedCard) buttons += '<button class="btn-secondary btn-sm unapprove-btn" data-id="' + sub.id + '" style="white-space:nowrap">Unapprove</button>';
+            if (isAdmin) buttons += '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '">Edit</button>';
+        } else {
+            cardBorderColor = sub.impactCodeId ? 'var(--accent,#e74c3c)' : 'var(--warn,#f39c12)';
+            buttons = '<button class="btn btn-primary btn-sm approve-btn" data-id="' + sub.id + '">Approve</button>' +
+                '<button class="btn btn-danger btn-sm reject-btn" data-id="' + sub.id + '">Reject</button>' +
+                (isAdmin ? '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '">Edit</button>' : '');
+        }
+
+        return '<div class="card appr-card appr-' + (isHistory ? 'history' : 'pending') + '" data-sub-id="' + sub.id + '" style="border-left:3px solid ' + cardBorderColor + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">' +
+                '<div style="flex:1;min-width:200px">' +
+                    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+                        '<strong style="font-size:1.05rem">' + Utils.escapeHtml(workerName) + '</strong>' +
+                        statusBadge +
+                        editBadge +
+                        impactBadge +
+                        '<span style="font-size:.85rem;color:var(--text2)">' + Utils.escapeHtml(projectName) + '</span>' +
+                        '<span class="appr-date" style="font-size:.8rem;color:var(--text2)">' + self._dayDate(sub.date) + '</span>' +
+                    '</div>' +
+                    self._clockLine(sub) +
+                    (subtask ? '<div style="font-size:.85rem;margin-bottom:4px"><strong>Subtask:</strong> ' + Utils.escapeHtml(subtask.name) + '</div>' : '') +
+                    '<div style="font-size:.9rem;margin-bottom:4px">' + Utils.escapeHtml(sub.description || 'No description') + '</div>' +
+                    '<div style="font-size:.85rem;color:var(--text2)">' + amountInfo + '</div>' +
+                    (sub.entryMethod ? '<div style="font-size:.78rem;margin-top:3px"><span style="padding:2px 7px;border-radius:10px;background:' + (sub.entryMethod === 'Clock In/Out' ? 'rgba(46,204,113,.15);color:var(--success)' : 'rgba(200,200,200,.15);color:var(--text2)') + '">' + Utils.escapeHtml(sub.entryMethod) + '</span></div>' : '') +
+                    (sub.unitsCompleted ? '<div style="font-size:.85rem;color:var(--text2)">Units completed: ' + sub.unitsCompleted + '</div>' : '') +
+                    reasonLine +
+                    reviewLine +
+                    impactDetail +
+                    '<div class="photo-thumbs" data-sub-id="' + sub.id + '" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px"></div>' +
+                '</div>' +
+                '<div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">' + buttons + '</div>' +
+            '</div>' +
+        '</div>';
+    },
+
+    // Photo thumbnails under each card, from the local photo store.
+    _loadCardPhotos(contentEl, subs) {
+        const self = this;
+        if (!AppData.getPhotosBySubmission) return;
+        subs.forEach(function(sub) {
             AppData.getPhotosBySubmission(sub.id).then(function(photos) {
                 const thumbsEl = contentEl.querySelector('.photo-thumbs[data-sub-id="' + sub.id + '"]');
-                if (!thumbsEl || photos.length === 0) return;
+                if (!thumbsEl || !photos || photos.length === 0) return;
                 photos.forEach(function(photo) {
                     const blob = photo.thumbnail || photo.blob;
                     if (!blob) return;
@@ -489,8 +538,22 @@ window.AdminApprovals = {
                     });
                     thumbsEl.appendChild(img);
                 });
-            });
+            }).catch(function() { /* no local photos */ });
         });
+    },
+
+    _renderPending(contentEl, pending) {
+        const self = this;
+        if (pending.length === 0) {
+            contentEl.innerHTML = self._filterActive()
+                ? '<div class="card"><div class="empty"><h3>No Pending Entries Match</h3><p>Nothing pending for this employee and date range. Clear the filter to see everything.</p></div></div>'
+                : '<div class="card"><div class="empty"><h3>No Pending Approvals</h3><p>All worker submissions have been reviewed. Check back later.</p></div></div>';
+            return;
+        }
+
+        pending = self._sortList(pending);
+        contentEl.innerHTML = pending.map(function(sub) { return self._subCardHtml(sub, 'pending'); }).join('');
+        self._loadCardPhotos(contentEl, pending);
 
         // Approve buttons
         contentEl.querySelectorAll('.approve-btn').forEach(function(btn) {
@@ -520,9 +583,7 @@ window.AdminApprovals = {
 
     _renderHistory(contentEl, approved, rejected) {
         const self = this;
-        const all = approved.concat(rejected).sort(function(a, b) {
-            return new Date(b.reviewedAt || b.date) - new Date(a.reviewedAt || a.date);
-        });
+        const all = self._sortList(approved.concat(rejected));
 
         if (all.length === 0) {
             contentEl.innerHTML = self._filterActive()
@@ -531,52 +592,10 @@ window.AdminApprovals = {
             return;
         }
 
-        const isAdmin = window.App && window.App.currentUser && window.App.currentUser.type === 'admin';
-
-        contentEl.innerHTML = '<div class="card"><table>' +
-            '<thead><tr><th>Date</th><th>Worker</th><th>Project</th><th>Description</th><th class="amount">Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>' +
-            '<tbody>' +
-            all.map(function(sub) {
-                const worker = AppData.getWorker(sub.workerId);
-                const project = AppData.getProject(sub.projectId);
-                let amount = 0;
-                if (sub.rateType === 'flat' || sub.rateType === 'Flat') {
-                    amount = parseFloat(sub.flatAmount || sub.amount) || 0;
-                } else {
-                    amount = (parseFloat(sub.hours) || 0) * (parseFloat(sub.rate) || 0);
-                }
-                const statusStyle = sub.status === 'Approved'
-                    ? 'background:rgba(46,204,113,.2);color:var(--success)'
-                    : 'background:rgba(233,69,96,.2);color:var(--accent)';
-                const editHistory = Array.isArray(sub.editHistory) ? sub.editHistory : [];
-                const editedTag = editHistory.length > 0
-                    ? ' <span style="font-size:.68rem;color:#b8860b" title="' + Utils.escapeHtml(editHistory.map(function(e){ return 'Edited by ' + e.modifiedBy + (e.reason ? ': ' + e.reason : ''); }).join(' | ')) + '">✏</span>'
-                    : '';
-
-                let actionBtns = '';
-                if (sub.status === 'Approved') {
-                    actionBtns += '<button class="btn-secondary btn-sm unapprove-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px;white-space:nowrap">Unapprove</button> ';
-                }
-                if (isAdmin) {
-                    actionBtns += '<button class="btn-secondary btn-sm edit-sub-btn" data-id="' + sub.id + '" style="font-size:.75rem;padding:3px 10px">Edit</button>';
-                }
-
-                const impactBadgeHistory = self._impactBadgeHtml(sub);
-                return '<tr>' +
-                    '<td>' + Utils.formatDate(sub.date) + '</td>' +
-                    '<td>' + Utils.escapeHtml(worker ? worker.name : 'Unknown') + '</td>' +
-                    '<td>' + Utils.escapeHtml(project ? project.name : 'Unknown') + '</td>' +
-                    '<td>' + Utils.escapeHtml(sub.description || '') + editedTag + impactBadgeHistory +
-                        (sub.rejectionReason ? '<br><span style="font-size:.8rem;color:var(--accent)">Reason: ' + Utils.escapeHtml(sub.rejectionReason) + '</span>' : '') +
-                        (sub.impactCodeId ? '<br><span style="font-size:.77rem;color:var(--text2)">Impact: ' + Utils.escapeHtml(self._impactCodeName(sub.impactCodeId)) + (sub.impactHours ? ' (' + sub.impactHours + 'h)' : '') + '</span>' : '') +
-                    '</td>' +
-                    '<td class="amount">' + Utils.formatCurrency(amount) + '</td>' +
-                    '<td style="font-size:.78rem;white-space:nowrap">' + (sub.entryMethod === 'Clock In/Out' ? '<span style="color:var(--success)">⏱ Clock In/Out</span>' : '<span style="color:var(--text2)">✏️ Manual</span>') + '</td>' +
-                    '<td><span style="font-size:.75rem;padding:2px 8px;border-radius:12px;' + statusStyle + '">' + sub.status + '</span></td>' +
-                    '<td style="white-space:nowrap">' + actionBtns + '</td>' +
-                '</tr>';
-            }).join('') +
-            '</tbody></table></div>';
+        // Same card as the Pending tab (Damiano, 3 October: "change the format in the History
+        // section to match the format in the Pending section"), plus status and review info.
+        contentEl.innerHTML = all.map(function(sub) { return self._subCardHtml(sub, 'history'); }).join('');
+        self._loadCardPhotos(contentEl, all);
 
         // Unapprove buttons
         contentEl.querySelectorAll('.unapprove-btn').forEach(function(btn) {

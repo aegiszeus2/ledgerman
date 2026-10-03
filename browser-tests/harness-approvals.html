@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  harness-approvals.html — isolated test bed for the admin Approvals LIST (Pending and
+  History tabs, filter bar, sort). Loads js/admin/approvals.js with the real Utils and UI
+  against a stub AppData: no login, no network, no real company data.
+  Used by approvals-list.spec.js.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+<div class="admin-content"><div id="adminContent"></div></div>
+<script src="../js/utils.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+window.__subs = [];
+window.__timecards = [];
+window.__workers = [{ id: 'w1', name: 'Kosta S', defaultRate: 30 }, { id: 'w2', name: 'Jonathan Brewer', defaultRate: 28 }];
+window.__projects = [{ id: 'p1', name: 'Yard Work 4062' }, { id: 'p2', name: 'Sand and Stone Resort, Landscaping' }];
+window.AppData = {
+    API_BASE: 'http://api.test',
+    getJwt: function() { return 'test-jwt'; },
+    getSubmissions: function() { return window.__subs; },
+    getSubmission: function(id) { return window.__subs.filter(function(s) { return s.id === id; })[0] || null; },
+    getWorkers: function() { return window.__workers; },
+    getWorker: function(id) { return window.__workers.filter(function(w) { return w.id === id; })[0] || null; },
+    getProjects: function() { return window.__projects; },
+    getProject: function(id) { return window.__projects.filter(function(p) { return p.id === id; })[0] || null; },
+    getEquipment: function() { return []; },
+    getSubtasks: function() { return []; },
+    getSubtask: function() { return null; },
+    getExpenses: function() { return []; },
+    getPhotosBySubmission: function() { return Promise.resolve([]); },
+    generateId: function() { return 'id' + Math.random().toString(36).slice(2, 10); },
+};
+window.App = { currentUser: { type: 'admin', name: 'Damiano' } };
+window.LMIcons = new Proxy({}, { get: function() { return ''; } });
+// Fake API: impact codes empty, pending timecards from the stub list
+window.fetch = function(url) {
+    var u = String(url);
+    if (u.indexOf('/api/impact-codes') !== -1) return Promise.resolve(new Response('[]', { status: 200 }));
+    if (u.indexOf('/api/timecards') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__timecards), { status: 200 }));
+    return Promise.resolve(new Response('{"error":"not found"}', { status: 404 }));
+};
+</script>
+<script src="../js/admin/approvals.js"></script>
+<script>
+window.load = function(subs, timecards) {
+    window.__subs = subs || [];
+    window.__timecards = timecards || [];
+    AdminApprovals._tab = 'pending';
+    AdminApprovals._filter = { workerId: '', from: '', to: '', sort: 'desc' };
+    AdminApprovals.render(document.getElementById('adminContent'));
+};
+</script>
+</body>
+</html>
