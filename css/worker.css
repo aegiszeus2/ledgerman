@@ -520,6 +520,31 @@
   object-fit: cover;
 }
 
+/* Photos grouped by the day they were taken (time entry form) */
+.photo-preview-days { margin-top: var(--space-3); }
+.photo-day-group { margin-top: var(--space-3); }
+.photo-day-group:first-child { margin-top: 0; }
+.photo-day-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: .85rem; }
+.photo-day-title { font-weight: 700; }
+.photo-day-count { color: var(--text2); }
+.photo-day-note { flex-basis: 100%; font-size: .8rem; color: var(--text2); }
+.photo-day-mismatch .photo-day-header { border-left: 3px solid var(--amber); padding-left: 8px; }
+.photo-day-mismatch .photo-day-note { color: var(--amber); font-weight: 600; }
+.photo-day-group .photo-preview-grid { margin-top: var(--space-2); }
+.photo-preview-item .photo-time {
+  position: absolute; left: 4px; bottom: 4px;
+  font-size: .7rem; padding: 1px 5px; border-radius: 4px;
+  background: rgba(0,0,0,.55); color: #fff;
+}
+/* Photo thumbnails on each day's card (history) */
+.photo-thumb-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.photo-thumb-strip .photo-thumb-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; }
+.photo-view-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.9);
+  display: flex; align-items: center; justify-content: center; z-index: 9999;
+}
+.photo-view-overlay img { max-width: 96vw; max-height: 92vh; object-fit: contain; }
+
 .photo-preview-item .remove-photo {
   position: absolute;
   top: 4px;

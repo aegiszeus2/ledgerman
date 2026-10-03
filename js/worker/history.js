@@ -338,7 +338,8 @@ window.WorkerHistory = {
 
                 // Photo count
                 if (sub.photoIds && sub.photoIds.length > 0) {
-                    cardHTML += '<div style="font-size:.85rem;color:var(--text2);margin-top:2px">&#128247; ' + sub.photoIds.length + ' photo' + (sub.photoIds.length !== 1 ? 's' : '') + ' attached</div>';
+                    cardHTML += '<div style="font-size:.85rem;color:var(--text2);margin-top:2px">&#128247; ' + sub.photoIds.length + ' photo' + (sub.photoIds.length !== 1 ? 's' : '') + ' attached</div>' +
+                        '<div class="photo-thumb-strip" data-sub-id="' + esc(sub.id) + '"></div>';
                 }
 
                 // Submitted timestamp
@@ -370,6 +371,50 @@ window.WorkerHistory = {
                 card.innerHTML = cardHTML;
                 container.appendChild(card);
             });
+
+            // Photo thumbnails under each day's card, so the photos are visible by
+            // day without opening the entry. This device's copy first, then the server.
+            filtered.forEach(function(sub) {
+                if (!sub.photoIds || !sub.photoIds.length) return;
+                var strip = container.querySelector('.photo-thumb-strip[data-sub-id="' + sub.id + '"]');
+                if (!strip) return;
+                sub.photoIds.forEach(function(pid) {
+                    (async function() {
+                        var url = '';
+                        try {
+                            var local = AppData.getPhoto ? await AppData.getPhoto(pid) : null;
+                            var b = local && (local.thumbnail || local.blob);
+                            if (b) url = (typeof b === 'string') ? b : URL.createObjectURL(b instanceof Blob ? b : new Blob([b]));
+                        } catch (e) {}
+                        if (!url && AppData.API_BASE) {
+                            try {
+                                var jwt = AppData.getJwt ? AppData.getJwt() : '';
+                                var r = await fetch(AppData.API_BASE + '/api/photos/' + encodeURIComponent(pid), { headers: { 'Authorization': 'Bearer ' + jwt } });
+                                if (r.ok) {
+                                    var pj = await r.json();
+                                    var s = pj.thumbnailB64 || pj.blobB64 || '';
+                                    if (s) url = s.indexOf('data:') === 0 ? s : 'data:image/jpeg;base64,' + s;
+                                }
+                            } catch (e) {}
+                        }
+                        if (!url) return;
+                        var img = document.createElement('img');
+                        img.className = 'photo-thumb-img';
+                        img.src = url;
+                        img.alt = 'Photo';
+                        img.addEventListener('click', function() { _showPhoto(url); });
+                        strip.appendChild(img);
+                    })();
+                });
+            });
+
+            function _showPhoto(url) {
+                var overlay = document.createElement('div');
+                overlay.className = 'photo-view-overlay';
+                overlay.innerHTML = '<img src="' + url + '" alt="Photo">';
+                overlay.addEventListener('click', function() { overlay.remove(); });
+                document.body.appendChild(overlay);
+            }
 
             // Full prefill for editing an existing entry. Every section of the
             // form is carried over (equipment, equipment note, photos, expenses,
