@@ -1380,6 +1380,11 @@ window.AdminApprovals = {
                     restoreC();
                     return;
                 }
+                // The server stamps an overlapping card (overlapsWith); the local copy is the
+                // object as sent, so pull the stamp in now rather than at the next login.
+                if (fields.overlapReason && typeof AppData.syncFromServer === 'function') {
+                    try { await AppData.syncFromServer(); } catch (e) { /* next login syncs */ }
+                }
                 Utils.showToast('Timecard created — pending approval');
                 modal.close();
                 self._renderContent();
@@ -1419,6 +1424,10 @@ window.AdminApprovals = {
                 surfaceOverlap(e.message || '');
                 restore();
                 return;
+            }
+
+            if (fields.overlapReason && typeof AppData.syncFromServer === 'function') {
+                try { await AppData.syncFromServer(); } catch (e) { /* next login syncs */ }
             }
 
             // Photos the admin took off the card
