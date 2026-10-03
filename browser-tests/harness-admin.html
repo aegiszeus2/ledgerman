@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<!--
+  harness-admin.html — isolated test bed for the admin Approvals module.
+
+  Loads js/admin/approvals.js with the real UI, Utils and PhotoDate helpers
+  against a stub AppData so the Edit Submission modal can be driven directly:
+  no login, no network, no real company data. Used by admin-edit-photos.spec.js.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <link rel="stylesheet" href="../css/worker.css">
+</head>
+<body>
+<div id="adminContent"></div>
+<script src="../js/utils.js"></script>
+<script src="../js/ui.js"></script>
+<script src="../js/photo-date.js"></script>
+<script>
+window.__calls = { savePhoto: [], deletePhoto: [], editSubmission: [], saveSubmission: [], fetch: [] };
+window.__photoStore = {};      // id -> {id, blob|thumbnail}
+window.__serverPhotos = {};    // id -> {thumbnailB64|blobB64}
+window.__subs = {};
+window.__workers = [{ id: 'w1', name: 'Kosta S', defaultRate: 30 }, { id: 'w2', name: 'Jonathan', defaultRate: 28 }];
+window.__projects = [{ id: 'p1', name: 'Yard Work 4062' }, { id: 'p2', name: 'Sand and Stone Resort, Landscaping' }];
+
+window.AppData = {
+    API_BASE: 'http://api.test',
+    getJwt: function() { return 'test-jwt'; },
+    getSubmission: function(id) { return window.__subs[id] || null; },
+    getWorkers: function() { return window.__workers; },
+    getWorker: function(id) { return window.__workers.filter(function(w) { return w.id === id; })[0] || null; },
+    getProjects: function() { return window.__projects; },
+    getEquipment: function() { return [{ id: 'e1', name: 'Ford Transit Connect' }]; },
+    getSubtasks: function() { return []; },
+    getSubtask: function() { return null; },
+    getExpenses: function() { return []; },
+    deleteExpense: function() {},
+    generateId: function() { return 'id' + Math.random().toString(36).slice(2, 10); },
+    getPhoto: function(id) { return Promise.resolve(window.__photoStore[id] || null); },
+    savePhoto: function(p) { window.__calls.savePhoto.push(p); window.__photoStore[p.id] = p; return Promise.resolve(); },
+    deletePhoto: function(id) { window.__calls.deletePhoto.push(id); return Promise.resolve(); },
+    editSubmissionAsync: function(id, fields, reason, reApprove) {
+        window.__calls.editSubmission.push({ id: id, fields: JSON.parse(JSON.stringify(fields)), reason: reason, reApprove: reApprove });
+        if (window.__failEdit) return Promise.reject(new Error(window.__failEdit));
+        Object.assign(window.__subs[id], fields);
+        return Promise.resolve(window.__subs[id]);
+    },
+    saveSubmission: function(s) { window.__calls.saveSubmission.push(JSON.parse(JSON.stringify(s))); window.__subs[s.id] = s; },
+};
+
+window.App = { currentUser: { type: 'admin', name: 'Damiano' } };
+window.LMIcons = new Proxy({}, { get: function() { return ''; } });
+
+// Fake API: only /api/photos/<id> is needed here
+window.fetch = function(url, opts) {
+    window.__calls.fetch.push(String(url));
+    var m = String(url).match(/\/api\/photos\/([^/?]+)$/);
+    if (m && window.__serverPhotos[decodeURIComponent(m[1])]) {
+        return Promise.resolve(new Response(JSON.stringify(Object.assign({ id: m[1] }, window.__serverPhotos[decodeURIComponent(m[1])])), { status: 200 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({ error: 'not found' }), { status: 404 }));
+};
+</script>
+<script src="../js/admin/approvals.js"></script>
+<script>
+AdminApprovals._impactCodes = [];
+AdminApprovals._renderContent = function() { window.__rerendered = (window.__rerendered || 0) + 1; };
+window.openEdit = function(sub) {
+    if (sub) window.__subs[sub.id] = sub;
+    AdminApprovals._showEditModal(sub ? sub.id : null);
+};
+</script>
+</body>
+</html>

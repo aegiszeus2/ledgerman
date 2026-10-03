@@ -924,6 +924,17 @@ window.AdminApprovals = {
             </fieldset>
 
             <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+                <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Photos</legend>
+                <div class="photo-preview-days" id="editPhotoDays"></div>
+                <div id="editPhotoEmpty" style="font-size:.82rem;color:var(--text2)">No photos on this entry yet.</div>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+                    <button type="button" id="editAddPhotosBtn" class="btn-secondary btn-sm">&#128247; Add Photos</button>
+                    <span style="font-size:.75rem;color:var(--text2)">Filed under the date on this card. Up to 10 photos, 10 MB each.</span>
+                </div>
+                <input type="file" id="editPhotoInput" accept="image/*" multiple style="display:none">
+            </fieldset>
+
+            <fieldset style="border:1px solid var(--border,#e0e0e0);border-radius:6px;padding:12px 14px;margin-bottom:14px">
                 <legend style="font-size:.8rem;font-weight:600;color:var(--text2);padding:0 6px">Impact / Delay Code</legend>
                 <div class="form-group">
                     <label>Impact Code</label>
@@ -1017,6 +1028,137 @@ window.AdminApprovals = {
             q('#editImpactDetails').style.display = this.value ? 'block' : 'none';
         });
 
+        // ── Photos (Damiano, 3 October: "when editing a timecard there is no
+        // option to add photos"). Existing photos are loaded off the entry's
+        // photoIds (local store first, then the server), new ones are picked with
+        // the same single input the worker form uses (iOS shows Take Photo /
+        // Library / Files). Shown grouped by the day the photo was taken, oldest
+        // first, like the worker form; a day other than the card's date is flagged
+        // because every photo on the card is filed under the card's date on save.
+        const originalPhotoIds = (!isCreate && Array.isArray(sub.photoIds)) ? sub.photoIds.slice() : [];
+        let editPhotos = originalPhotoIds.map(function(pid) {
+            return { id: pid, existing: true, file: null, thumbnailUrl: '', takenAt: null };
+        });
+        const esc = Utils.escapeHtml;
+        function photoCardDate() { const d = q('#editDate'); return (d && d.value) ? d.value : ''; }
+        function photoDayOf(p) {
+            if (p.existing) return sub.date || photoCardDate();      // already filed under this card
+            return p.takenAt ? p.takenAt.slice(0, 10) : '';
+        }
+        function photoDayLabel(day) {
+            return (window.PhotoDate && PhotoDate.dayLabel) ? PhotoDate.dayLabel(day) : day;
+        }
+        function renderEditPhotos() {
+            const area = q('#editPhotoDays'); const empty = q('#editPhotoEmpty');
+            if (!area) return;
+            area.innerHTML = '';
+            if (empty) empty.style.display = editPhotos.length ? 'none' : 'block';
+            if (!editPhotos.length) return;
+            const card = photoCardDate();
+            const groups = {};
+            editPhotos.forEach(function(p) { const k = photoDayOf(p); (groups[k] = groups[k] || []).push(p); });
+            const days = Object.keys(groups).sort(function(a, b) {
+                if (!a) return 1; if (!b) return -1;              // "date not in photo" goes last
+                return a < b ? -1 : (a > b ? 1 : 0);
+            });
+            days.forEach(function(day) {
+                const list = groups[day].slice().sort(function(a, b) {
+                    const x = a.takenAt || '', y = b.takenAt || '';
+                    return x < y ? -1 : (x > y ? 1 : 0);
+                });
+                const mismatch = !!(day && card && day !== card);
+                const wrap = document.createElement('div');
+                wrap.className = 'photo-day-group' + (mismatch ? ' photo-day-mismatch' : '');
+                wrap.setAttribute('data-day', day || 'unknown');
+                let note = '';
+                if (mismatch)  note = '<span class="photo-day-note">Taken on a different day than this card, which is dated ' + esc(photoDayLabel(card)) + '</span>';
+                else if (!day) note = '<span class="photo-day-note">No date inside the photo. It will be filed under this card\'s date.</span>';
+                const head = document.createElement('div');
+                head.className = 'photo-day-header';
+                head.innerHTML =
+                    '<span class="photo-day-title">' + esc(day ? photoDayLabel(day) : 'Date not in photo') + '</span>' +
+                    '<span class="photo-day-count">' + list.length + (list.length === 1 ? ' photo' : ' photos') + '</span>' + note;
+                wrap.appendChild(head);
+                const grid = document.createElement('div');
+                grid.className = 'photo-preview-grid';
+                list.forEach(function(p) {
+                    const item = document.createElement('div');
+                    item.className = 'photo-preview-item';
+                    item.setAttribute('data-photo-id', p.id);
+                    const at = p.takenAt ? p.takenAt.slice(11, 16) : '';
+                    item.innerHTML =
+                        (p.thumbnailUrl ? '<img src="' + p.thumbnailUrl + '" alt="Photo">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:.75rem;color:var(--text2)">&#128247; saved</div>') +
+                        (at ? '<span class="photo-time">' + esc(at) + '</span>' : '') +
+                        '<button type="button" class="remove-photo" data-id="' + esc(p.id) + '" aria-label="Remove photo">&times;</button>';
+                    const img = item.querySelector('img');
+                    if (img) img.addEventListener('click', function() { self._showPhotoLightbox({ blob: p.file || null, dataUrl: p.thumbnailUrl }); });
+                    item.querySelector('.remove-photo').addEventListener('click', function() {
+                        const pid = this.getAttribute('data-id');
+                        editPhotos = editPhotos.filter(function(x) { return x.id !== pid; });
+                        renderEditPhotos();
+                    });
+                    grid.appendChild(item);
+                });
+                wrap.appendChild(grid);
+                area.appendChild(wrap);
+            });
+        }
+        // Thumbnails for the photos already on the entry
+        originalPhotoIds.forEach(function(pid) {
+            (async function() {
+                let url = '';
+                try {
+                    const local = AppData.getPhoto ? await AppData.getPhoto(pid) : null;
+                    const b = local && (local.thumbnail || local.blob);
+                    if (b) url = (typeof b === 'string') ? b : URL.createObjectURL(b instanceof Blob ? b : new Blob([b]));
+                } catch (e) {}
+                if (!url && AppData.API_BASE) {
+                    try {
+                        const jwt = AppData.getJwt ? AppData.getJwt() : '';
+                        const r = await fetch(AppData.API_BASE + '/api/photos/' + encodeURIComponent(pid), { headers: { 'Authorization': 'Bearer ' + jwt } });
+                        if (r.ok) {
+                            const pj = await r.json();
+                            const b64 = pj.thumbnailB64 || pj.blobB64 || '';
+                            if (b64) url = b64.indexOf('data:') === 0 ? b64 : 'data:image/jpeg;base64,' + b64;
+                        }
+                    } catch (e) {}
+                }
+                const ph = editPhotos.filter(function(x) { return x.id === pid; })[0];
+                if (ph && url) { ph.thumbnailUrl = url; renderEditPhotos(); }
+            })();
+        });
+        function handleEditPhotos(files) {
+            const MAX_PHOTOS = 10, MAX_MB = 10, MAX_BYTES = MAX_MB * 1024 * 1024;
+            const oversized = [];
+            let accepted = [];
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].size > MAX_BYTES) oversized.push(files[i].name); else accepted.push(files[i]);
+            }
+            if (oversized.length) Utils.showToast('Photo(s) too large (max ' + MAX_MB + ' MB each): ' + oversized.join(', '), 'error');
+            const remaining = MAX_PHOTOS - editPhotos.length;
+            if (accepted.length > remaining) {
+                Utils.showToast('Max ' + MAX_PHOTOS + ' photos per entry. Only the first ' + Math.max(remaining, 0) + ' added.', 'error');
+                accepted = accepted.slice(0, Math.max(remaining, 0));
+            }
+            accepted.forEach(function(file) {
+                const id = AppData.generateId();
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const item = { id: id, existing: false, file: file, thumbnailUrl: e.target.result, takenAt: null };
+                    editPhotos.push(item);
+                    renderEditPhotos();
+                    if (window.PhotoDate && PhotoDate.readTakenAt) {
+                        PhotoDate.readTakenAt(file).then(function(t) { item.takenAt = t || null; if (q('#editPhotoDays')) renderEditPhotos(); });
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        q('#editAddPhotosBtn').addEventListener('click', function() { q('#editPhotoInput').click(); });
+        q('#editPhotoInput').addEventListener('change', function() { handleEditPhotos(this.files); this.value = ''; });
+        q('#editDate').addEventListener('change', function() { if (editPhotos.length) renderEditPhotos(); });
+        renderEditPhotos();
+
         // ── Save ────────────────────────────────────────────────────────────
         modal.submitBtn.addEventListener('click', async function() {
             const errEl = q('#editErrMsg');
@@ -1088,17 +1230,44 @@ window.AdminApprovals = {
                 fields.rate      = parseFloat(q('#editRate').value) || 0;
             }
 
+            // Photos: store any newly picked files (local store, then the server),
+            // then the list of ids this card should carry, in display order.
+            async function uploadNewPhotos(forSubmissionId, f) {
+                const ids = [];
+                for (let i = 0; i < editPhotos.length; i++) {
+                    const ph = editPhotos[i];
+                    if (ph.existing) { ids.push(ph.id); continue; }
+                    await AppData.savePhoto({
+                        id:           ph.id,
+                        projectId:    f.projectId,
+                        workerId:     f.workerId,
+                        workerName:   f.workerName || '',
+                        submissionId: forSubmissionId,
+                        date:         f.date,
+                        blob:         ph.file,
+                        thumbnail:    null,
+                        filename:     (ph.file && ph.file.name) || 'photo.jpg',
+                    });
+                    ph.existing = true;   // never upload twice if the save below fails and is retried
+                    ids.push(ph.id);
+                }
+                return ids;
+            }
+
             // ── Create mode: brand-new admin-entered timecard ───────────────
             if (isCreate) {
                 if (!newWorkerId) { errEl.textContent = 'Worker is required.'; errEl.style.display = 'block'; return; }
                 const restoreC = UI.btnLoading(modal.submitBtn, 'Creating…');
                 try {
+                    const newId = AppData.generateId();
+                    const newPhotoIds = await uploadNewPhotos(newId, fields);
                     const newSub = Object.assign({
-                        id:              AppData.generateId(),
+                        id:              newId,
                         status:          'Pending',
                         submittedAt:     new Date().toISOString(),
                         entryMethod:     'Admin Entry',
                         rejectionReason: null,
+                        photoIds:        newPhotoIds,
                     }, fields);
                     AppData.saveSubmission(newSub);
                 } catch (e) {
@@ -1121,6 +1290,16 @@ window.AdminApprovals = {
             }
 
             const restore = UI.btnLoading(modal.submitBtn, 'Saving…');
+            let finalPhotoIds = originalPhotoIds;
+            try {
+                finalPhotoIds = await uploadNewPhotos(subId, fields);
+                if (JSON.stringify(finalPhotoIds) !== JSON.stringify(originalPhotoIds)) fields.photoIds = finalPhotoIds;
+            } catch (e) {
+                errEl.textContent = 'Failed to store photos: ' + e.message;
+                errEl.style.display = 'block';
+                restore();
+                return;
+            }
             try {
                 if (typeof AppData.editSubmissionAsync === 'function') {
                     await AppData.editSubmissionAsync(subId, fields, reason, requireReApproval);
@@ -1137,6 +1316,13 @@ window.AdminApprovals = {
                 return;
             }
 
+            // Photos the admin took off the card
+            if (AppData.deletePhoto) {
+                originalPhotoIds
+                    .filter(function(pid) { return finalPhotoIds.indexOf(pid) === -1; })
+                    .forEach(function(pid) { AppData.deletePhoto(pid).catch(function() {}); });
+            }
+
             Utils.showToast('Submission updated' + (requireReApproval && (isApproved || isRejected) ? ' — moved to Pending' : ''));
             modal.close();
             self._renderContent();
@@ -1145,13 +1331,13 @@ window.AdminApprovals = {
 
     _showPhotoLightbox(photo) {
         const blob = photo.blob || photo.thumbnail;
-        if (!blob) return;
-        const url = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
+        if (!blob && !photo.dataUrl) return;
+        const url = blob ? URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob])) : photo.dataUrl;
         const modal = UI.modal('', '<img src="' + url + '" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:var(--radius);display:block;margin:0 auto">', {
             noFooter: true,
         });
         // Revoke URL when modal is closed
         const origClose = modal.close.bind(modal);
-        modal.close = function() { URL.revokeObjectURL(url); origClose(); };
+        modal.close = function() { if (blob) URL.revokeObjectURL(url); origClose(); };
     }
 };
