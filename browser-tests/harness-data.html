@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<!-- harness-data.html — loads the real js/data.js against a stub fetch so the
+     AppData cache behaviour can be checked with no login and no network.
+     Used by data-cache.spec.js. -->
+<html lang="en"><head><meta charset="UTF-8"></head><body>
+<script>
+window.__server = { submissions: [] };
+window.__calls = [];
+window.LEDGERMAN_API_URL = 'http://api.test';
+sessionStorage.setItem('ledgeman_companyId', 'co1');
+sessionStorage.setItem('ledgeman_jwt', 'test-jwt');
+window.fetch = function(url, opts) {
+    opts = opts || {}; var u = String(url); var method = (opts.method || 'GET').toUpperCase();
+    window.__calls.push({ url: u, method: method, body: opts.body || null });
+    if (u.indexOf('/api/sync') !== -1) {
+        return Promise.resolve(new Response(JSON.stringify({ submissions: window.__server.submissions, workers: [], projects: [] }), { status: 200 }));
+    }
+    var m = u.match(/\/api\/submissions\/([^/]+)\/admin-edit$/);
+    if (m && method === 'PATCH') {
+        var body = JSON.parse(opts.body);
+        var sub = window.__server.submissions.filter(function(s) { return s.id === m[1]; })[0];
+        Object.keys(body).forEach(function(k) { if (k !== 'reason' && k !== 'requireReApproval') sub[k] = body[k]; });
+        sub.editHistory = (sub.editHistory || []).concat([{ reason: body.reason }]);
+        return Promise.resolve(new Response(JSON.stringify(sub), { status: 200 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+};
+</script>
+<script src="../js/data.js"></script>
+</body></html>

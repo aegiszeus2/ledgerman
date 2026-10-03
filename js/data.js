@@ -1041,12 +1041,15 @@ async function editSubmissionAsync(submissionId, fields, reason, requireReApprov
     if (!resp || resp.error) {
         throw new Error(resp && resp.error ? resp.error : 'Failed to edit submission');
     }
-    // Update local cache
-    var cached = getData('submissions');
+    // Update the live list (in-memory cache when synced, localStorage otherwise).
+    // Was getData/setData only, which left _cache stale after a sync, so the
+    // Approvals list and a reopened Edit modal showed the pre-edit card until the
+    // next full sync (found 2026-10-03 while adding photos on edit).
+    var cached = _getList('submissions').slice();
     var idx = cached.findIndex(function(s) { return s.id === submissionId; });
     if (idx >= 0) cached[idx] = resp;
     else cached.push(resp);
-    setData('submissions', cached);
+    _setList('submissions', cached);
     return resp;
 }
 
