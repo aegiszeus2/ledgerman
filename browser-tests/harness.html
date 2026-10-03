@@ -43,6 +43,10 @@ window.AppData = {
     getSubtasks: function() { return []; },
     getWorkerSubmissions: function() { return window.__submissions || []; },
     saveSubmission: function(s) { (window.__submissions = window.__submissions || []).push(s); },
+    generateId: function() { return 'id' + Math.random().toString(36).slice(2, 10); },
+    getPhoto: function(id) { return Promise.resolve((window.__photoStore || {})[id] || null); },
+    savePhoto: function(p) { (window.__photoStore = window.__photoStore || {})[p.id] = p; return Promise.resolve(); },
+    deletePhoto: function() { return Promise.resolve(); },
     getEquipment: function() { return []; },
     getProjectEquipment: function() { return []; },
     saveNotification: function() {},
@@ -118,6 +122,7 @@ window.renderHistory = function() {
     window.WorkerHistory.render(document.getElementById('workerContent'), window.__worker);
 };
 </script>
+<script src="../js/photo-date.js"></script>
 <script src="../js/worker/timeentry.js"></script>
 <script src="../js/worker/history.js"></script>
 </body>

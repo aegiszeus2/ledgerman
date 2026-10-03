@@ -776,7 +776,7 @@ window.WorkerTimeEntry = {
                     '</div>' +
                     '<input type="file" id="tePhotoInput" accept="image/*" multiple style="display:none">' +
                     '<div id="tePhotoDropZone" style="margin-top:6px;"></div>' +
-                    '<div class="photo-preview-grid" id="photoPreviewArea"></div>' +
+                    '<div class="photo-preview-days" id="photoPreviewArea"></div>' +
                 '</div>';
 
             // Submit
@@ -1242,6 +1242,8 @@ window.WorkerTimeEntry = {
                 form.querySelector('#tePhotoInput').click();
             });
             form.querySelector('#tePhotoInput').addEventListener('change', function() { handlePhotos(this.files); this.value = ''; });
+            // Changing the card's date changes which photo day is flagged as off-card.
+            form.querySelector('#teDate').addEventListener('change', function() { if (selectedPhotos.length) renderPreviews(); });
 
             // Photo drag-and-drop zone (desktop enhancement — Add Photos button remains primary on mobile)
             if (window.UploadHelper) {
@@ -1284,28 +1286,93 @@ window.WorkerTimeEntry = {
                         var id = AppData.generateId();
                         var reader = new FileReader();
                         reader.onload = function(e) {
-                            selectedPhotos.push({ id: id, file: file, thumbnailUrl: e.target.result });
+                            var item = { id: id, file: file, thumbnailUrl: e.target.result, takenAt: null };
+                            selectedPhotos.push(item);
                             renderPreviews();
+                            // Read the day the photo was taken (EXIF) so it sorts under its own day.
+                            if (window.PhotoDate && PhotoDate.readTakenAt) {
+                                PhotoDate.readTakenAt(file).then(function(t) {
+                                    item.takenAt = t || null;
+                                    if (form.querySelector('#photoPreviewArea')) renderPreviews();
+                                });
+                            }
                         };
                         reader.readAsDataURL(file);
                     })(accepted[j]);
                 }
             }
 
+            // Photos are shown sorted and grouped by the day they were TAKEN, one block
+            // per day, oldest first, so a batch picked from the camera roll reads as
+            // Friday's photos, then Saturday's. A day that is not this card's date is
+            // flagged, because the whole batch gets filed under the card's date on save.
+            function cardDate() {
+                var d = form.querySelector('#teDate');
+                return (d && d.value) ? d.value : '';
+            }
+            function photoDay(photo) {
+                if (photo.existing) return defaults.date || cardDate(); // already filed under this card
+                return photo.takenAt ? photo.takenAt.slice(0, 10) : '';
+            }
+            function dayLabel(day) {
+                return (window.PhotoDate && PhotoDate.dayLabel) ? PhotoDate.dayLabel(day) : day;
+            }
             function renderPreviews() {
                 var area = form.querySelector('#photoPreviewArea');
                 area.innerHTML = '';
-                selectedPhotos.forEach(function(photo, idx) {
-                    var item = document.createElement('div');
-                    item.className = 'photo-preview-item';
-                    item.innerHTML =
-                        (photo.thumbnailUrl ? '<img src="' + photo.thumbnailUrl + '" alt="Photo">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:.75rem;color:var(--text2)">&#128247; saved</div>') +
-                        '<button type="button" class="remove-photo" data-idx="' + idx + '">&times;</button>';
-                    item.querySelector('.remove-photo').addEventListener('click', function() {
-                        selectedPhotos.splice(parseInt(this.dataset.idx, 10), 1);
-                        renderPreviews();
+                if (!selectedPhotos.length) return;
+                var card = cardDate();
+                var groups = {};
+                selectedPhotos.forEach(function(p) {
+                    var k = photoDay(p);
+                    (groups[k] = groups[k] || []).push(p);
+                });
+                var days = Object.keys(groups).sort(function(a, b) {
+                    if (!a) return 1;          // "date not in photo" goes last
+                    if (!b) return -1;
+                    return a < b ? -1 : (a > b ? 1 : 0);
+                });
+                days.forEach(function(day) {
+                    var list = groups[day].slice().sort(function(a, b) {
+                        var x = a.takenAt || '', y = b.takenAt || '';
+                        return x < y ? -1 : (x > y ? 1 : 0);
                     });
-                    area.appendChild(item);
+                    var mismatch = !!(day && card && day !== card);
+                    var wrap = document.createElement('div');
+                    wrap.className = 'photo-day-group' + (mismatch ? ' photo-day-mismatch' : '');
+                    wrap.setAttribute('data-day', day || 'unknown');
+
+                    var note = '';
+                    if (mismatch)  note = '<span class="photo-day-note">Taken on a different day than this card, which is dated ' + esc(dayLabel(card)) + '</span>';
+                    else if (!day) note = '<span class="photo-day-note">No date inside the photo. It will be filed under this card\'s date.</span>';
+                    var head = document.createElement('div');
+                    head.className = 'photo-day-header';
+                    head.innerHTML =
+                        '<span class="photo-day-title">' + esc(day ? dayLabel(day) : 'Date not in photo') + '</span>' +
+                        '<span class="photo-day-count">' + list.length + (list.length === 1 ? ' photo' : ' photos') + '</span>' +
+                        note;
+                    wrap.appendChild(head);
+
+                    var grid = document.createElement('div');
+                    grid.className = 'photo-preview-grid';
+                    list.forEach(function(photo) {
+                        var item = document.createElement('div');
+                        item.className = 'photo-preview-item';
+                        item.setAttribute('data-photo-id', photo.id);
+                        var at = photo.takenAt ? photo.takenAt.slice(11, 16) : '';
+                        item.innerHTML =
+                            (photo.thumbnailUrl ? '<img src="' + photo.thumbnailUrl + '" alt="Photo">' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:.75rem;color:var(--text2)">&#128247; saved</div>') +
+                            (at ? '<span class="photo-time">' + esc(at) + '</span>' : '') +
+                            '<button type="button" class="remove-photo" data-id="' + esc(photo.id) + '" aria-label="Remove photo">&times;</button>';
+                        item.querySelector('.remove-photo').addEventListener('click', function() {
+                            var pid = this.getAttribute('data-id');
+                            selectedPhotos = selectedPhotos.filter(function(x) { return x.id !== pid; });
+                            renderPreviews();
+                        });
+                        grid.appendChild(item);
+                    });
+                    wrap.appendChild(grid);
+                    area.appendChild(wrap);
                 });
             }
 
