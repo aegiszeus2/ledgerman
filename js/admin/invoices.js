@@ -164,9 +164,19 @@ window.AdminInvoices = {
     // (equipment, other) are written by the backend with snake_case project_id,
     // so a projectId-only filter hid them from the invoice entirely.
     _projectExpenses(projectId) {
-        return AppData.getExpenses().filter(function(e) {
-            return !projectId || e.projectId === projectId || e.project_id === projectId;
-        });
+        return projectId ? AppData.getExpenses(projectId) : AppData.getExpenses();
+    },
+
+    // One rule for "may this expense go on an invoice": billable, not already flagged
+    // invoiced by this client, not excluded, and not carried on any draft or issued
+    // invoice line (billedState is derived by the server from invoice line items, uid 1122).
+    _pickable(e) { return AppData.expenseIsPickable(e); },
+
+    // Categories in display order; anything else present (Other, Subcontractor, custom) follows.
+    _categoryOrder(groups) {
+        var order = ['Labor', 'Equipment', 'Material', 'Subcontractor', 'Other'];
+        Object.keys(groups || {}).forEach(function(c) { if (order.indexOf(c) === -1) order.push(c); });
+        return order;
     },
 
     // Invoice-ready copies. The stored expense is never modified here.
@@ -223,13 +233,13 @@ window.AdminInvoices = {
         var projects = AppData.getProjects();
         var eligible = projects.filter(function(p) {
             var expenses = AdminInvoices._invoiceExpenses(p.id);
-            return expenses.some(function(e) { return e.billable !== false && !e.invoiced; });
+            return expenses.some(function(e) { return AdminInvoices._pickable(e); });
         });
 
         // Also treat expenses without a billable flag as billable (backwards compat)
         var eligible2 = projects.filter(function(p) {
             var expenses = AdminInvoices._invoiceExpenses(p.id);
-            return expenses.some(function(e) { return e.billable !== false && !e.invoiced; });
+            return expenses.some(function(e) { return AdminInvoices._pickable(e); });
         });
 
         if (eligible2.length === 0) {
@@ -262,7 +272,7 @@ window.AdminInvoices = {
         // If a project was pre-selected, pre-select all its expenses
         if (self._wizardData.projectId) {
             var expenses = AdminInvoices._invoiceExpenses(self._wizardData.projectId).filter(function(e) {
-                return e.billable !== false && !e.invoiced;
+                return AdminInvoices._pickable(e);
             });
             self._wizardData.selectedExpenseIds = expenses.map(function(e) { return e.id; });
         }
@@ -316,7 +326,7 @@ window.AdminInvoices = {
         stepEl.innerHTML = '<h3 class="section-title">Select a Project</h3>' +
             '<p style="color:var(--text2);margin-bottom:12px">Choose a project that has billable expenses ready to invoice.</p>' +
             wd.eligibleProjects.map(function(p) {
-                var expenses = AdminInvoices._invoiceExpenses(p.id).filter(function(e) { return e.billable !== false && !e.invoiced; });
+                var expenses = AdminInvoices._invoiceExpenses(p.id).filter(function(e) { return AdminInvoices._pickable(e); });
                 var total = expenses.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
                 var selected = wd.projectId === p.id ? 'border-color:var(--accent);background:rgba(233,69,96,.05)' : '';
                 return '<div class="project-option" data-id="' + p.id + '" style="padding:16px;border:2px solid var(--border);border-radius:var(--radius);margin-bottom:8px;cursor:pointer;' + selected + '">' +
@@ -336,7 +346,7 @@ window.AdminInvoices = {
                 wd.projectId = el.dataset.id;
                 // Pre-select all expenses
                 var expenses = AdminInvoices._invoiceExpenses(wd.projectId).filter(function(e) {
-                    return e.billable !== false && !e.invoiced;
+                    return AdminInvoices._pickable(e);
                 });
                 wd.selectedExpenseIds = expenses.map(function(e) { return e.id; });
             });
@@ -354,7 +364,7 @@ window.AdminInvoices = {
         var self = this;
         var esc = Utils.escapeHtml;
         var expenses = AdminInvoices._invoiceExpenses(wd.projectId).filter(function(e) {
-            return e.billable !== false && !e.invoiced;
+            return AdminInvoices._pickable(e);
         });
 
         // Build vendor list and apply filter
@@ -391,7 +401,7 @@ window.AdminInvoices = {
 
         stepEl.innerHTML = '<h3 class="section-title">Select Expenses to Include</h3>' + vendorFilterHtml;
 
-        ['Labor', 'Equipment', 'Material'].forEach(function(cat) {
+        AdminInvoices._categoryOrder(groups).forEach(function(cat) {
             var items = groups[cat];
             if (!items || items.length === 0) return;
             var catTotal = items.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
@@ -638,7 +648,7 @@ window.AdminInvoices = {
 
         var html = '<table><thead><tr><th>Description</th><th>Category</th><th style="text-align:center">Qty/Hours</th><th class="amount">Rate</th><th class="amount">Amount</th></tr></thead><tbody>';
 
-        ['Labor', 'Equipment', 'Material'].forEach(function(cat) {
+        AdminInvoices._categoryOrder(groups).forEach(function(cat) {
             var items = groups[cat];
             if (!items || items.length === 0) return;
             items.forEach(function(item) {
@@ -721,7 +731,7 @@ window.AdminInvoices = {
         });
 
         var linesHtml = '';
-        ['Labor', 'Equipment', 'Material'].forEach(function(cat) {
+        AdminInvoices._categoryOrder(groups).forEach(function(cat) {
             var items = groups[cat];
             if (!items || items.length === 0) return;
             linesHtml += '<tr class="inv-cat-row"><td colspan="5">' + cat + '</td></tr>';
@@ -1194,7 +1204,7 @@ window.AdminInvoices = {
             groups[cat].push(item);
         });
 
-        ['Labor', 'Equipment', 'Material'].forEach(function(cat) {
+        AdminInvoices._categoryOrder(groups).forEach(function(cat) {
             var items = groups[cat];
             if (!items || items.length === 0) return;
             linesHtml += '<tr><td colspan="5" style="font-weight:700;padding-top:16px;border-bottom:none;color:#1a1a2e">' + cat + '</td></tr>';
@@ -1490,6 +1500,8 @@ window.AdminInvoices = {
             var currentExpenseIds = editItems.map(function(i) { return i.expenseId || i.id || null; }).filter(Boolean);
             return expenses.filter(function(e) {
                 if (currentExpenseIds.indexOf(e.id) !== -1) return false;
+                if (e.excludeFromInvoice || e.billable === false) return false;
+                if (e.billedInvoiceId && e.billedInvoiceId !== invoiceId) return false;
                 return !e.invoiced || e.invoiceId === invoiceId;
             });
         }

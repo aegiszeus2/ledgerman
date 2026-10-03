@@ -728,6 +728,11 @@ window.WorkerTimeEntry = {
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
                         '<input class="form-control" type="text" id="teExpenseDesc" placeholder="Expense description (e.g. Gas, Tools)" style="flex:1;min-width:150px">' +
                         '<input class="form-control" type="number" id="teExpenseAmount" placeholder="$0.00" step="0.01" min="0" style="width:100px">' +
+                        '<select class="form-control" id="teExpensePayType" title="Paid already, or still owed (payable)" style="width:110px">' +
+                            '<option value="paid">Paid</option>' +
+                            '<option value="payable">Payable</option>' +
+                        '</select>' +
+                        '<input class="form-control" type="date" id="teExpenseDue" title="Due date (payable)" style="width:150px;display:none">' +
                         '<button type="button" class="btn btn-secondary" id="teExpenseFileBtn" style="padding:10px 16px;white-space:nowrap" aria-label="Attach receipt or document">📎 Attach</button>' +
                         '<button type="button" class="btn btn-secondary" id="addExpenseBtn" style="padding:10px 16px;white-space:nowrap">Add</button>' +
                     '</div>' +
@@ -1118,6 +1123,20 @@ window.WorkerTimeEntry = {
                 });
             }
 
+            // Paid / payable: a payable gets a due date, 30 days from the entry date by default
+            var payTypeEl = form.querySelector('#teExpensePayType');
+            var dueEl     = form.querySelector('#teExpenseDue');
+            function defaultDue() {
+                var base = (form.querySelector('#teDate') && form.querySelector('#teDate').value) || Utils.today();
+                var d = new Date(base + 'T00:00:00'); d.setDate(d.getDate() + 30);
+                return d.toISOString().slice(0, 10);
+            }
+            payTypeEl.addEventListener('change', function() {
+                var payable = payTypeEl.value === 'payable';
+                dueEl.style.display = payable ? '' : 'none';
+                if (payable && !dueEl.value) dueEl.value = defaultDue();
+            });
+
             form.querySelector('#addExpenseBtn').addEventListener('click', function() {
                 var desc = form.querySelector('#teExpenseDesc').value.trim();
                 var amt  = parseFloat(form.querySelector('#teExpenseAmount').value);
@@ -1125,12 +1144,17 @@ window.WorkerTimeEntry = {
                     Utils.showToast('Enter expense description and valid amount', 'error');
                     return;
                 }
+                var payType = payTypeEl.value === 'payable' ? 'payable' : 'paid';
+                var dueDate = payType === 'payable' ? (dueEl.value || defaultDue()) : '';
+                var entryDate = (form.querySelector('#teDate') && form.querySelector('#teDate').value) || Utils.today();
+                var paidDate = payType === 'paid' ? entryDate : '';
                 if (pendingExpenseFiles.length > 1) {
                     // Multi-file: auto-create one expense line per file
                     pendingExpenseFiles.forEach(function(file, i) {
                         selectedExpenses.push({
                             description: desc + ' (' + (i + 1) + ')',
                             amount: amt,
+                            paymentType: payType, dueDate: dueDate, paidDate: paidDate,
                             file: file
                         });
                     });
@@ -1139,11 +1163,13 @@ window.WorkerTimeEntry = {
                     selectedExpenses.push({
                         description: desc,
                         amount: amt,
+                        paymentType: payType, dueDate: dueDate, paidDate: paidDate,
                         file: pendingExpenseFiles.length === 1 ? pendingExpenseFiles[0] : null
                     });
                 }
                 form.querySelector('#teExpenseDesc').value  = '';
                 form.querySelector('#teExpenseAmount').value = '';
+                payTypeEl.value = 'paid'; dueEl.value = ''; dueEl.style.display = 'none';
                 pendingExpenseFiles = [];
                 updateExpenseFileStatus();
                 renderExpenseList();
@@ -1159,8 +1185,12 @@ window.WorkerTimeEntry = {
                     var item = document.createElement('div');
                     item.style.cssText = 'padding:8px;background:rgba(245,158,11,.1);border-radius:6px;margin-bottom:6px';
 
+                    var payLabel = (exp.paymentType === 'payable')
+                        ? 'Payable' + (exp.dueDate ? ', due ' + esc(exp.dueDate) : '')
+                        : 'Paid';
                     var itemContent = '<div style="display:flex;justify-content:space-between;align-items:center">' +
-                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + ((exp.file || exp.attachmentId) ? ' 📎' : '') + '</span>' +
+                        '<span>' + esc(exp.description) + ': $' + exp.amount.toFixed(2) + ((exp.file || exp.attachmentId) ? ' 📎' : '') +
+                        ' <span class="te-exp-pay" style="font-size:.78rem;color:var(--text2);margin-left:6px">' + payLabel + '</span></span>' +
                         '<button type="button" class="btn btn-sm" style="padding:4px 8px;color:var(--accent)" data-idx="' + idx + '">Remove</button>' +
                         '</div>';
 
@@ -1389,7 +1419,10 @@ window.WorkerTimeEntry = {
                     var processedExpenses = [];
                     for (var e = 0; e < selectedExpenses.length; e++) {
                         var exp = selectedExpenses[e];
-                        var expObj = { description: exp.description, amount: exp.amount, attachmentId: exp.attachmentId || null };
+                        var expObj = { description: exp.description, amount: exp.amount, attachmentId: exp.attachmentId || null,
+                                       paymentType: exp.paymentType === 'payable' ? 'payable' : 'paid',
+                                       dueDate: exp.paymentType === 'payable' ? (exp.dueDate || '') : '',
+                                       paidDate: exp.paymentType === 'payable' ? (exp.paidDate || '') : (exp.paidDate || dateValue) };
 
                         // Upload expense attachment if present
                         if (exp.file) {

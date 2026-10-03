@@ -814,7 +814,76 @@ function saveSubtask(s) { return save('subtasks', s); }
 function deleteSubtask(id) { remove('subtasks', id); }
 
 // ─── Expenses ──────────────────────────────────────────────────────────────
-function getExpenses(projectId) { return projectId ? getAll('expenses').filter(function(e) { return e.projectId === projectId; }) : getAll('expenses'); }
+// Rows carry the project under projectId (app writes) or project_id (timecard sync); match either.
+function getExpenses(projectId) { return projectId ? getAll('expenses').filter(function(e) { return e.projectId === projectId || e.project_id === projectId; }) : getAll('expenses'); }
+
+// ─── Expense state (uid 1122): paid / payable, due date, billed state ──────────
+// The server derives billedState by joining invoice line items and fills payment defaults;
+// these helpers read that and give both entry points one vocabulary.
+var EXPENSE_BILLED_LABELS = { not_invoiced: 'Not invoiced', on_draft: 'On draft', issued: 'Issued' };
+function expenseBilledState(e) {
+    if (e.billedState) return e.billedState;
+    // Cache not yet refreshed from the server: derive from what this client knows
+    if (e.invoiceId || e.invoiced) {
+        var inv = getById('invoices', e.invoiceId);
+        if (inv) return (String(inv.status || '').toLowerCase() === 'draft' || inv.draft) ? 'on_draft' : 'issued';
+        if (e.invoiced) return 'issued';
+    }
+    return 'not_invoiced';
+}
+function expenseBilledLabel(e) {
+    var st = expenseBilledState(e);
+    var lbl = EXPENSE_BILLED_LABELS[st] || st;
+    return e.billedInvoiceNumber ? lbl + ' (' + e.billedInvoiceNumber + ')' : lbl;
+}
+function expenseIsBilled(e) { return expenseBilledState(e) !== 'not_invoiced'; }
+function expenseIsPickable(e) {
+    return e.billable !== false && !e.invoiced && !e.excludeFromInvoice && !expenseIsBilled(e);
+}
+function expensePaymentType(e) {
+    var t = String(e.paymentType || '').toLowerCase();
+    if (t === 'paid' || t === 'payable') return t;
+    return (e.category === 'Labor' || e.category === 'Labour' || e.category === 'Equipment') ? 'paid' : 'payable';
+}
+function expenseIsPaid(e) { return expensePaymentType(e) === 'paid' || !!e.paidDate; }
+function expenseDueDate(e) {
+    if (e.dueDate) return e.dueDate;
+    if (expensePaymentType(e) !== 'payable' || !e.date) return '';
+    var d = new Date(e.date + 'T00:00:00'); d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+}
+function expensePaymentState(e) {
+    if (expenseIsPaid(e)) return 'paid';
+    var due = expenseDueDate(e);
+    return (due && due < new Date().toISOString().slice(0, 10)) ? 'overdue' : 'due';
+}
+function expensePaymentLabel(e) {
+    if (expensePaymentType(e) === 'paid') return 'Paid' + (e.paidDate ? ' ' + e.paidDate : '');
+    if (e.paidDate) return 'Payable, paid ' + e.paidDate;
+    var due = expenseDueDate(e);
+    return (expensePaymentState(e) === 'overdue' ? 'Payable, overdue ' : 'Payable, due ') + (due || '');
+}
+/**
+ * updateExpensePayment(id, patch) — PATCH /api/expenses/<id>/payment
+ * patch: { paymentType?, dueDate?, paidDate?, excludeFromInvoice?, excludeReason? }
+ * Works on approved rows (the generic save refuses those). Updates the cache on success.
+ */
+async function updateExpensePayment(id, patch) {
+    if (isApiMode() && getJwt()) {
+        var resp = await _apiFetch('/api/expenses/' + encodeURIComponent(id) + '/payment', {
+            method: 'PATCH', body: JSON.stringify(patch)
+        });
+        if (resp && resp.error) throw new Error(resp.error);
+        var items = _getList('expenses');
+        var idx = items.findIndex(function(x) { return x.id === id; });
+        if (idx >= 0) { items[idx] = Object.assign({}, items[idx], resp || patch); _setList('expenses', items); }
+        return resp;
+    }
+    var e = getById('expenses', id);
+    if (!e) throw new Error('Expense not found');
+    Object.assign(e, patch);
+    return save('expenses', e);
+}
 function getExpense(id) { return getById('expenses', id); }
 function saveExpense(e) { return save('expenses', e); }
 function deleteExpense(id) { remove('expenses', id); }
@@ -1438,6 +1507,8 @@ window.AppData = {
     getSubtasks, getSubtask, saveSubtask, deleteSubtask,
     // Expenses
     getExpenses, getExpense, saveExpense, deleteExpense,
+    expenseBilledState, expenseBilledLabel, expenseIsBilled, expenseIsPickable,
+    expensePaymentType, expenseIsPaid, expenseDueDate, expensePaymentState, expensePaymentLabel, updateExpensePayment,
     // Submissions
     getSubmissions, getSubmission, saveSubmission, deleteSubmission,
     getPendingSubmissions, getWorkerSubmissions,

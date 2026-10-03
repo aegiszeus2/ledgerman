@@ -9,7 +9,8 @@ window.AdminExpensesReview = {
         dateFrom: '',
         dateTo: '',
         billable: '',
-        invoiced: ''
+        invoiced: '',
+        payment: ''
     },
     _sort: { field: 'date', dir: 'desc' },
     _selected: [],
@@ -36,7 +37,7 @@ window.AdminExpensesReview = {
         var expenses = AppData.getExpenses(); // no project filter
         return expenses.map(function(e) {
             return Object.assign({}, e, {
-                projectName: projectMap[e.projectId] || 'Unknown Project'
+                projectName: projectMap[e.projectId || e.project_id] || 'Unknown Project'
             });
         });
     },
@@ -44,7 +45,7 @@ window.AdminExpensesReview = {
     _applyFilters(expenses) {
         var f = this._filters;
         return expenses.filter(function(e) {
-            if (f.projectId && e.projectId !== f.projectId) return false;
+            if (f.projectId && e.projectId !== f.projectId && e.project_id !== f.projectId) return false;
             if (f.category && e.category !== f.category) return false;
             if (f.vendorId && e.vendorId !== f.vendorId) return false;
             if (f.vendorSearch) {
@@ -55,8 +56,19 @@ window.AdminExpensesReview = {
             if (f.dateTo && e.date > f.dateTo) return false;
             if (f.billable === 'yes' && !e.billable) return false;
             if (f.billable === 'no' && e.billable) return false;
-            if (f.invoiced === 'yes' && e.invoiceStatus !== 'Already Invoiced') return false;
-            if (f.invoiced === 'no' && e.invoiceStatus === 'Already Invoiced') return false;
+            // Billed state is derived by the server from invoice line items (uid 1122)
+            var billed = AppData.expenseBilledState(e);
+            if (f.invoiced === 'yes' && billed === 'not_invoiced') return false;
+            if (f.invoiced === 'no' && billed !== 'not_invoiced') return false;
+            if (f.invoiced === 'draft' && billed !== 'on_draft') return false;
+            if (f.invoiced === 'issued' && billed !== 'issued') return false;
+            if (f.payment) {
+                var ps = AppData.expensePaymentState(e);
+                if (f.payment === 'paid' && ps !== 'paid') return false;
+                if (f.payment === 'open' && ps === 'paid') return false;
+                if (f.payment === 'overdue' && ps !== 'overdue') return false;
+                if (f.payment === 'payable' && AppData.expensePaymentType(e) !== 'payable') return false;
+            }
             return true;
         });
     },
@@ -70,6 +82,7 @@ window.AdminExpensesReview = {
             else if (field === 'amount') { va = parseFloat(a.amount) || 0; vb = parseFloat(b.amount) || 0; }
             else if (field === 'category') { va = a.category || ''; vb = b.category || ''; }
             else if (field === 'project') { va = a.projectName || ''; vb = b.projectName || ''; }
+            else if (field === 'due') { va = AppData.expenseDueDate(a) || ''; vb = AppData.expenseDueDate(b) || ''; }
             else if (field === 'vendor') {
                 va = a.vendorName || a.vendor || '';
                 vb = b.vendorName || b.vendor || '';
@@ -93,7 +106,12 @@ window.AdminExpensesReview = {
         // Summary
         var total = filtered.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
         var billableAmt = filtered.filter(function(e) { return e.billable; }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
-        var invoicedAmt = filtered.filter(function(e) { return e.invoiceStatus === 'Already Invoiced'; }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+        var invoicedAmt = filtered.filter(function(e) { return AppData.expenseIsBilled(e); }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+        var onDraftAmt = filtered.filter(function(e) { return AppData.expenseBilledState(e) === 'on_draft'; }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+        var payableOpen = filtered.filter(function(e) { return AppData.expensePaymentType(e) === 'payable' && !AppData.expenseIsPaid(e); });
+        var payableOpenAmt = payableOpen.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+        var overdueAmt = payableOpen.filter(function(e) { return AppData.expensePaymentState(e) === 'overdue'; }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+        var paidAmt = filtered.filter(function(e) { return AppData.expenseIsPaid(e); }).reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
 
         // Sort indicator
         var si = function(col) { return self._sort.field === col ? (self._sort.dir === 'asc' ? ' ▲' : ' ▼') : ''; };
@@ -150,8 +168,20 @@ window.AdminExpensesReview = {
             '<label>Invoiced</label>' +
             '<select id="erFInvoiced">' +
             '<option value="">All</option>' +
-            '<option value="yes"' + (f.invoiced === 'yes' ? ' selected' : '') + '>Invoiced</option>' +
-            '<option value="no"' + (f.invoiced === 'no' ? ' selected' : '') + '>Not Invoiced</option>' +
+            '<option value="no"' + (f.invoiced === 'no' ? ' selected' : '') + '>Not invoiced</option>' +
+            '<option value="draft"' + (f.invoiced === 'draft' ? ' selected' : '') + '>On draft</option>' +
+            '<option value="issued"' + (f.invoiced === 'issued' ? ' selected' : '') + '>Issued</option>' +
+            '<option value="yes"' + (f.invoiced === 'yes' ? ' selected' : '') + '>On draft or issued</option>' +
+            '</select></div>' +
+
+            '<div class="filter-group">' +
+            '<label>Payment</label>' +
+            '<select id="erFPayment">' +
+            '<option value="">All</option>' +
+            '<option value="open"' + (f.payment === 'open' ? ' selected' : '') + '>Payable, open</option>' +
+            '<option value="overdue"' + (f.payment === 'overdue' ? ' selected' : '') + '>Payable, overdue</option>' +
+            '<option value="payable"' + (f.payment === 'payable' ? ' selected' : '') + '>Payable, all</option>' +
+            '<option value="paid"' + (f.payment === 'paid' ? ' selected' : '') + '>Paid</option>' +
             '</select></div>' +
 
             '<div class="filter-group" style="justify-content:flex-end">' +
@@ -165,7 +195,9 @@ window.AdminExpensesReview = {
             '<span class="sr-item">Count: <strong>' + filtered.length + '</strong></span>' +
             '<span class="sr-item">Total: <strong>' + Utils.formatCurrency(total) + '</strong></span>' +
             '<span class="sr-item">Billable: <strong>' + Utils.formatCurrency(billableAmt) + '</strong></span>' +
-            '<span class="sr-item">Invoiced: <strong>' + Utils.formatCurrency(invoicedAmt) + '</strong></span>' +
+            '<span class="sr-item">Billed: <strong>' + Utils.formatCurrency(invoicedAmt) + '</strong>' + (onDraftAmt > 0 ? ' <span style="color:var(--text-muted)">(on draft ' + Utils.formatCurrency(onDraftAmt) + ')</span>' : '') + '</span>' +
+            '<span class="sr-item">Paid: <strong>' + Utils.formatCurrency(paidAmt) + '</strong></span>' +
+            '<span class="sr-item">Payable open: <strong>' + Utils.formatCurrency(payableOpenAmt) + '</strong>' + (overdueAmt > 0 ? ' <span style="color:var(--danger,#c0392b)">(overdue ' + Utils.formatCurrency(overdueAmt) + ')</span>' : '') + '</span>' +
             '</div>';
 
         // Bulk actions
@@ -173,6 +205,7 @@ window.AdminExpensesReview = {
             '<span id="erSelCount" style="font-size:.85rem;color:var(--text-muted)">0 selected</span>' +
             '<button class="btn btn-secondary btn-sm" id="erMarkBillable">Mark Billable</button>' +
             '<button class="btn btn-secondary btn-sm" id="erMarkNonBillable">Mark Non-Billable</button>' +
+            '<button class="btn btn-secondary btn-sm" id="erMarkPaid">Mark Paid</button>' +
             '</div>';
 
         // Table
@@ -189,15 +222,19 @@ window.AdminExpensesReview = {
                 '<th>Description</th>' +
                 '<th class="sortable" data-col="amount" style="cursor:pointer;text-align:right">Amount' + si('amount') + '</th>' +
                 '<th style="text-align:center">Billable</th>' +
-                '<th style="text-align:center">Invoiced</th>' +
+                '<th class="sortable" data-col="due" style="cursor:pointer">Payment' + si('due') + '</th>' +
+                '<th>Billed</th>' +
                 '</tr></thead>' +
                 '<tbody id="erTbody">';
 
             sorted.forEach(function(e) {
                 var vendorDisplay = e.vendorName || e.vendor || '—';
                 var isBillable = !!e.billable;
-                var isInvoiced = e.invoiceStatus === 'Already Invoiced';
+                var isInvoiced = AppData.expenseIsBilled(e);
                 var isSelected = self._selected.indexOf(e.id) !== -1;
+                var payState = AppData.expensePaymentState(e);
+                var payColor = payState === 'overdue' ? 'var(--danger,#c0392b)' : (payState === 'paid' ? 'var(--text-muted)' : 'inherit');
+                var billedText = e.billable === false ? 'Non-billable' : (e.excludeFromInvoice ? 'Excluded' : AppData.expenseBilledLabel(e));
                 html += '<tr class="er-row" data-id="' + e.id + '">' +
                     '<td onclick="event.stopPropagation()"><input type="checkbox" class="er-cb" data-id="' + e.id + '"' + (isSelected ? ' checked' : '') + '></td>' +
                     '<td>' + Utils.formatDate(e.date) + '</td>' +
@@ -207,9 +244,10 @@ window.AdminExpensesReview = {
                     '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(e.description) + '">' + esc(e.description) + '</td>' +
                     '<td style="text-align:right;font-weight:600">' + Utils.formatCurrency(e.amount) + '</td>' +
                     '<td style="text-align:center">' + (isBillable ? '✅' : '❌') + '</td>' +
-                    '<td style="text-align:center">' + (isInvoiced ? '✅' : '—') + '</td>' +
+                    '<td style="white-space:nowrap;font-size:.85rem;color:' + payColor + '" class="er-pay er-pay-' + payState + '">' + esc(AppData.expensePaymentLabel(e)) + '</td>' +
+                    '<td style="white-space:nowrap;font-size:.85rem" class="er-billed er-billed-' + AppData.expenseBilledState(e) + '">' + esc(billedText) + '</td>' +
                     '</tr>' +
-                    '<tr class="er-expand-row" id="er-expand-' + e.id + '" style="display:none"><td colspan="9"></td></tr>';
+                    '<tr class="er-expand-row" id="er-expand-' + e.id + '" style="display:none"><td colspan="10"></td></tr>';
             });
 
             html += '</tbody></table></div>';
@@ -218,8 +256,8 @@ window.AdminExpensesReview = {
         self._container.innerHTML = html;
 
         // Filter event listeners
-        var filterIds = ['erFProject', 'erFCategory', 'erFVendor', 'erFDateFrom', 'erFDateTo', 'erFBillable', 'erFInvoiced'];
-        var filterKeys = ['projectId', 'category', 'vendorId', 'dateFrom', 'dateTo', 'billable', 'invoiced'];
+        var filterIds = ['erFProject', 'erFCategory', 'erFVendor', 'erFDateFrom', 'erFDateTo', 'erFBillable', 'erFInvoiced', 'erFPayment'];
+        var filterKeys = ['projectId', 'category', 'vendorId', 'dateFrom', 'dateTo', 'billable', 'invoiced', 'payment'];
         filterIds.forEach(function(id, i) {
             var el = self._container.querySelector('#' + id);
             if (el) {
@@ -234,7 +272,7 @@ window.AdminExpensesReview = {
         var clearBtn = self._container.querySelector('#erClearFilters');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
-                self._filters = { projectId: '', category: '', vendorId: '', vendorSearch: '', dateFrom: '', dateTo: '', billable: '', invoiced: '' };
+                self._filters = { projectId: '', category: '', vendorId: '', vendorSearch: '', dateFrom: '', dateTo: '', billable: '', invoiced: '', payment: '' };
                 self._selected = [];
                 self._renderView();
             });
@@ -308,6 +346,8 @@ window.AdminExpensesReview = {
                 await self._bulkSetBillable(false);
             });
         }
+        var markPaidBtn = self._container.querySelector('#erMarkPaid');
+        if (markPaidBtn) markPaidBtn.addEventListener('click', function() { self._bulkMarkPaid(); });
 
         // Export CSV
         var exportBtn = self._container.querySelector('#erExportCsv');
@@ -361,7 +401,9 @@ window.AdminExpensesReview = {
             (worker ? '<div><strong>Worker:</strong> ' + esc(worker.name) + '</div>' : '') +
             '<div><strong>Amount:</strong> ' + Utils.formatCurrency(expense.amount) + '</div>' +
             '<div><strong>Billable:</strong> ' + (expense.billable ? 'Yes' : 'No') + '</div>' +
-            '<div><strong>Invoice Status:</strong> ' + esc(expense.invoiceStatus || 'N/A') + '</div>' +
+            '<div><strong>Payment:</strong> ' + esc(AppData.expensePaymentLabel(expense)) + '</div>' +
+            '<div><strong>Billed:</strong> ' + esc(expense.excludeFromInvoice ? 'Excluded from invoicing' + (expense.excludeReason ? ' (' + expense.excludeReason + ')' : '') : AppData.expenseBilledLabel(expense)) + '</div>' +
+            (expense.source_timecard_id ? '<div><strong>Source:</strong> timecard line (' + esc(expense.source_type || '') + ')</div>' : '') +
             (expense.changeOrder ? '<div><strong style="color:var(--warning)">Change Order</strong></div>' : '') +
             '</div>';
 
@@ -383,14 +425,31 @@ window.AdminExpensesReview = {
         html += '<div class="er-receipt-placeholder">' + (expense.receiptPhotoId ? '<em style="font-size:.8rem;color:var(--text-muted)">Loading receipt…</em>' : '') + '</div>';
 
         // Actions
-        if (expense.invoiceStatus !== 'Already Invoiced') {
-            html += '<div style="margin-top:10px;display:flex;gap:8px">' +
-                '<button class="btn btn-secondary btn-sm er-edit-btn" data-id="' + expense.id + '">Edit</button>' +
-                '<button class="btn btn-danger btn-sm er-del-btn" data-id="' + expense.id + '">Delete</button>' +
-                '</div>';
+        html += '<div style="margin-top:10px;display:flex;gap:8px">';
+        if (AppData.expensePaymentType(expense) === 'payable' && !AppData.expenseIsPaid(expense)) {
+            html += '<button class="btn btn-secondary btn-sm er-paid-btn" data-id="' + expense.id + '">Mark paid</button>';
         }
+        if (!AppData.expenseIsBilled(expense) && expense.status !== 'approved') {
+            html += '<button class="btn btn-secondary btn-sm er-edit-btn" data-id="' + expense.id + '">Edit</button>' +
+                '<button class="btn btn-danger btn-sm er-del-btn" data-id="' + expense.id + '">Delete</button>';
+        }
+        html += '</div>';
 
         expandRow.querySelector('td').innerHTML = html;
+
+        var paidBtn = expandRow.querySelector('.er-paid-btn');
+        if (paidBtn) {
+            paidBtn.addEventListener('click', async function() {
+                var paidDate = window.prompt('Paid on (YYYY-MM-DD)', Utils.today());
+                if (!paidDate) return;
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(paidDate)) { Utils.showToast('Enter the date as YYYY-MM-DD', 'error'); return; }
+                try {
+                    await AppData.updateExpensePayment(expense.id, { paidDate: paidDate });
+                    Utils.showToast('Marked paid ' + paidDate);
+                    window.AdminExpensesReview._renderView();
+                } catch (err) { Utils.showToast('Could not mark paid: ' + err.message, 'error'); }
+            });
+        }
 
         // Edit
         var editBtn = expandRow.querySelector('.er-edit-btn');
@@ -419,12 +478,29 @@ window.AdminExpensesReview = {
         }
     },
 
+    async _bulkMarkPaid() {
+        var self = this;
+        if (self._selected.length === 0) return;
+        var paidDate = window.prompt('Paid on (YYYY-MM-DD)', Utils.today());
+        if (!paidDate) return;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(paidDate)) { Utils.showToast('Enter the date as YYYY-MM-DD', 'error'); return; }
+        var done = 0, failed = 0;
+        for (var _pi = 0; _pi < self._selected.length; _pi++) {
+            var pe = AppData.getExpense(self._selected[_pi]);
+            if (!pe || AppData.expenseIsPaid(pe)) continue;
+            try { await AppData.updateExpensePayment(pe.id, { paidDate: paidDate }); done++; } catch (e) { failed++; }
+        }
+        Utils.showToast('Marked ' + done + ' paid' + (failed ? ', ' + failed + ' failed' : ''), failed ? 'error' : 'success');
+        self._selected = [];
+        self._renderView();
+    },
+
     async _bulkSetBillable(billable) {
         var self = this;
         if (self._selected.length === 0) return;
         for (var _bi = 0; _bi < self._selected.length; _bi++) {
             var exp = AppData.getExpense(self._selected[_bi]);
-            if (!exp || exp.invoiceStatus === 'Already Invoiced') continue;
+            if (!exp || AppData.expenseIsBilled(exp) || exp.status === 'approved') continue;
             exp.billable = billable;
             exp.invoiceStatus = billable ? 'Ready to Invoice' : 'N/A';
             try { await AppData.saveEntityAsync('expenses', exp); } catch (e) { /* non-critical */ }
@@ -440,18 +516,22 @@ window.AdminExpensesReview = {
         var projectMap = {};
         projects.forEach(function(p) { projectMap[p.id] = p.name; });
 
-        var header = ['Date', 'Project', 'Category', 'Vendor', 'Description', 'Amount', 'Billable', 'Invoiced', 'Change Order'];
+        var header = ['Date', 'Project', 'Category', 'Vendor', 'Description', 'Amount', 'Billable', 'Payment', 'Due', 'Paid', 'Billed', 'Invoice', 'Change Order'];
         var rows = expenses.map(function(e) {
             var vendorDisplay = e.vendorName || e.vendor || '';
             return [
                 esc(e.date || ''),
-                esc(projectMap[e.projectId] || ''),
+                esc(projectMap[e.projectId || e.project_id] || ''),
                 esc(e.category || ''),
                 esc(vendorDisplay),
                 esc(e.description || ''),
                 esc((parseFloat(e.amount) || 0).toFixed(2)),
                 esc(e.billable ? 'Yes' : 'No'),
-                esc(e.invoiceStatus === 'Already Invoiced' ? 'Yes' : 'No'),
+                esc(AppData.expensePaymentType(e)),
+                esc(AppData.expenseDueDate(e)),
+                esc(e.paidDate || (AppData.expensePaymentType(e) === 'paid' ? (e.date || '') : '')),
+                esc(AppData.expenseBilledState(e)),
+                esc(e.billedInvoiceNumber || ''),
                 esc(e.changeOrder ? 'Yes' : 'No')
             ].join(',');
         });
