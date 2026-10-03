@@ -360,7 +360,10 @@ window.WorkerTimeEntry = {
         }
 
         function removeDraftLocal(date) {
-            try { AppData.setData(draftKeyFor(date), null); } catch (e) {}
+            // Remove the key outright. Writing null left a "null" entry behind,
+            // which read back as a draft slot and cluttered the store.
+            try { localStorage.removeItem('ledgeman_' + draftKeyFor(date)); }
+            catch (e) { try { AppData.setData(draftKeyFor(date), null); } catch (e2) {} }
         }
 
         // ── One-time migration off the old date-less key ─────────────────
@@ -496,6 +499,69 @@ window.WorkerTimeEntry = {
                 };
         }
 
+        // Does this draft hold anything the worker typed or picked? A draft with
+        // nothing in it must never be stored or restored: it used to be written
+        // the moment the camera opened on a fresh form, and on reload it produced
+        // a "Draft restored" banner over an empty form while the day the worker
+        // was actually filling in sat unseen under another date key.
+        function draftHasContent(d) {
+            if (!d) return false;
+            var txt = ['description', 'startTime', 'endTime', 'subtaskId', 'units',
+                       'impactCodeId', 'impactHours', 'impactDescription', 'equipmentNote'];
+            for (var i = 0; i < txt.length; i++) {
+                if (d[txt[i]] != null && String(d[txt[i]]).trim() !== '') return true;
+            }
+            if (d.expenses  && d.expenses.length)  return true;
+            if (d.equipment && d.equipment.length) return true;
+            return false;
+        }
+
+        // Most recent draft with content held on this phone for this worker and
+        // project, whatever its date. Used when the form opens on a day that has
+        // no draft, so the worker lands back on the day they were working on.
+        function latestLocalDraft() {
+            var best = null;
+            try {
+                var storePrefix = 'ledgeman_' + DRAFT_KEY_PREFIX;
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (!k || k.indexOf(storePrefix) !== 0) continue;
+                    var dpart = k.slice(storePrefix.length);
+                    if (!_isDateStr(dpart)) continue;
+                    var d = readDraft(dpart);
+                    if (!d || !d.draftSavedAt || !draftHasContent(d)) continue;
+                    if (!_isDateStr(d.date)) d.date = dpart;
+                    if (!best || String(d.draftSavedAt) > String(best.draftSavedAt)) best = d;
+                }
+            } catch (e) { /* best effort */ }
+            return best;
+        }
+
+        // Same lookup against the server mirror: every draft this worker holds
+        // for the project, newest content wins.
+        function fetchLatestDraftFromServer(cb) {
+            var jwt = _clockJwt();
+            if (!jwt || !AppData.API_BASE) { cb(null); return; }
+            fetch(AppData.API_BASE + '/api/timeentry-drafts?projectId=' + encodeURIComponent(projectId), {
+                headers: { 'Authorization': 'Bearer ' + jwt }
+            }).then(function(r) { return r.ok ? r.json() : null; })
+              .then(function(j) {
+                  var best = null;
+                  ((j && j.drafts) || []).forEach(function(row) {
+                      var d = row && row.payload;
+                      if (!d || !d.draftSavedAt || !draftHasContent(d)) return;
+                      if (!_isDateStr(d.date)) d.date = row.date;
+                      if (!best || String(d.draftSavedAt) > String(best.draftSavedAt)) best = d;
+                  });
+                  cb(best);
+              })
+              .catch(function(e) { console.warn('[draft] server restore failed:', e && e.message); cb(null); });
+        }
+
+        // The date the open form is keyed to. Set on render and on every save,
+        // so a date change knows which day's draft the content is moving from.
+        var lastDraftDate = null;
+
         function saveDraft() {
             // An edit of a saved entry is not a draft: holding it as one would
             // leak its contents into the next new entry for that date.
@@ -507,7 +573,20 @@ window.WorkerTimeEntry = {
                 // Key by the date the form is actually for, so two days on the
                 // same project can never overwrite each other.
                 var dkey = _isDateStr(draft.date) ? draft.date : _todayStr();
+                if (!draftHasContent(draft)) {
+                    // Nothing typed yet: store nothing. An empty draft is not
+                    // worth a banner, and it must never shadow a real one.
+                    var hadLocal = !!readDraft(dkey);
+                    removeDraftLocal(dkey);
+                    if (hadLocal) clearDraftOnServer(dkey);
+                    draftDirty = false;
+                    draftLastSavedAt = null;
+                    lastDraftDate = dkey;
+                    updateDraftStatus();
+                    return;
+                }
                 AppData.setData(draftKeyFor(dkey), draft);
+                lastDraftDate = dkey;
                 draftDirty = false;
                 draftSaveFailed = false;
                 draftSaveWarned = false; // recovered — allow a future warning
@@ -571,6 +650,21 @@ window.WorkerTimeEntry = {
             // When editing an existing entry, the entry itself is the source of truth,
             // not a draft that may belong to other work on that day.
             var existingDraft = editOf ? null : readDraft(draftDate);
+            if (existingDraft && !draftHasContent(existingDraft)) {
+                // Written by an older build before anything was typed. Drop it
+                // rather than announce a restore of nothing.
+                removeDraftLocal(draftDate);
+                existingDraft = null;
+            }
+            // A new entry opened on a day with no draft: if the worker was part
+            // way through another day on this project, bring that day back,
+            // date included. Not for edits, prefilled entries or a clock-out,
+            // where the caller already knows which day and times this is for.
+            var allowLookBack = !editOf && !hasPrefill && !defaultStart && !defaultEnd;
+            if (!existingDraft && allowLookBack) {
+                var lb = latestLocalDraft();
+                if (lb) { existingDraft = lb; draftDate = lb.date; defaultDate = lb.date; }
+            }
             if (editOf) {
                 (defaults.equipmentEntries || []).forEach(function(e) {
                     selectedEquipment.push({ equipmentId: e.equipmentId, equipmentName: e.equipmentName, hours: e.hours });
@@ -602,6 +696,7 @@ window.WorkerTimeEntry = {
                 restoredFromDraft = true;
                 draftLastSavedAt  = existingDraft.draftSavedAt;
             }
+            lastDraftDate = _isDateStr(defaultDate) ? defaultDate : draftDate;
 
             var form = document.createElement('form');
             form.className = 'time-entry-form';
@@ -810,21 +905,26 @@ window.WorkerTimeEntry = {
             // response can never overwrite what the worker is typing.
             if (!editOf && !restoredFromDraft && !serverRestoreTried) {
                 serverRestoreTried = true;
-                (function(dateAtRender, startAtRender, endAtRender) {
-                    fetchDraftFromServer(dateAtRender, function(serverDraft) {
+                (function(dateAtRender, startAtRender, endAtRender, lookBack) {
+                    var fetchFn = lookBack
+                        ? fetchLatestDraftFromServer
+                        : function(cb) { fetchDraftFromServer(dateAtRender, cb); };
+                    fetchFn(function(serverDraft) {
                         if (!serverDraft || !serverDraft.draftSavedAt) return;
+                        if (!draftHasContent(serverDraft)) return;
                         if (userTouchedForm) return;
                         if (!document.getElementById('timeEntryForm')) return;
                         if (currentDraftDate() !== dateAtRender) return;
+                        var restoreDate = _isDateStr(serverDraft.date) ? serverDraft.date : dateAtRender;
                         try {
-                            AppData.setData(draftKeyFor(dateAtRender), serverDraft);
+                            AppData.setData(draftKeyFor(restoreDate), serverDraft);
                         } catch (e) { /* can't cache it locally; still restore below */ }
-                        renderCompleteForm(dateAtRender, startAtRender, endAtRender);
+                        renderCompleteForm(restoreDate, startAtRender, endAtRender);
                         try {
                             Utils.showToast('Your saved entry was restored from your account.', 'info');
                         } catch (e) {}
                     });
-                })(draftDate, defaultStart, defaultEnd);
+                })(draftDate, defaultStart, defaultEnd, allowLookBack);
             }
 
             // ── Draft restore banner ─────────────────────────────────────
@@ -833,7 +933,12 @@ window.WorkerTimeEntry = {
                 banner.id = 'teDraftBanner';
                 banner.style.cssText = 'background:rgba(52,152,219,.1);border:1px solid rgba(52,152,219,.35);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;display:flex;justify-content:space-between;align-items:flex-start;gap:12px';
                 var savedTime = existingDraft.draftSavedAt ? new Date(existingDraft.draftSavedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-                var bannerMsg = '📋 Draft restored from ' + savedTime + '.';
+                var savedDay = '';
+                try {
+                    var pd = String(existingDraft.date || defaultDate || '').split('-');
+                    if (pd.length === 3) savedDay = new Date(+pd[0], +pd[1] - 1, +pd[2]).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+                } catch (e) {}
+                var bannerMsg = '📋 Draft restored from ' + savedTime + (savedDay ? ' for ' + savedDay : '') + '.';
                 if (draftHadFiles) bannerMsg += ' Re-attach receipt files — files cannot be saved in drafts.';
                 banner.innerHTML =
                     '<span>' + bannerMsg + '</span>' +
@@ -965,7 +1070,24 @@ window.WorkerTimeEntry = {
             if (dateEl) {
                 dateEl.addEventListener('change', function() {
                     userTouchedForm = true;
+                    if (editOf) return;
+                    var fromDate = lastDraftDate;
+                    var toDate   = currentDraftDate();
+                    var cur      = _collectDraft(form);
+                    var target   = readDraft(toDate);
+                    if (!draftHasContent(cur) && target && draftHasContent(target)) {
+                        // An empty form moved onto a day that already holds work:
+                        // show that work instead of writing a blank over it.
+                        clearTimeout(draftSaveTimer);
+                        renderCompleteForm(toDate, target.startTime || '', target.endTime || '');
+                        return;
+                    }
                     saveDraft();
+                    if (fromDate && fromDate !== toDate && draftHasContent(cur)) {
+                        // The entry moved with its date; the old day's copy is now stale.
+                        removeDraftLocal(fromDate);
+                        clearDraftOnServer(fromDate);
+                    }
                 });
             }
 
