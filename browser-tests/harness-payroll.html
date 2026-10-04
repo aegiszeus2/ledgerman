@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<!--
+  harness-payroll.html — isolated test bed for the admin Payroll module (Pay Runs,
+  Deductions, Employees). Loads js/admin/payroll.js with the real Utils and UI against a
+  stub AppData and a fake fetch: no login, no network, no real company data.
+  Used by payroll-employees.spec.js.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+<div class="admin-content"><div id="adminContent"></div></div>
+<script src="../js/utils.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+window.__runs = [];
+window.__deds = [];
+window.__workers = [{ id: 'w1', name: 'Kosta S', defaultRate: 30 }, { id: 'w2', name: 'Jonathan Brewer', defaultRate: 28 }, { id: 'w4', name: 'Noah Unpaid', defaultRate: 25 }];
+window.__projects = [{ id: 'p1', name: 'Yard Work 4062' }];
+window.AppData = {
+    API_BASE: 'http://api.test',
+    getJwt: function() { return 'test-jwt'; },
+    getWorkers: function() { return window.__workers; },
+    getWorker: function(id) { return window.__workers.filter(function(w) { return w.id === id; })[0] || null; },
+    getProjects: function() { return window.__projects; },
+    getProject: function(id) { return window.__projects.filter(function(p) { return p.id === id; })[0] || null; },
+    generateId: function() { return 'id' + Math.random().toString(36).slice(2, 10); },
+    addAuditLog: function() {}
+};
+window.App = { currentUser: { type: 'admin', name: 'Damiano' } };
+window.LMIcons = new Proxy({}, { get: function() { return ''; } });
+window.fetch = function(url) {
+    var u = String(url);
+    if (u.indexOf('/api/payroll_runs') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__runs), { status: 200 }));
+    if (u.indexOf('/api/payroll_deductions') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__deds), { status: 200 }));
+    return Promise.resolve(new Response('{"error":"not found"}', { status: 404 }));
+};
+</script>
+<script src="../js/admin/payroll.js"></script>
+<script>
+window.load = function(runs, deds, tab) {
+    window.__runs = runs || [];
+    window.__deds = deds || [];
+    AdminPayroll._tab = tab || 'runs';
+    AdminPayroll._empId = '';
+    return AdminPayroll.render(document.getElementById('adminContent'));
+};
+</script>
+</body>
+</html>

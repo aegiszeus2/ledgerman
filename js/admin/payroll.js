@@ -9,8 +9,9 @@
 // Storage: generic entities 'payroll_runs' and 'payroll_deductions' on the server.
 // Both are admin-only on the backend (workers and supervisors get 403).
 window.AdminPayroll = {
-    _tab: 'runs',          // 'runs' | 'deductions'
+    _tab: 'runs',          // 'runs' | 'deductions' | 'employees'
     _view: 'list',         // 'list' | 'new' | 'detail'
+    _empId: '',            // employee whose pay history is open on the Employees tab
     _runs: [],
     _deductions: [],
     _detailId: null,
@@ -130,12 +131,15 @@ window.AdminPayroll = {
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     ${self._tab === 'runs'
                         ? '<button class="btn-primary btn-sm" id="payNewRunBtn">+ New Pay Run</button>'
-                        : '<button class="btn-primary btn-sm" id="payAddDedBtn">+ Add Deduction</button>'}
+                        : self._tab === 'deductions'
+                            ? '<button class="btn-primary btn-sm" id="payAddDedBtn">+ Add Deduction</button>'
+                            : (self._empId ? '<button class="btn-secondary btn-sm" id="payEmpPrintBtn">Print statement</button>' : '')}
                 </div>
             </div>
             <div class="tabs" style="margin-bottom:16px">
                 <button class="tab-btn ${self._tab === 'runs' ? 'active' : ''}" data-tab="runs">Pay Runs (${self._runs.length})</button>
                 <button class="tab-btn ${self._tab === 'deductions' ? 'active' : ''}" data-tab="deductions">Deductions ${openDed.length ? '<span class="badge-gold" style="margin-left:6px">' + openDed.length + ' open</span>' : ''}</button>
+                <button class="tab-btn ${self._tab === 'employees' ? 'active' : ''}" data-tab="employees">Employees (${self._employeeHistory().length})</button>
             </div>
             <div id="payrollContent"></div>
         `;
@@ -146,9 +150,12 @@ window.AdminPayroll = {
         if (newBtn) newBtn.addEventListener('click', function() { self._startNewRun(); });
         const addBtn = c.querySelector('#payAddDedBtn');
         if (addBtn) addBtn.addEventListener('click', function() { self._showDeductionModal(null); });
+        const empPrint = c.querySelector('#payEmpPrintBtn');
+        if (empPrint) empPrint.addEventListener('click', function() { window.print(); });
 
         const el = c.querySelector('#payrollContent');
         if (self._tab === 'runs') self._renderRunsList(el);
+        else if (self._tab === 'employees') self._renderEmployees(el);
         else self._renderDeductions(el);
     },
 
@@ -479,7 +486,7 @@ window.AdminPayroll = {
                 const deds = Array.isArray(l.deductions) ? l.deductions : [];
                 return '<div class="card">' +
                     '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">' +
-                        '<strong style="font-size:1.05rem">' + Utils.escapeHtml(l.workerName) + '</strong>' +
+                        '<strong style="font-size:1.05rem">' + Utils.escapeHtml(l.workerName) + ' <button class="btn-secondary btn-sm pay-emp-link" data-wid="' + Utils.escapeHtml(l.workerId) + '" style="font-size:.72rem;padding:2px 8px;margin-left:6px;vertical-align:middle">Pay history</button></strong>' +
                         '<span>' + self._num(l.hours).toFixed(2) + ' h @ ' + self._money(l.rate) + ' = ' + self._money(l.gross) + (l.deductionTotal ? ' &minus; ' + self._money(l.deductionTotal) : '') + ' = <strong>' + self._money(l.net) + ' net</strong></span>' +
                     '</div>' +
                     (days.length ? '<table style="margin-top:8px;font-size:.85rem"><thead><tr><th>Day</th><th>Project</th><th class="amount">Hours</th></tr></thead><tbody>' +
@@ -495,6 +502,9 @@ window.AdminPayroll = {
         `;
         c.querySelector('#payBackBtn').addEventListener('click', function() { self._view = 'list'; self._renderContent(); });
         c.querySelector('#payPrintBtn').addEventListener('click', function() { window.print(); });
+        c.querySelectorAll('.pay-emp-link').forEach(function(b) {
+            b.addEventListener('click', function() { self._empId = b.dataset.wid; self._tab = 'employees'; self._view = 'list'; self._renderContent(); });
+        });
         c.querySelector('#payDeleteBtn').addEventListener('click', async function() {
             const ok = await Utils.confirm('Delete this pay run? The hours go back to unpaid and any deductions taken in it reopen. This does not reverse any money already sent.');
             if (!ok) return;
@@ -530,6 +540,151 @@ window.AdminPayroll = {
         else Utils.showToast('Pay run deleted');
         self._view = 'list';
         self._renderContent();
+    },
+
+    // ── employees: pay history per person across every run ──────────────────
+    // Built from the recorded runs only, so it always agrees with the Pay Runs tab
+    // to the cent. One entry per employee who appears on at least one run line.
+    _employeeHistory() {
+        const self = this;
+        const by = {};
+        (self._runs || []).forEach(function(r) {
+            (Array.isArray(r.lines) ? r.lines : []).forEach(function(l) {
+                const wid = String(l.workerId || '');
+                if (!by[wid]) {
+                    const w = AppData.getWorker(wid);
+                    by[wid] = { workerId: wid, workerName: (w && w.name) || l.workerName || wid || 'Unknown', runs: 0, hours: 0, gross: 0, deductions: 0, net: 0, firstPaid: '', lastPaid: '', entries: [] };
+                }
+                const e = by[wid];
+                const hrs = self._num(l.hours) || self._lineHours(l);
+                const gross = self._num(l.gross), ded = self._num(l.deductionTotal), net = l.net !== undefined ? self._num(l.net) : self._round2(gross - ded);
+                e.runs += 1;
+                e.hours = self._round2(e.hours + hrs); e.gross = self._round2(e.gross + gross);
+                e.deductions = self._round2(e.deductions + ded); e.net = self._round2(e.net + net);
+                const paid = String(r.paidDate || '').slice(0, 10);
+                if (paid && (!e.firstPaid || paid < e.firstPaid)) e.firstPaid = paid;
+                if (paid && (!e.lastPaid || paid > e.lastPaid)) e.lastPaid = paid;
+                e.entries.push({
+                    runId: r.id, periodStart: r.periodStart, periodEnd: r.periodEnd, paidDate: r.paidDate,
+                    method: r.method || '', reference: r.reference || '',
+                    hours: hrs, regularHours: self._num(l.regularHours), otHours: self._num(l.otHours), dtHours: self._num(l.dtHours),
+                    rate: self._num(l.rate), gross: gross, deductionTotal: ded, net: net,
+                    deductions: Array.isArray(l.deductions) ? l.deductions : [],
+                    days: Array.isArray(l.days) ? l.days : []
+                });
+            });
+        });
+        const list = Object.keys(by).map(function(k) { return by[k]; });
+        list.forEach(function(e) {
+            e.entries.sort(function(a, b) {
+                return String(b.paidDate || '').localeCompare(String(a.paidDate || '')) || String(b.periodEnd || '').localeCompare(String(a.periodEnd || ''));
+            });
+        });
+        list.sort(function(a, b) { return a.workerName.localeCompare(b.workerName); });
+        return list;
+    },
+
+    _owingFor(workerId) {
+        const self = this;
+        return self._round2(self._openDeductions(workerId).reduce(function(s, d) { return s + self._remaining(d); }, 0));
+    },
+
+    _renderEmployees(el) {
+        const self = this;
+        const hist = self._employeeHistory();
+        const workers = (AppData.getWorkers ? AppData.getWorkers() : []).slice().sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+        // every current worker, plus anyone on a run who is no longer on the crew list
+        const options = workers.map(function(w) { return { id: String(w.id), name: w.name }; });
+        hist.forEach(function(e) { if (!options.some(function(o) { return o.id === e.workerId; })) options.push({ id: e.workerId, name: e.workerName }); });
+        options.sort(function(a, b) { return String(a.name).localeCompare(String(b.name)); });
+
+        let html = '<div class="card" style="padding:10px 14px"><div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
+            '<div class="form-group" style="margin:0;min-width:200px"><label style="font-size:.78rem">Employee</label><select class="form-control" id="payEmpSelect"><option value="">All employees, one line each</option>' +
+                options.map(function(o) { return '<option value="' + Utils.escapeHtml(o.id) + '"' + (o.id === String(self._empId) ? ' selected' : '') + '>' + Utils.escapeHtml(o.name) + '</option>'; }).join('') +
+            '</select></div></div></div>';
+
+        if (!self._empId) html += self._employeeSummaryHtml(hist);
+        else html += self._employeeStatementHtml(hist.find(function(e) { return e.workerId === String(self._empId); }) || null);
+        el.innerHTML = html;
+
+        el.querySelector('#payEmpSelect').addEventListener('change', function(e) { self._empId = e.target.value; self._renderContent(); });
+        el.querySelectorAll('.pay-emp-open').forEach(function(b) {
+            b.addEventListener('click', function() { self._empId = b.dataset.wid; self._renderContent(); });
+        });
+        el.querySelectorAll('.pay-emp-run').forEach(function(b) {
+            b.addEventListener('click', function() { self._detailId = b.dataset.run; self._view = 'detail'; self._renderContent(); });
+        });
+    },
+
+    _employeeSummaryHtml(hist) {
+        const self = this;
+        if (hist.length === 0) {
+            return '<div class="card"><div class="empty"><h3>Nobody has been paid yet</h3><p>Once a pay run is recorded, every employee on it gets a line here with everything they have been paid across all runs.</p></div></div>';
+        }
+        let tH = 0, tG = 0, tD = 0, tN = 0;
+        const rows = hist.map(function(e) {
+            tH += e.hours; tG += e.gross; tD += e.deductions; tN += e.net;
+            const owing = self._owingFor(e.workerId);
+            return '<tr class="pay-emp-row" data-wid="' + Utils.escapeHtml(e.workerId) + '">' +
+                '<td><strong>' + Utils.escapeHtml(e.workerName) + '</strong>' + (owing ? '<div style="font-size:.75rem;color:#b8860b">' + self._money(owing) + ' still owing</div>' : '') + '</td>' +
+                '<td class="amount">' + e.runs + '</td>' +
+                '<td class="amount">' + e.hours.toFixed(2) + '</td>' +
+                '<td class="amount">' + self._money(e.gross) + '</td>' +
+                '<td class="amount">' + (e.deductions ? '-' + self._money(e.deductions) : '—') + '</td>' +
+                '<td class="amount"><strong>' + self._money(e.net) + '</strong></td>' +
+                '<td style="white-space:nowrap;font-size:.85rem">' + Utils.escapeHtml(self._dayDate(e.lastPaid)) + '</td>' +
+                '<td style="white-space:nowrap"><button class="btn-secondary btn-sm pay-emp-open" data-wid="' + Utils.escapeHtml(e.workerId) + '">View</button></td>' +
+            '</tr>';
+        }).join('');
+        return '<div class="card" style="overflow-x:auto"><table>' +
+            '<thead><tr><th>Employee</th><th class="amount">Pay runs</th><th class="amount">Hours</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net paid</th><th>Last paid</th><th></th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '<tfoot><tr style="font-weight:600"><td>Total, ' + hist.length + ' employee' + (hist.length === 1 ? '' : 's') + '</td><td></td><td class="amount">' + self._round2(tH).toFixed(2) + '</td><td class="amount">' + self._money(tG) + '</td><td class="amount">' + (tD ? '-' + self._money(tD) : '') + '</td><td class="amount">' + self._money(tN) + '</td><td></td><td></td></tr></tfoot>' +
+            '</table></div>';
+    },
+
+    _employeeStatementHtml(e) {
+        const self = this;
+        const name = e ? e.workerName : self._workerName(self._empId);
+        const owing = self._owingFor(self._empId);
+        const openDeds = self._openDeductions(self._empId);
+        let html = '<div class="card" id="payEmpStatement" style="font-size:.9rem">' +
+            '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">' +
+                '<strong style="font-size:1.1rem">' + Utils.escapeHtml(name) + ', pay history</strong>' +
+                (e ? '<span>' + e.runs + ' pay run' + (e.runs === 1 ? '' : 's') + ', ' + Utils.escapeHtml(self._dayDate(e.firstPaid)) + (e.firstPaid !== e.lastPaid ? ' to ' + Utils.escapeHtml(self._dayDate(e.lastPaid)) : '') + '</span>' : '') +
+            '</div>';
+        if (e) {
+            html += '<div style="margin-top:6px"><strong>' + e.hours.toFixed(2) + ' hours</strong>, gross ' + self._money(e.gross) + (e.deductions ? ' &minus; deductions ' + self._money(e.deductions) : '') + ' = <strong>' + self._money(e.net) + ' net paid</strong></div>';
+        }
+        if (owing) {
+            html += '<div style="margin-top:6px;color:#b8860b">' + self._money(owing) + ' still owing: ' + openDeds.map(function(d) { return Utils.escapeHtml(d.description || d.type || 'Deduction') + ' ' + self._money(self._remaining(d)); }).join(', ') + '</div>';
+        }
+        html += '</div>';
+
+        if (!e) {
+            html += '<div class="card"><div class="empty"><h3>No pay recorded for ' + Utils.escapeHtml(name) + '</h3><p>They have not been on any pay run yet.' + (owing ? ' Their open deductions are listed above and will come off their first run.' : '') + '</p></div></div>';
+            return html;
+        }
+        const rows = e.entries.map(function(x) {
+            const breakdown = (x.otHours || x.dtHours) ? '<div style="font-size:.75rem;color:var(--text2)">' + x.regularHours + ' reg' + (x.otHours ? ' + ' + x.otHours + ' OT' : '') + (x.dtHours ? ' + ' + x.dtHours + ' DT' : '') + '</div>' : '';
+            const dedTxt = x.deductions.length ? '<div style="font-size:.75rem;color:var(--text2)">' + x.deductions.map(function(d) { return Utils.escapeHtml(d.description || d.type || 'Deduction') + ' ' + self._money(d.amount); }).join(', ') + '</div>' : '';
+            return '<tr class="pay-emp-entry" data-run="' + Utils.escapeHtml(x.runId) + '">' +
+                '<td style="white-space:nowrap">' + Utils.escapeHtml(self._dayDate(x.periodStart)) + ' to ' + Utils.escapeHtml(self._dayDate(x.periodEnd)) + '</td>' +
+                '<td style="white-space:nowrap;font-size:.85rem">' + Utils.escapeHtml(self._dayDate(x.paidDate)) + (x.method ? '<br><span style="color:var(--text2)">' + Utils.escapeHtml(x.method) + (x.reference ? ', ' + Utils.escapeHtml(x.reference) : '') + '</span>' : '') + '</td>' +
+                '<td class="amount">' + self._num(x.hours).toFixed(2) + breakdown + '</td>' +
+                '<td class="amount">' + self._money(x.rate) + '</td>' +
+                '<td class="amount">' + self._money(x.gross) + '</td>' +
+                '<td class="amount">' + (x.deductionTotal ? '-' + self._money(x.deductionTotal) : '—') + dedTxt + '</td>' +
+                '<td class="amount"><strong>' + self._money(x.net) + '</strong></td>' +
+                '<td style="white-space:nowrap"><button class="btn-secondary btn-sm pay-emp-run" data-run="' + Utils.escapeHtml(x.runId) + '" style="font-size:.75rem;padding:3px 10px">Run</button></td>' +
+            '</tr>';
+        }).join('');
+        html += '<div class="card" style="overflow-x:auto"><table>' +
+            '<thead><tr><th>Period</th><th>Paid</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net</th><th></th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '<tfoot><tr style="font-weight:600"><td>Total</td><td></td><td class="amount">' + e.hours.toFixed(2) + '</td><td></td><td class="amount">' + self._money(e.gross) + '</td><td class="amount">' + (e.deductions ? '-' + self._money(e.deductions) : '') + '</td><td class="amount">' + self._money(e.net) + '</td><td></td></tr></tfoot>' +
+            '</table></div>';
+        return html;
     },
 
     // ── deductions ───────────────────────────────────────────────────────────
