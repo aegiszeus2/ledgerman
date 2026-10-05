@@ -254,7 +254,8 @@ window.AdminPayroll = {
                     rate: w ? self._num(w.defaultRate) : 0,
                     regularHours: 0, otHours: 0, dtHours: 0,
                     days: [], timecardIds: [],
-                    deductions: []
+                    deductions: [],
+                    pay: true   // untick on the form to leave this person out of the run
                 };
             }
             const line = byWorker[wid];
@@ -303,11 +304,18 @@ window.AdminPayroll = {
                 (d.alreadyPaid ? ' ' + d.alreadyPaid + ' already paid in an earlier run.' : '') + '</p></div></div>';
         } else {
             let totHours = 0, totGross = 0, totDed = 0;
-            tableHtml = '<div class="card" style="overflow-x:auto"><table>' +
-                '<thead><tr><th>Employee</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th>Deductions this run</th><th class="amount">Net</th></tr></thead><tbody>' +
+            const paying = lines.filter(function(l) { return l.pay !== false; }).length;
+            tableHtml = '<div class="card" style="border-left:3px solid var(--primary,#2d6cdf);font-size:.88rem" id="payPickNote">' +
+                (paying === lines.length
+                    ? 'Everyone with approved hours in this period is listed. To pay one person on their own, untick the others. Anyone left unticked is not paid in this run and their hours come back the next time you load a run.'
+                    : 'Paying ' + paying + ' of ' + lines.length + '. The unticked ' + (lines.length - paying === 1 ? 'person is' : 'people are') + ' left out of this run and their hours stay unpaid until you include them in a later run.') +
+                '</div>' +
+                '<div class="card" style="overflow-x:auto"><table>' +
+                '<thead><tr><th>Pay</th><th>Employee</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th>Deductions this run</th><th class="amount">Net</th></tr></thead><tbody>' +
                 lines.map(function(l, i) {
+                    const inRun = l.pay !== false;
                     const hrs = self._lineHours(l), gross = self._lineGross(l), ded = self._lineDeductions(l), net = self._round2(gross - ded);
-                    totHours += hrs; totGross += gross; totDed += ded;
+                    if (inRun) { totHours += hrs; totGross += gross; totDed += ded; }
                     const breakdown = (l.otHours || l.dtHours) ? '<div style="font-size:.75rem;color:var(--text2)">' + l.regularHours + ' reg' + (l.otHours ? ' + ' + l.otHours + ' OT x1.5' : '') + (l.dtHours ? ' + ' + l.dtHours + ' DT x2' : '') + '</div>' : '';
                     const daysHtml = '<div style="font-size:.75rem;color:var(--text2);margin-top:4px">' + l.days.map(function(dd) { return Utils.escapeHtml(self._dayDate(dd.date)) + ' ' + dd.hours + 'h'; }).join(' · ') + '</div>';
                     const dedHtml = (l.deductions.length === 0)
@@ -320,8 +328,9 @@ window.AdminPayroll = {
                             '</div>';
                         }).join('');
                     const rateWarn = self._num(l.rate) > 0 ? '' : '<div style="font-size:.72rem;color:var(--accent)">No pay rate on file</div>';
-                    return '<tr>' +
-                        '<td><strong>' + Utils.escapeHtml(l.workerName) + '</strong>' + daysHtml + '</td>' +
+                    return '<tr class="pay-line' + (inRun ? '' : ' pay-line-out') + '" data-wid="' + Utils.escapeHtml(l.workerId) + '"' + (inRun ? '' : ' style="opacity:.45"') + '>' +
+                        '<td><input type="checkbox" class="pay-line-include" data-i="' + i + '" aria-label="Pay ' + Utils.escapeHtml(l.workerName) + ' in this run"' + (inRun ? ' checked' : '') + '></td>' +
+                        '<td><strong>' + Utils.escapeHtml(l.workerName) + '</strong>' + (inRun ? '' : ' <span style="font-size:.72rem;color:var(--text2)">left out of this run</span>') + daysHtml + '</td>' +
                         '<td class="amount">' + hrs.toFixed(2) + breakdown + '</td>' +
                         '<td class="amount"><input type="number" step="0.01" min="0" class="form-control pay-rate" data-i="' + i + '" value="' + self._num(l.rate) + '" style="width:90px;padding:3px 6px;text-align:right">' + rateWarn + '</td>' +
                         '<td class="amount">' + self._money(gross) + '</td>' +
@@ -329,7 +338,7 @@ window.AdminPayroll = {
                         '<td class="amount"><strong>' + self._money(net) + '</strong></td>' +
                     '</tr>';
                 }).join('') +
-                '</tbody><tfoot><tr style="font-weight:600"><td>Total</td><td class="amount">' + self._round2(totHours).toFixed(2) + '</td><td></td><td class="amount">' + self._money(totGross) + '</td><td class="amount">' + (totDed ? '-' + self._money(totDed) : '') + '</td><td class="amount">' + self._money(totGross - totDed) + '</td></tr></tfoot></table></div>';
+                '</tbody><tfoot><tr style="font-weight:600"><td></td><td>Total, ' + paying + ' of ' + lines.length + ' paid</td><td class="amount">' + self._round2(totHours).toFixed(2) + '</td><td></td><td class="amount">' + self._money(totGross) + '</td><td class="amount">' + (totDed ? '-' + self._money(totDed) : '') + '</td><td class="amount">' + self._money(totGross - totDed) + '</td></tr></tfoot></table></div>';
             const notes = [];
             if (d.pendingCount) notes.push(d.pendingCount + ' timecard' + (d.pendingCount === 1 ? '' : 's') + ' in this period still pending approval and not included.');
             if (d.alreadyPaid) notes.push(d.alreadyPaid + ' approved timecard' + (d.alreadyPaid === 1 ? '' : 's') + ' already paid in an earlier run, left out.');
@@ -368,6 +377,9 @@ window.AdminPayroll = {
             const restore = UI.btnLoading ? UI.btnLoading(c.querySelector('#payLoadBtn'), 'Loading…') : function() {};
             self._loadHours().finally(restore);
         });
+        c.querySelectorAll('.pay-line-include').forEach(function(cb) {
+            cb.addEventListener('change', function() { lines[+cb.dataset.i].pay = cb.checked; self._renderContent(); });
+        });
         c.querySelectorAll('.pay-rate').forEach(function(inp) {
             inp.addEventListener('change', function() { lines[+inp.dataset.i].rate = self._num(inp.value); self._renderContent(); });
         });
@@ -398,13 +410,15 @@ window.AdminPayroll = {
         const d = self._draft;
         const btn = self._container.querySelector('#payRecordBtn');
         if (!d || !d.lines || !d.lines.length) return;
+        const picked = d.lines.filter(function(l) { return l.pay !== false; });
+        if (!picked.length) { Utils.showToast('Tick at least one person to pay', 'error'); return; }
         if (!d.paidDate) { Utils.showToast('Enter the date it was paid', 'error'); return; }
-        const zeroRate = d.lines.filter(function(l) { return self._lineHours(l) > 0 && self._num(l.rate) <= 0; });
+        const zeroRate = picked.filter(function(l) { return self._lineHours(l) > 0 && self._num(l.rate) <= 0; });
         if (zeroRate.length) {
             const ok = await Utils.confirm(zeroRate.map(function(l) { return l.workerName; }).join(', ') + ' would be paid at $0 an hour. Record anyway?');
             if (!ok) return;
         }
-        const lines = d.lines.map(function(l) {
+        const lines = picked.map(function(l) {
             const gross = self._lineGross(l), ded = self._lineDeductions(l);
             return {
                 workerId: l.workerId, workerName: l.workerName, rate: self._num(l.rate),

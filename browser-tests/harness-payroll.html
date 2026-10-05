@@ -19,6 +19,9 @@
 <script>
 window.__runs = [];
 window.__deds = [];
+window.__approved = [];   // approved timecards offered to New Pay Run
+window.__pending = [];
+window.__posted = [];     // every POST body, so a spec can read what would be recorded
 window.__workers = [{ id: 'w1', name: 'Kosta S', defaultRate: 30 }, { id: 'w2', name: 'Jonathan Brewer', defaultRate: 28 }, { id: 'w4', name: 'Noah Unpaid', defaultRate: 25 }];
 window.__projects = [{ id: 'p1', name: 'Yard Work 4062' }];
 window.AppData = {
@@ -33,10 +36,18 @@ window.AppData = {
 };
 window.App = { currentUser: { type: 'admin', name: 'Damiano' } };
 window.LMIcons = new Proxy({}, { get: function() { return ''; } });
-window.fetch = function(url) {
+window.fetch = function(url, opts) {
     var u = String(url);
+    if (opts && opts.method === 'POST') {
+        var body = JSON.parse(opts.body);
+        window.__posted.push({ url: u, body: body });
+        if (u.indexOf('/api/payroll_runs') !== -1) window.__runs = window.__runs.concat([body]);
+        return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    }
     if (u.indexOf('/api/payroll_runs') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__runs), { status: 200 }));
     if (u.indexOf('/api/payroll_deductions') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__deds), { status: 200 }));
+    if (u.indexOf('/api/timecards?status=approved') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__approved), { status: 200 }));
+    if (u.indexOf('/api/timecards?status=pending') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__pending), { status: 200 }));
     return Promise.resolve(new Response('{"error":"not found"}', { status: 404 }));
 };
 </script>
