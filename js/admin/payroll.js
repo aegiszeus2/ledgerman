@@ -170,17 +170,22 @@ window.AdminPayroll = {
             return;
         }
         el.innerHTML = '<div class="card"><table>' +
-            '<thead><tr><th>Period</th><th>Employees</th><th class="amount">Hours</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net paid</th><th>Paid</th><th></th></tr></thead><tbody>' +
+            '<thead><tr><th>Period</th><th>Employees</th><th class="amount">Hours</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net due</th><th class="amount">Net paid</th><th>Paid</th><th></th></tr></thead><tbody>' +
             runs.map(function(r) {
                 const t = r.totals || {};
                 const lines = Array.isArray(r.lines) ? r.lines : [];
-                return '<tr>' +
+                const carried = self._num(t.carriedIn);
+                const due = t.due !== undefined ? self._num(t.due) : self._round2(self._num(t.net) + carried);
+                const paidAmt = t.paid !== undefined ? self._num(t.paid) : self._num(t.net);
+                const short = self._num(t.shortfall);
+                return '<tr class="pay-run-row" data-id="' + Utils.escapeHtml(r.id) + '">' +
                     '<td style="white-space:nowrap">' + Utils.escapeHtml(self._dayDate(r.periodStart)) + ' to ' + Utils.escapeHtml(self._dayDate(r.periodEnd)) + '</td>' +
                     '<td>' + Utils.escapeHtml(lines.map(function(l) { return l.workerName; }).join(', ')) + '</td>' +
                     '<td class="amount">' + self._num(t.hours).toFixed(2) + '</td>' +
                     '<td class="amount">' + self._money(t.gross) + '</td>' +
                     '<td class="amount">' + (self._num(t.deductions) ? '-' + self._money(t.deductions) : '—') + '</td>' +
-                    '<td class="amount"><strong>' + self._money(t.net) + '</strong></td>' +
+                    '<td class="amount">' + self._money(due) + (carried ? '<div style="font-size:.72rem;color:var(--text2)">incl. ' + self._money(carried) + ' carried in</div>' : '') + '</td>' +
+                    '<td class="amount"><strong>' + self._money(paidAmt) + '</strong>' + (short > 0.005 ? '<div class="pay-run-short" style="font-size:.72rem;color:#b8860b">' + self._money(short) + ' unsettled</div>' : '') + '</td>' +
                     '<td style="white-space:nowrap;font-size:.85rem">' + Utils.escapeHtml(self._dayDate(r.paidDate)) + (r.method ? '<br><span style="color:var(--text2)">' + Utils.escapeHtml(r.method) + '</span>' : '') + '</td>' +
                     '<td style="white-space:nowrap"><button class="btn-secondary btn-sm pay-view-btn" data-id="' + Utils.escapeHtml(r.id) + '">View</button></td>' +
                 '</tr>';
@@ -267,6 +272,22 @@ window.AdminPayroll = {
             line.days.push({ date: String(tc.date || '').slice(0, 10), projectName: p ? p.name : (tc.projectId || ''), hours: self._round2(reg + ot + dt), timecardId: tc.id });
             line.timecardIds.push(tc.id);
         });
+        // Anyone still owed an unsettled balance from an earlier run gets a line even with
+        // no hours this period, so the balance can be settled on its own.
+        const unsettledBy = self._unsettledByWorker();
+        Object.keys(unsettledBy).forEach(function(wid) {
+            if (byWorker[wid]) return;
+            const w = AppData.getWorker(wid);
+            byWorker[wid] = {
+                workerId: wid,
+                workerName: w ? w.name : (unsettledBy[wid][0].workerName || wid || 'Unknown'),
+                rate: w ? self._num(w.defaultRate) : 0,
+                regularHours: 0, otHours: 0, dtHours: 0,
+                days: [], timecardIds: [],
+                deductions: [],
+                pay: true
+            };
+        });
         const lines = Object.keys(byWorker).map(function(k) { return byWorker[k]; });
         lines.sort(function(a, b) { return a.workerName.localeCompare(b.workerName); });
         lines.forEach(function(l) {
@@ -274,9 +295,89 @@ window.AdminPayroll = {
             l.deductions = self._openDeductions(l.workerId).map(function(dd) {
                 return { deductionId: dd.id, description: dd.description || dd.type || 'Deduction', type: dd.type || '', remaining: self._remaining(dd), amount: self._remaining(dd), apply: true };
             });
+            l.carriedIn = (unsettledBy[l.workerId] || []).map(function(b) {
+                return { runId: b.runId, periodStart: b.periodStart, periodEnd: b.periodEnd, paidDate: b.paidDate, amount: b.amount, reason: b.reason || '' };
+            });
+            l.paid = null;          // null = pay in full; a number = what was actually paid this run
+            l.shortReason = '';
         });
         d.lines = lines;
         self._renderContent();
+    },
+
+    // ── unsettled balances ───────────────────────────────────────────────────
+    // A run line can record less than what was due (a partial payment). The gap is the
+    // line's shortfall and it stays owed to the employee until a later run carries it in
+    // and pays it. Nothing is stored for this beyond the run lines themselves: the open
+    // balance is always shortfall minus whatever later runs have carried in against it.
+    _lineCarriedIn(l) {
+        const self = this;
+        return self._round2((l.carriedIn || []).reduce(function(s, b) { return s + self._num(b.amount); }, 0));
+    },
+    // What is owed on a line this run: this period's net plus any balance brought forward.
+    _lineDue(l) {
+        return this._round2(this._round2(this._lineGross(l) - this._lineDeductions(l)) + this._lineCarriedIn(l));
+    },
+    _linePaid(l) {
+        const due = this._lineDue(l);
+        if (l.paid === null || l.paid === undefined) return due;
+        const p = this._round2(this._num(l.paid));
+        return p > due ? due : (p < 0 ? 0 : p);
+    },
+    _lineShortfall(l) { return this._round2(this._lineDue(l) - this._linePaid(l)); },
+
+    // Saved runs: the amount actually paid and the shortfall, tolerant of runs recorded
+    // before partial payments existed (paid in full, nothing carried).
+    _savedPaid(l) { return l.paid !== undefined && l.paid !== null ? this._num(l.paid) : this._num(l.net); },
+    _savedShortfall(l) { return this._round2(this._num(l.shortfall)); },
+
+    // Every unsettled balance, keyed by worker: one entry per earlier run line whose
+    // shortfall has not been fully carried into a later run. Oldest first.
+    _unsettledByWorker() {
+        const self = this;
+        const settled = {};   // runId -> amount later runs have carried in against it
+        (self._runs || []).forEach(function(r) {
+            (Array.isArray(r.lines) ? r.lines : []).forEach(function(l) {
+                (Array.isArray(l.carriedIn) ? l.carriedIn : []).forEach(function(b) {
+                    settled[String(b.runId)] = self._round2((settled[String(b.runId)] || 0) + self._num(b.amount));
+                });
+            });
+        });
+        const by = {};
+        (self._runs || []).forEach(function(r) {
+            (Array.isArray(r.lines) ? r.lines : []).forEach(function(l) {
+                const short = self._savedShortfall(l);
+                if (short <= 0.005) return;
+                const remaining = self._round2(short - (settled[String(r.id)] || 0));
+                if (remaining <= 0.005) return;
+                const wid = String(l.workerId || '');
+                if (!by[wid]) by[wid] = [];
+                by[wid].push({ runId: r.id, workerName: l.workerName, periodStart: r.periodStart, periodEnd: r.periodEnd, paidDate: r.paidDate, amount: remaining, reason: l.shortReason || '' });
+            });
+        });
+        Object.keys(by).forEach(function(wid) {
+            by[wid].sort(function(a, b) { return String(a.paidDate || '').localeCompare(String(b.paidDate || '')) || String(a.periodEnd || '').localeCompare(String(b.periodEnd || '')); });
+        });
+        return by;
+    },
+    _unsettledFor(workerId) {
+        return this._unsettledByWorker()[String(workerId)] || [];
+    },
+    _unsettledTotal(workerId) {
+        const self = this;
+        return self._round2(self._unsettledFor(workerId).reduce(function(s, b) { return s + self._num(b.amount); }, 0));
+    },
+    // Runs that have carried a balance in from the given run (so it cannot be deleted first).
+    _runsSettling(runId) {
+        return (this._runs || []).filter(function(r) {
+            return (Array.isArray(r.lines) ? r.lines : []).some(function(l) {
+                return (Array.isArray(l.carriedIn) ? l.carriedIn : []).some(function(b) { return String(b.runId) === String(runId); });
+            });
+        });
+    },
+    _balanceLabel(b) {
+        const self = this;
+        return self._money(b.amount) + ' from ' + self._dayDate(b.periodStart) + ' to ' + self._dayDate(b.periodEnd) + ', unsettled since ' + self._dayDate(b.paidDate) + (b.reason ? ' (' + b.reason + ')' : '');
     },
 
     _lineGross(l) {
@@ -303,21 +404,36 @@ window.AdminPayroll = {
                 (d.pendingCount ? d.pendingCount + ' timecard' + (d.pendingCount === 1 ? '' : 's') + ' in this period still pending approval. Approve them first, then reload.' : 'Nothing approved between these dates.') +
                 (d.alreadyPaid ? ' ' + d.alreadyPaid + ' already paid in an earlier run.' : '') + '</p></div></div>';
         } else {
-            let totHours = 0, totGross = 0, totDed = 0;
+            let totHours = 0, totGross = 0, totDed = 0, totCarried = 0, totDue = 0, totPaid = 0, totShort = 0;
             const paying = lines.filter(function(l) { return l.pay !== false; }).length;
+            const carriedLines = lines.filter(function(l) { return l.pay !== false && self._lineCarriedIn(l) > 0; }).length;
             tableHtml = '<div class="card" style="border-left:3px solid var(--primary,#2d6cdf);font-size:.88rem" id="payPickNote">' +
                 (paying === lines.length
                     ? 'Everyone with approved hours in this period is listed. To pay one person on their own, untick the others. Anyone left unticked is not paid in this run and their hours come back the next time you load a run.'
                     : 'Paying ' + paying + ' of ' + lines.length + '. The unticked ' + (lines.length - paying === 1 ? 'person is' : 'people are') + ' left out of this run and their hours stay unpaid until you include them in a later run.') +
+                ' Paid now starts at the full amount due. Enter a smaller number to record a partial payment; the rest is carried to the next run as an unsettled balance and you must say why.' +
+                (carriedLines ? ' ' + carriedLines + (carriedLines === 1 ? ' person has' : ' people have') + ' an unsettled balance brought forward from an earlier run, added to what is due below.' : '') +
                 '</div>' +
                 '<div class="card" style="overflow-x:auto"><table>' +
-                '<thead><tr><th>Pay</th><th>Employee</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th>Deductions this run</th><th class="amount">Net</th></tr></thead><tbody>' +
+                '<thead><tr><th>Pay</th><th>Employee</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th>Deductions this run</th><th class="amount">Due</th><th class="amount">Paid now</th></tr></thead><tbody>' +
                 lines.map(function(l, i) {
                     const inRun = l.pay !== false;
                     const hrs = self._lineHours(l), gross = self._lineGross(l), ded = self._lineDeductions(l), net = self._round2(gross - ded);
-                    if (inRun) { totHours += hrs; totGross += gross; totDed += ded; }
+                    const carried = self._lineCarriedIn(l), due = self._lineDue(l), paidNow = self._linePaid(l), short = self._lineShortfall(l);
+                    if (inRun) { totHours += hrs; totGross += gross; totDed += ded; totCarried += carried; totDue += due; totPaid += paidNow; totShort += short; }
                     const breakdown = (l.otHours || l.dtHours) ? '<div style="font-size:.75rem;color:var(--text2)">' + l.regularHours + ' reg' + (l.otHours ? ' + ' + l.otHours + ' OT x1.5' : '') + (l.dtHours ? ' + ' + l.dtHours + ' DT x2' : '') + '</div>' : '';
-                    const daysHtml = '<div style="font-size:.75rem;color:var(--text2);margin-top:4px">' + l.days.map(function(dd) { return Utils.escapeHtml(self._dayDate(dd.date)) + ' ' + dd.hours + 'h'; }).join(' · ') + '</div>';
+                    const daysHtml = l.days.length
+                        ? '<div style="font-size:.75rem;color:var(--text2);margin-top:4px">' + l.days.map(function(dd) { return Utils.escapeHtml(self._dayDate(dd.date)) + ' ' + dd.hours + 'h'; }).join(' · ') + '</div>'
+                        : '<div style="font-size:.75rem;color:var(--text2);margin-top:4px">No approved hours this period</div>';
+                    const carriedHtml = (l.carriedIn || []).length
+                        ? '<div class="pay-carried-in" style="font-size:.75rem;color:#b8860b;margin-top:4px"><span style="font-weight:600">Unsettled balance brought forward:</span> ' + l.carriedIn.map(function(b) { return Utils.escapeHtml(self._balanceLabel(b)); }).join('; ') + '</div>'
+                        : '';
+                    const dueHtml = self._money(due) + (carried ? '<div style="font-size:.72rem;color:var(--text2)">' + self._money(net) + ' this period + ' + self._money(carried) + ' carried</div>' : '');
+                    const paidHtml = '<input type="number" step="0.01" min="0" max="' + due + '" class="form-control pay-paid" data-i="' + i + '" value="' + paidNow.toFixed(2) + '" style="width:100px;padding:3px 6px;text-align:right"' + (inRun ? '' : ' disabled') + '>' +
+                        (short > 0.005
+                            ? '<div class="pay-short" style="font-size:.75rem;color:#b8860b;margin-top:4px;text-align:left;min-width:160px"><strong>' + self._money(short) + ' short</strong>, carried to the next run as unsettled.' +
+                              '<textarea class="form-control pay-short-reason" data-i="' + i + '" rows="2" placeholder="Why not paid in full (required)" style="margin-top:4px;font-size:.8rem">' + Utils.escapeHtml(l.shortReason || '') + '</textarea></div>'
+                            : '');
                     const dedHtml = (l.deductions.length === 0)
                         ? '<span style="color:var(--text2);font-size:.85rem">None open</span>'
                         : l.deductions.map(function(dd, j) {
@@ -330,15 +446,16 @@ window.AdminPayroll = {
                     const rateWarn = self._num(l.rate) > 0 ? '' : '<div style="font-size:.72rem;color:var(--accent)">No pay rate on file</div>';
                     return '<tr class="pay-line' + (inRun ? '' : ' pay-line-out') + '" data-wid="' + Utils.escapeHtml(l.workerId) + '"' + (inRun ? '' : ' style="opacity:.45"') + '>' +
                         '<td><input type="checkbox" class="pay-line-include" data-i="' + i + '" aria-label="Pay ' + Utils.escapeHtml(l.workerName) + ' in this run"' + (inRun ? ' checked' : '') + '></td>' +
-                        '<td><strong>' + Utils.escapeHtml(l.workerName) + '</strong>' + (inRun ? '' : ' <span style="font-size:.72rem;color:var(--text2)">left out of this run</span>') + daysHtml + '</td>' +
+                        '<td><strong>' + Utils.escapeHtml(l.workerName) + '</strong>' + (inRun ? '' : ' <span style="font-size:.72rem;color:var(--text2)">left out of this run</span>') + daysHtml + carriedHtml + '</td>' +
                         '<td class="amount">' + hrs.toFixed(2) + breakdown + '</td>' +
                         '<td class="amount"><input type="number" step="0.01" min="0" class="form-control pay-rate" data-i="' + i + '" value="' + self._num(l.rate) + '" style="width:90px;padding:3px 6px;text-align:right">' + rateWarn + '</td>' +
                         '<td class="amount">' + self._money(gross) + '</td>' +
                         '<td>' + dedHtml + '</td>' +
-                        '<td class="amount"><strong>' + self._money(net) + '</strong></td>' +
+                        '<td class="amount"><strong>' + dueHtml + '</strong></td>' +
+                        '<td class="amount">' + paidHtml + '</td>' +
                     '</tr>';
                 }).join('') +
-                '</tbody><tfoot><tr style="font-weight:600"><td></td><td>Total, ' + paying + ' of ' + lines.length + ' paid</td><td class="amount">' + self._round2(totHours).toFixed(2) + '</td><td></td><td class="amount">' + self._money(totGross) + '</td><td class="amount">' + (totDed ? '-' + self._money(totDed) : '') + '</td><td class="amount">' + self._money(totGross - totDed) + '</td></tr></tfoot></table></div>';
+                '</tbody><tfoot><tr style="font-weight:600"><td></td><td>Total, ' + paying + ' of ' + lines.length + ' paid</td><td class="amount">' + self._round2(totHours).toFixed(2) + '</td><td></td><td class="amount">' + self._money(totGross) + '</td><td class="amount">' + (totDed ? '-' + self._money(totDed) : '') + '</td><td class="amount">' + self._money(totDue) + (totCarried ? '<div style="font-size:.72rem;font-weight:400;color:var(--text2)">incl. ' + self._money(totCarried) + ' carried</div>' : '') + '</td><td class="amount">' + self._money(totPaid) + (totShort > 0.005 ? '<div id="payShortTotal" style="font-size:.72rem;color:#b8860b">' + self._money(totShort) + ' unsettled, carried forward</div>' : '') + '</td></tr></tfoot></table></div>';
             const notes = [];
             if (d.pendingCount) notes.push(d.pendingCount + ' timecard' + (d.pendingCount === 1 ? '' : 's') + ' in this period still pending approval and not included.');
             if (d.alreadyPaid) notes.push(d.alreadyPaid + ' approved timecard' + (d.alreadyPaid === 1 ? '' : 's') + ' already paid in an earlier run, left out.');
@@ -395,6 +512,22 @@ window.AdminPayroll = {
                 dd.amount = v; self._renderContent();
             });
         });
+        c.querySelectorAll('.pay-paid').forEach(function(inp) {
+            inp.addEventListener('change', function() {
+                const l = lines[+inp.dataset.i];
+                const due = self._lineDue(l);
+                let v = self._round2(self._num(inp.value));
+                if (v < 0) v = 0;
+                if (v > due) { v = due; Utils.showToast('Capped at the ' + self._money(due) + ' due. To pay more, raise the rate or add the hours.', 'error'); }
+                l.paid = (Math.abs(v - due) < 0.005) ? null : v;
+                self._renderContent();
+                const again = c.querySelector('.pay-short-reason[data-i="' + inp.dataset.i + '"]');
+                if (again) again.focus();
+            });
+        });
+        c.querySelectorAll('.pay-short-reason').forEach(function(ta) {
+            ta.addEventListener('input', function() { lines[+ta.dataset.i].shortReason = ta.value; });
+        });
         const paidDate = c.querySelector('#payPaidDate');
         if (paidDate) {
             paidDate.addEventListener('change', function(e) { d.paidDate = e.target.value; });
@@ -418,12 +551,24 @@ window.AdminPayroll = {
             const ok = await Utils.confirm(zeroRate.map(function(l) { return l.workerName; }).join(', ') + ' would be paid at $0 an hour. Record anyway?');
             if (!ok) return;
         }
+        // A partial payment must say why. Refuse before anything is saved.
+        const noReason = picked.filter(function(l) { return self._lineShortfall(l) > 0.005 && !String(l.shortReason || '').trim(); });
+        if (noReason.length) {
+            Utils.showToast('Say why ' + noReason.map(function(l) { return l.workerName; }).join(', ') + (noReason.length === 1 ? ' was' : ' were') + ' not paid in full', 'error');
+            const ta = self._container.querySelector('.pay-short-reason');
+            if (ta) ta.focus();
+            return;
+        }
         const lines = picked.map(function(l) {
             const gross = self._lineGross(l), ded = self._lineDeductions(l);
+            const carried = self._lineCarriedIn(l), due = self._lineDue(l), paidNow = self._linePaid(l), short = self._lineShortfall(l);
             return {
                 workerId: l.workerId, workerName: l.workerName, rate: self._num(l.rate),
                 regularHours: l.regularHours, otHours: l.otHours, dtHours: l.dtHours, hours: self._lineHours(l),
                 gross: gross, deductionTotal: ded, net: self._round2(gross - ded),
+                carriedIn: (l.carriedIn || []).map(function(b) { return { runId: b.runId, periodStart: b.periodStart, periodEnd: b.periodEnd, paidDate: b.paidDate, amount: self._round2(b.amount), reason: b.reason || '' }; }),
+                carriedInTotal: carried, due: due, paid: paidNow, shortfall: short,
+                shortReason: short > 0.005 ? String(l.shortReason || '').trim() : '',
                 days: l.days, timecardIds: l.timecardIds,
                 deductions: l.deductions.filter(function(x) { return x.apply && self._num(x.amount) > 0; }).map(function(x) {
                     return { deductionId: x.deductionId, description: x.description, type: x.type, amount: self._round2(x.amount) };
@@ -432,8 +577,10 @@ window.AdminPayroll = {
         });
         const totals = lines.reduce(function(t, l) {
             t.hours = self._round2(t.hours + l.hours); t.gross = self._round2(t.gross + l.gross);
-            t.deductions = self._round2(t.deductions + l.deductionTotal); t.net = self._round2(t.net + l.net); return t;
-        }, { hours: 0, gross: 0, deductions: 0, net: 0 });
+            t.deductions = self._round2(t.deductions + l.deductionTotal); t.net = self._round2(t.net + l.net);
+            t.carriedIn = self._round2(t.carriedIn + l.carriedInTotal); t.due = self._round2(t.due + l.due);
+            t.paid = self._round2(t.paid + l.paid); t.shortfall = self._round2(t.shortfall + l.shortfall); return t;
+        }, { hours: 0, gross: 0, deductions: 0, net: 0, carriedIn: 0, due: 0, paid: 0, shortfall: 0 });
         const run = {
             id: AppData.generateId(), periodStart: d.periodStart, periodEnd: d.periodEnd,
             paidDate: d.paidDate, method: d.method, reference: d.reference || '', notes: d.notes || '',
@@ -464,11 +611,11 @@ window.AdminPayroll = {
                 catch (e) { failed.push(ded.description || ded.id); }
             }
         }
-        if (window.AppData && AppData.addAuditLog) AppData.addAuditLog(self._actor(), 'Pay Run Recorded', d.periodStart + ' to ' + d.periodEnd + ' — net ' + self._money(totals.net));
+        if (window.AppData && AppData.addAuditLog) AppData.addAuditLog(self._actor(), 'Pay Run Recorded', d.periodStart + ' to ' + d.periodEnd + ' — paid ' + self._money(totals.paid) + (totals.shortfall > 0.005 ? ', ' + self._money(totals.shortfall) + ' unsettled carried forward' : ''));
         try { await self._load(); } catch (e) { /* list refresh only */ }
         restore();
         if (failed.length) Utils.showToast('Pay run recorded, but these deductions did not update: ' + failed.join(', '), 'error');
-        else Utils.showToast('Pay run recorded: ' + self._money(totals.net) + ' net');
+        else Utils.showToast('Pay run recorded: ' + self._money(totals.paid) + ' paid' + (totals.shortfall > 0.005 ? ', ' + self._money(totals.shortfall) + ' carried forward as unsettled' : ''));
         self._draft = null; self._detailId = run.id; self._view = 'detail';
         self._renderContent();
     },
@@ -498,20 +645,28 @@ window.AdminPayroll = {
             ${lines.map(function(l) {
                 const days = Array.isArray(l.days) ? l.days : [];
                 const deds = Array.isArray(l.deductions) ? l.deductions : [];
-                return '<div class="card">' +
+                const carriedIn = Array.isArray(l.carriedIn) ? l.carriedIn : [];
+                const carried = self._num(l.carriedInTotal);
+                const due = l.due !== undefined ? self._num(l.due) : self._round2(self._num(l.net) + carried);
+                const paidAmt = self._savedPaid(l), short = self._savedShortfall(l);
+                return '<div class="card pay-detail-line" data-wid="' + Utils.escapeHtml(l.workerId) + '">' +
                     '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">' +
                         '<strong style="font-size:1.05rem">' + Utils.escapeHtml(l.workerName) + ' <button class="btn-secondary btn-sm pay-emp-link" data-wid="' + Utils.escapeHtml(l.workerId) + '" style="font-size:.72rem;padding:2px 8px;margin-left:6px;vertical-align:middle">Pay history</button></strong>' +
-                        '<span>' + self._num(l.hours).toFixed(2) + ' h @ ' + self._money(l.rate) + ' = ' + self._money(l.gross) + (l.deductionTotal ? ' &minus; ' + self._money(l.deductionTotal) : '') + ' = <strong>' + self._money(l.net) + ' net</strong></span>' +
+                        '<span>' + self._num(l.hours).toFixed(2) + ' h @ ' + self._money(l.rate) + ' = ' + self._money(l.gross) + (l.deductionTotal ? ' &minus; ' + self._money(l.deductionTotal) : '') + ' = <strong>' + self._money(l.net) + ' net</strong>' +
+                            (carried ? ' + ' + self._money(carried) + ' carried in = <strong>' + self._money(due) + ' due</strong>' : '') +
+                            (short > 0.005 ? ', <strong>' + self._money(paidAmt) + ' paid</strong>' : '') + '</span>' +
                     '</div>' +
+                    (carriedIn.length ? '<div style="margin-top:6px;font-size:.85rem;color:#b8860b"><strong>Brought forward:</strong> ' + carriedIn.map(function(b) { return Utils.escapeHtml(self._balanceLabel(b)); }).join('; ') + '</div>' : '') +
+                    (short > 0.005 ? '<div class="pay-detail-short" style="margin-top:6px;font-size:.85rem;color:#b8860b"><strong>' + self._money(short) + ' unsettled</strong>, carried to the next run' + (l.shortReason ? '. Reason: ' + Utils.escapeHtml(l.shortReason) : '') + '</div>' : '') +
                     (days.length ? '<table style="margin-top:8px;font-size:.85rem"><thead><tr><th>Day</th><th>Project</th><th class="amount">Hours</th></tr></thead><tbody>' +
                         days.map(function(dd) { return '<tr><td>' + Utils.escapeHtml(self._dayDate(dd.date)) + '</td><td>' + Utils.escapeHtml(dd.projectName || '') + '</td><td class="amount">' + self._num(dd.hours).toFixed(2) + '</td></tr>'; }).join('') +
                         '</tbody></table>' : '') +
                     (deds.length ? '<div style="margin-top:8px;font-size:.85rem"><strong>Deducted:</strong> ' + deds.map(function(x) { return Utils.escapeHtml(x.description) + ' ' + self._money(x.amount); }).join(', ') + '</div>' : '') +
                 '</div>';
             }).join('')}
-            <div class="card" style="font-weight:600;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div class="card" style="font-weight:600;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px" id="payDetailTotals">
                 <span>${lines.length} employee${lines.length === 1 ? '' : 's'}, ${self._num(t.hours).toFixed(2)} hours</span>
-                <span>Gross ${self._money(t.gross)}${self._num(t.deductions) ? ' &minus; deductions ' + self._money(t.deductions) : ''} = Net ${self._money(t.net)}</span>
+                <span>Gross ${self._money(t.gross)}${self._num(t.deductions) ? ' &minus; deductions ' + self._money(t.deductions) : ''} = Net ${self._money(t.net)}${self._num(t.carriedIn) ? ' + ' + self._money(t.carriedIn) + ' carried in = Due ' + self._money(t.due) : ''}${self._num(t.shortfall) > 0.005 ? ', Paid ' + self._money(t.paid) + ', <span style="color:#b8860b">' + self._money(t.shortfall) + ' unsettled, carried forward</span>' : ''}</span>
             </div>
         `;
         c.querySelector('#payBackBtn').addEventListener('click', function() { self._view = 'list'; self._renderContent(); });
@@ -520,7 +675,12 @@ window.AdminPayroll = {
             b.addEventListener('click', function() { self._empId = b.dataset.wid; self._tab = 'employees'; self._view = 'list'; self._renderContent(); });
         });
         c.querySelector('#payDeleteBtn').addEventListener('click', async function() {
-            const ok = await Utils.confirm('Delete this pay run? The hours go back to unpaid and any deductions taken in it reopen. This does not reverse any money already sent.');
+            const settlers = self._runsSettling(r.id);
+            if (settlers.length) {
+                Utils.showToast('The unsettled balance from this run was carried into the run of ' + self._dayDate(settlers[0].periodStart) + ' to ' + self._dayDate(settlers[0].periodEnd) + '. Delete that one first.', 'error');
+                return;
+            }
+            const ok = await Utils.confirm('Delete this pay run? The hours go back to unpaid and any deductions taken in it reopen.' + (self._num((r.totals || {}).carriedIn) ? ' The balance it carried in becomes unsettled again.' : '') + ' This does not reverse any money already sent.');
             if (!ok) return;
             await self._deleteRun(r);
         });
@@ -567,14 +727,16 @@ window.AdminPayroll = {
                 const wid = String(l.workerId || '');
                 if (!by[wid]) {
                     const w = AppData.getWorker(wid);
-                    by[wid] = { workerId: wid, workerName: (w && w.name) || l.workerName || wid || 'Unknown', runs: 0, hours: 0, gross: 0, deductions: 0, net: 0, firstPaid: '', lastPaid: '', entries: [] };
+                    by[wid] = { workerId: wid, workerName: (w && w.name) || l.workerName || wid || 'Unknown', runs: 0, hours: 0, gross: 0, deductions: 0, net: 0, paid: 0, unsettled: 0, firstPaid: '', lastPaid: '', entries: [] };
                 }
                 const e = by[wid];
                 const hrs = self._num(l.hours) || self._lineHours(l);
                 const gross = self._num(l.gross), ded = self._num(l.deductionTotal), net = l.net !== undefined ? self._num(l.net) : self._round2(gross - ded);
+                const carried = self._num(l.carriedInTotal), paidAmt = self._savedPaid(l), short = self._savedShortfall(l);
                 e.runs += 1;
                 e.hours = self._round2(e.hours + hrs); e.gross = self._round2(e.gross + gross);
                 e.deductions = self._round2(e.deductions + ded); e.net = self._round2(e.net + net);
+                e.paid = self._round2(e.paid + paidAmt);
                 const paid = String(r.paidDate || '').slice(0, 10);
                 if (paid && (!e.firstPaid || paid < e.firstPaid)) e.firstPaid = paid;
                 if (paid && (!e.lastPaid || paid > e.lastPaid)) e.lastPaid = paid;
@@ -583,6 +745,9 @@ window.AdminPayroll = {
                     method: r.method || '', reference: r.reference || '',
                     hours: hrs, regularHours: self._num(l.regularHours), otHours: self._num(l.otHours), dtHours: self._num(l.dtHours),
                     rate: self._num(l.rate), gross: gross, deductionTotal: ded, net: net,
+                    carriedIn: Array.isArray(l.carriedIn) ? l.carriedIn : [], carriedInTotal: carried,
+                    due: l.due !== undefined ? self._num(l.due) : self._round2(net + carried),
+                    paid: paidAmt, shortfall: short, shortReason: l.shortReason || '',
                     deductions: Array.isArray(l.deductions) ? l.deductions : [],
                     days: Array.isArray(l.days) ? l.days : []
                 });
@@ -590,6 +755,7 @@ window.AdminPayroll = {
         });
         const list = Object.keys(by).map(function(k) { return by[k]; });
         list.forEach(function(e) {
+            e.unsettled = self._unsettledTotal(e.workerId);
             e.entries.sort(function(a, b) {
                 return String(b.paidDate || '').localeCompare(String(a.paidDate || '')) || String(b.periodEnd || '').localeCompare(String(a.periodEnd || ''));
             });
@@ -635,25 +801,28 @@ window.AdminPayroll = {
         if (hist.length === 0) {
             return '<div class="card"><div class="empty"><h3>Nobody has been paid yet</h3><p>Once a pay run is recorded, every employee on it gets a line here with everything they have been paid across all runs.</p></div></div>';
         }
-        let tH = 0, tG = 0, tD = 0, tN = 0;
+        let tH = 0, tG = 0, tD = 0, tN = 0, tP = 0, tU = 0;
         const rows = hist.map(function(e) {
-            tH += e.hours; tG += e.gross; tD += e.deductions; tN += e.net;
+            tH += e.hours; tG += e.gross; tD += e.deductions; tN += e.net; tP += e.paid; tU += e.unsettled;
             const owing = self._owingFor(e.workerId);
+            const oldest = e.unsettled ? self._unsettledFor(e.workerId)[0] : null;
             return '<tr class="pay-emp-row" data-wid="' + Utils.escapeHtml(e.workerId) + '">' +
-                '<td><strong>' + Utils.escapeHtml(e.workerName) + '</strong>' + (owing ? '<div style="font-size:.75rem;color:#b8860b">' + self._money(owing) + ' still owing</div>' : '') + '</td>' +
+                '<td><strong>' + Utils.escapeHtml(e.workerName) + '</strong>' + (owing ? '<div style="font-size:.75rem;color:#b8860b">' + self._money(owing) + ' still owing</div>' : '') +
+                    (e.unsettled ? '<div class="pay-emp-unsettled" style="font-size:.75rem;color:#b8860b">' + self._money(e.unsettled) + ' unsettled, owed to them since ' + Utils.escapeHtml(self._dayDate(oldest.paidDate)) + '</div>' : '') + '</td>' +
                 '<td class="amount">' + e.runs + '</td>' +
                 '<td class="amount">' + e.hours.toFixed(2) + '</td>' +
                 '<td class="amount">' + self._money(e.gross) + '</td>' +
                 '<td class="amount">' + (e.deductions ? '-' + self._money(e.deductions) : '—') + '</td>' +
-                '<td class="amount"><strong>' + self._money(e.net) + '</strong></td>' +
+                '<td class="amount">' + self._money(e.net) + '</td>' +
+                '<td class="amount"><strong>' + self._money(e.paid) + '</strong></td>' +
                 '<td style="white-space:nowrap;font-size:.85rem">' + Utils.escapeHtml(self._dayDate(e.lastPaid)) + '</td>' +
                 '<td style="white-space:nowrap"><button class="btn-secondary btn-sm pay-emp-open" data-wid="' + Utils.escapeHtml(e.workerId) + '">View</button></td>' +
             '</tr>';
         }).join('');
         return '<div class="card" style="overflow-x:auto"><table>' +
-            '<thead><tr><th>Employee</th><th class="amount">Pay runs</th><th class="amount">Hours</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net paid</th><th>Last paid</th><th></th></tr></thead>' +
+            '<thead><tr><th>Employee</th><th class="amount">Pay runs</th><th class="amount">Hours</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net due</th><th class="amount">Net paid</th><th>Last paid</th><th></th></tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
-            '<tfoot><tr style="font-weight:600"><td>Total, ' + hist.length + ' employee' + (hist.length === 1 ? '' : 's') + '</td><td></td><td class="amount">' + self._round2(tH).toFixed(2) + '</td><td class="amount">' + self._money(tG) + '</td><td class="amount">' + (tD ? '-' + self._money(tD) : '') + '</td><td class="amount">' + self._money(tN) + '</td><td></td><td></td></tr></tfoot>' +
+            '<tfoot><tr style="font-weight:600"><td>Total, ' + hist.length + ' employee' + (hist.length === 1 ? '' : 's') + (tU > 0.005 ? '<div style="font-size:.75rem;color:#b8860b;font-weight:400">' + self._money(self._round2(tU)) + ' unsettled in total</div>' : '') + '</td><td></td><td class="amount">' + self._round2(tH).toFixed(2) + '</td><td class="amount">' + self._money(tG) + '</td><td class="amount">' + (tD ? '-' + self._money(tD) : '') + '</td><td class="amount">' + self._money(tN) + '</td><td class="amount">' + self._money(tP) + '</td><td></td><td></td></tr></tfoot>' +
             '</table></div>';
     },
 
@@ -668,7 +837,14 @@ window.AdminPayroll = {
                 (e ? '<span>' + e.runs + ' pay run' + (e.runs === 1 ? '' : 's') + ', ' + Utils.escapeHtml(self._dayDate(e.firstPaid)) + (e.firstPaid !== e.lastPaid ? ' to ' + Utils.escapeHtml(self._dayDate(e.lastPaid)) : '') + '</span>' : '') +
             '</div>';
         if (e) {
-            html += '<div style="margin-top:6px"><strong>' + e.hours.toFixed(2) + ' hours</strong>, gross ' + self._money(e.gross) + (e.deductions ? ' &minus; deductions ' + self._money(e.deductions) : '') + ' = <strong>' + self._money(e.net) + ' net paid</strong></div>';
+            html += '<div style="margin-top:6px"><strong>' + e.hours.toFixed(2) + ' hours</strong>, gross ' + self._money(e.gross) + (e.deductions ? ' &minus; deductions ' + self._money(e.deductions) : '') +
+                (Math.abs(e.paid - e.net) < 0.005 && !e.unsettled
+                    ? ' = <strong>' + self._money(e.net) + ' net paid</strong>'
+                    : ' = ' + self._money(e.net) + ' net due, <strong>' + self._money(e.paid) + ' paid</strong>') + '</div>';
+            if (e.unsettled) {
+                html += '<div class="pay-emp-unsettled" style="margin-top:6px;color:#b8860b"><strong>' + self._money(e.unsettled) + ' unsettled, owed to ' + Utils.escapeHtml(name) + '</strong>: ' +
+                    self._unsettledFor(e.workerId).map(function(b) { return Utils.escapeHtml(self._balanceLabel(b)); }).join('; ') + '. It is added to what is due the next time they are on a pay run.</div>';
+            }
         }
         if (owing) {
             html += '<div style="margin-top:6px;color:#b8860b">' + self._money(owing) + ' still owing: ' + openDeds.map(function(d) { return Utils.escapeHtml(d.description || d.type || 'Deduction') + ' ' + self._money(self._remaining(d)); }).join(', ') + '</div>';
@@ -682,6 +858,8 @@ window.AdminPayroll = {
         const rows = e.entries.map(function(x) {
             const breakdown = (x.otHours || x.dtHours) ? '<div style="font-size:.75rem;color:var(--text2)">' + x.regularHours + ' reg' + (x.otHours ? ' + ' + x.otHours + ' OT' : '') + (x.dtHours ? ' + ' + x.dtHours + ' DT' : '') + '</div>' : '';
             const dedTxt = x.deductions.length ? '<div style="font-size:.75rem;color:var(--text2)">' + x.deductions.map(function(d) { return Utils.escapeHtml(d.description || d.type || 'Deduction') + ' ' + self._money(d.amount); }).join(', ') + '</div>' : '';
+            const carriedTxt = x.carriedInTotal ? '<div style="font-size:.75rem;color:var(--text2)">incl. ' + self._money(x.carriedInTotal) + ' carried in from ' + x.carriedIn.map(function(b) { return Utils.escapeHtml(self._dayDate(b.periodStart)) + ' to ' + Utils.escapeHtml(self._dayDate(b.periodEnd)); }).join(', ') + '</div>' : '';
+            const shortTxt = x.shortfall > 0.005 ? '<div class="pay-emp-short" style="font-size:.75rem;color:#b8860b">' + self._money(x.shortfall) + ' unsettled' + (x.shortReason ? ': ' + Utils.escapeHtml(x.shortReason) : '') + '</div>' : '';
             return '<tr class="pay-emp-entry" data-run="' + Utils.escapeHtml(x.runId) + '">' +
                 '<td style="white-space:nowrap">' + Utils.escapeHtml(self._dayDate(x.periodStart)) + ' to ' + Utils.escapeHtml(self._dayDate(x.periodEnd)) + '</td>' +
                 '<td style="white-space:nowrap;font-size:.85rem">' + Utils.escapeHtml(self._dayDate(x.paidDate)) + (x.method ? '<br><span style="color:var(--text2)">' + Utils.escapeHtml(x.method) + (x.reference ? ', ' + Utils.escapeHtml(x.reference) : '') + '</span>' : '') + '</td>' +
@@ -689,14 +867,15 @@ window.AdminPayroll = {
                 '<td class="amount">' + self._money(x.rate) + '</td>' +
                 '<td class="amount">' + self._money(x.gross) + '</td>' +
                 '<td class="amount">' + (x.deductionTotal ? '-' + self._money(x.deductionTotal) : '—') + dedTxt + '</td>' +
-                '<td class="amount"><strong>' + self._money(x.net) + '</strong></td>' +
+                '<td class="amount">' + self._money(x.due) + carriedTxt + '</td>' +
+                '<td class="amount"><strong>' + self._money(x.paid) + '</strong>' + shortTxt + '</td>' +
                 '<td style="white-space:nowrap"><button class="btn-secondary btn-sm pay-emp-run" data-run="' + Utils.escapeHtml(x.runId) + '" style="font-size:.75rem;padding:3px 10px">Run</button></td>' +
             '</tr>';
         }).join('');
         html += '<div class="card" style="overflow-x:auto"><table>' +
-            '<thead><tr><th>Period</th><th>Paid</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Net</th><th></th></tr></thead>' +
+            '<thead><tr><th>Period</th><th>Paid</th><th class="amount">Hours</th><th class="amount">Rate</th><th class="amount">Gross</th><th class="amount">Deductions</th><th class="amount">Due</th><th class="amount">Paid</th><th></th></tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
-            '<tfoot><tr style="font-weight:600"><td>Total</td><td></td><td class="amount">' + e.hours.toFixed(2) + '</td><td></td><td class="amount">' + self._money(e.gross) + '</td><td class="amount">' + (e.deductions ? '-' + self._money(e.deductions) : '') + '</td><td class="amount">' + self._money(e.net) + '</td><td></td></tr></tfoot>' +
+            '<tfoot><tr style="font-weight:600"><td>Total</td><td></td><td class="amount">' + e.hours.toFixed(2) + '</td><td></td><td class="amount">' + self._money(e.gross) + '</td><td class="amount">' + (e.deductions ? '-' + self._money(e.deductions) : '') + '</td><td class="amount">' + self._money(e.net) + '</td><td class="amount">' + self._money(e.paid) + (e.unsettled ? '<div style="font-size:.75rem;color:#b8860b;font-weight:400">' + self._money(e.unsettled) + ' unsettled</div>' : '') + '</td><td></td></tr></tfoot>' +
             '</table></div>';
         return html;
     },

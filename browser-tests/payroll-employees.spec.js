@@ -44,7 +44,8 @@ test.describe('Payroll, per employee pay history', () => {
         expect(cells[4]).toContain('-');
         expect(cells[4]).toContain('150.00');         // deductions
         expect(cells[5]).toContain('2,190.00');       // net
-        expect(cells[6]).toContain('Oct 1');          // last paid
+        expect(cells[6]).toContain('2,190.00');       // net paid, same as net due when paid in full
+        expect(cells[7]).toContain('Oct 1');          // last paid
         await expect(kosta).toContainText('$80.00 still owing');
         const foot = await page.locator('#payrollContent tfoot').innerText();
         expect(foot).toContain('3 employees');

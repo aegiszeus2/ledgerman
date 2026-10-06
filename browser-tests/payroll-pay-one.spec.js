@@ -61,7 +61,7 @@ test.describe('Payroll, paying one person on their own', () => {
         expect(run.lines.length).toBe(1);
         expect(run.lines[0].workerName).toBe('Kosta S');
         expect(run.lines[0].timecardIds).toEqual(['k1', 'k2']);
-        expect(run.totals).toEqual({ hours: 16, gross: 480, deductions: 0, net: 480 });
+        expect(run.totals).toMatchObject({ hours: 16, gross: 480, deductions: 0, net: 480, paid: 480, shortfall: 0 });
         expect(run.reference).toBe('ET-KOSTA-1');
         // Start another run for the same period: Kosta is already paid and left out, the other two come back ticked.
         await page.click('#payBackBtn').catch(() => {});
