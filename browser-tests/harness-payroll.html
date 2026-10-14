@@ -3,7 +3,7 @@
   harness-payroll.html — isolated test bed for the admin Payroll module (Pay Runs,
   Deductions, Employees). Loads js/admin/payroll.js with the real Utils and UI against a
   stub AppData and a fake fetch: no login, no network, no real company data.
-  Used by payroll-employees.spec.js.
+  Used by payroll-employees.spec.js, payroll-pay-one.spec.js and payroll-period-ledger.spec.js.
 -->
 <html lang="en">
 <head>
@@ -38,6 +38,13 @@ window.App = { currentUser: { type: 'admin', name: 'Damiano' } };
 window.LMIcons = new Proxy({}, { get: function() { return ''; } });
 window.fetch = function(url, opts) {
     var u = String(url);
+    if (opts && opts.method === 'DELETE') {
+        var did = decodeURIComponent(u.split('/').pop());
+        window.__posted.push({ url: u, method: 'DELETE', id: did });
+        if (u.indexOf('/api/payroll_runs/') !== -1) window.__runs = window.__runs.filter(function(r) { return r.id !== did; });
+        if (u.indexOf('/api/payroll_deductions/') !== -1) window.__deds = window.__deds.filter(function(d) { return d.id !== did; });
+        return Promise.resolve(new Response('{"ok":true}', { status: 200 }));
+    }
     if (opts && opts.method === 'POST') {
         var body = JSON.parse(opts.body);
         window.__posted.push({ url: u, body: body });
