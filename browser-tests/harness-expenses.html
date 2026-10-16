@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<!--
+  harness-expenses.html: isolated test bed for the admin Expenses module.
+
+  Loads js/admin/expenses.js with the real Utils and UI against a stub AppData and a
+  fake fetch, so the Add Expense form and the receipt scan can be driven directly:
+  no login, no network, no real company data. Used by receipt-scan.spec.js.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <link rel="stylesheet" href="../css/worker.css">
+</head>
+<body>
+<div class="admin-content"><div id="adminContent"></div></div>
+<script src="../js/utils.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+window.__calls = { fetch: [] };          // every fetch: { url, method, body }
+window.__mock = {
+    photoStatus: 201,                    // POST /api/photos
+    extractStatus: 200,                  // POST /api/photos/<id>/extract
+    extractError: 'OCR service unavailable (ANTHROPIC_API_KEY not configured)',
+    extract: {                           // 200 body for extract
+        vendor: 'Home Depot', amount: 45.67, date: '2026-10-14',
+        line_items: [{ description: '2x4 lumber', amount: 30.17 }, { description: 'Deck screws', amount: 15.50 }],
+        confidence: 0.91, raw_text: 'HOME DEPOT\n2x4 LUMBER 30.17\nDECK SCREWS 15.50\nTOTAL 45.67', model: 'test', extracted_at: '2026-10-16T12:00:00Z'
+    },
+    attachStatus: 200,                   // POST /api/photos/<id>/attach-expense
+    expenseStatus: 200                   // POST /api/expenses
+};
+window.__projects = [{ id: 'p1', name: 'Yard Work 4062' }, { id: 'p2', name: 'Sand and Stone Resort, Landscaping' }];
+window.__vendors = [{ id: 'v1', name: 'Home Depot' }, { id: 'v2', name: 'Rona' }];
+window.__expenses = [];
+
+function respond(status, obj) {
+    return Promise.resolve(new Response(JSON.stringify(obj), { status: status, headers: { 'Content-Type': 'application/json' } }));
+}
+window.fetch = function(url, opts) {
+    var u = String(url);
+    var method = (opts && opts.method) || 'GET';
+    var body = null;
+    try { body = opts && opts.body ? JSON.parse(opts.body) : null; } catch (e) { body = opts.body; }
+    window.__calls.fetch.push({ url: u, method: method, body: body });
+    var m;
+    if ((m = u.match(/\/api\/photos\/([^/]+)\/extract$/)) && method === 'POST') {
+        if (window.__mock.extractStatus === 200) return respond(200, Object.assign({ photo_id: decodeURIComponent(m[1]) }, window.__mock.extract));
+        return respond(window.__mock.extractStatus, { error: window.__mock.extractError });
+    }
+    if ((m = u.match(/\/api\/photos\/([^/]+)\/attach-expense$/)) && method === 'POST') {
+        if (window.__mock.attachStatus === 200) return respond(200, { success: true, photo_id: decodeURIComponent(m[1]), expense_id: body && body.expense_id });
+        return respond(window.__mock.attachStatus, { error: 'Expense not found' });
+    }
+    if (/\/api\/photos$/.test(u) && method === 'POST') {
+        if (window.__mock.photoStatus === 201) return respond(201, { id: body.id, success: true });
+        return respond(window.__mock.photoStatus, { error: 'Photo store is full' });
+    }
+    if (/\/api\/expenses$/.test(u) && method === 'POST') {
+        if (window.__mock.expenseStatus === 200) { window.__expenses.push(body); return respond(200, body); }
+        return respond(window.__mock.expenseStatus, { error: 'Save refused' });
+    }
+    return respond(404, { error: 'not found' });
+};
+
+window.AppData = {
+    API_BASE: 'http://api.test',
+    getJwt: function() { return 'test-jwt'; },
+    getProjects: function() { return window.__projects; },
+    getProject: function(id) { return window.__projects.filter(function(p) { return p.id === id; })[0] || null; },
+    getWorkers: function() { return [{ id: 'w1', name: 'Kosta S', status: 'Active' }]; },
+    getSubtasks: function() { return []; },
+    getData: function(key) { return key === 'vendors' ? window.__vendors : null; },
+    getExpenses: function() { return window.__expenses; },
+    getExpense: function(id) { return window.__expenses.filter(function(e) { return e.id === id; })[0] || null; },
+    expenseIsBilled: function() { return false; },
+    expensePaymentType: function(e) { return e.paymentType || 'paid'; },
+    expenseIsPaid: function(e) { return !!e.paidDate; },
+    expensePaymentState: function() { return 'paid'; },
+    expensePaymentLabel: function() { return 'Paid'; },
+    expenseBilledState: function() { return 'ready'; },
+    expenseBilledLabel: function() { return 'Ready'; },
+    expenseDueDate: function() { return ''; },
+    generateId: function() { return 'id' + Math.random().toString(36).slice(2, 10); },
+    saveEntityAsync: async function(entity, item) {
+        var res = await fetch(window.AppData.API_BASE + '/api/' + entity, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+        var j = await res.json();
+        if (!res.ok || j.error) throw new Error(j.error || ('HTTP ' + res.status));
+        return item;
+    },
+    addAuditLog: function() {}
+};
+window.App = { currentUser: { type: 'admin', name: 'Damiano' } };
+window.LMIcons = new Proxy({}, { get: function() { return ''; } });
+</script>
+<script src="../js/admin/expenses.js"></script>
+<script>
+// Render the Expenses screen on project p1 and open the Add form for the given type.
+window.openForm = function(type) {
+    AdminExpenses._projectId = 'p1';
+    AdminExpenses.render(document.getElementById('adminContent'));
+    AdminExpenses._showExpenseForm(type, null);
+};
+</script>
+</body>
+</html>

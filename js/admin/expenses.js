@@ -275,6 +275,176 @@ window.AdminExpenses = {
         });
     },
 
+    // ---- Receipt scan ------------------------------------------------------------
+    // The photo is posted to /api/photos as soon as it is chosen, then
+    // /api/photos/<id>/extract reads vendor, date, amount and line items off it.
+    // Only empty fields are filled; anything the user typed stays as typed.
+    // The photo is linked to the expense after the save (attach-expense).
+
+    async _receiptApi(path, body) {
+        var headers = { 'Content-Type': 'application/json' };
+        var jwt = AppData.getJwt ? AppData.getJwt() : '';
+        if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+        var res = await fetch(AppData.API_BASE + path, { method: 'POST', headers: headers, body: JSON.stringify(body || {}) });
+        var json = null;
+        try { json = await res.json(); } catch (e) { json = null; }
+        return { ok: res.ok, status: res.status, json: json || {} };
+    },
+
+    // Downscale to max 1600 px on the long edge as JPEG, plus a 200 px thumbnail.
+    // Resolves { blobB64, thumbnailB64 } as data URLs (the format /api/photos stores).
+    _receiptPrepare(file) {
+        return new Promise(function(resolve, reject) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function() {
+                try {
+                    function draw(maxEdge, quality) {
+                        var scale = Math.min(maxEdge / img.width, maxEdge / img.height, 1);
+                        var c = document.createElement('canvas');
+                        c.width = Math.max(1, Math.round(img.width * scale));
+                        c.height = Math.max(1, Math.round(img.height * scale));
+                        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                        return c.toDataURL('image/jpeg', quality);
+                    }
+                    var out = { blobB64: draw(1600, 0.85), thumbnailB64: draw(200, 0.7) };
+                    URL.revokeObjectURL(url);
+                    resolve(out);
+                } catch (e) { URL.revokeObjectURL(url); reject(e); }
+            };
+            img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('Could not read that image. Use a JPEG or PNG photo.')); };
+            img.src = url;
+        });
+    },
+
+    _receiptConfidenceWords(c) {
+        if (c === null || c === undefined || isNaN(Number(c))) return '';
+        var n = Number(c);
+        if (n >= 0.8) return 'Read with high confidence.';
+        if (n >= 0.5) return 'Read with medium confidence.';
+        return 'Read with low confidence.';
+    },
+
+    _wireReceiptScan(modal, vendors) {
+        var self = this;
+        var q = function(s) { return modal.q(s); };
+        var state = { photoId: '' };
+        var btn = q('#receiptScanBtn'), input = q('#receiptFileInput'), statusEl = q('#receiptStatus'),
+            thumb = q('#receiptThumb'), rawWrap = q('#receiptRawWrap'), rawText = q('#receiptRawText');
+        if (!btn || !input) return state;
+
+        // Remember which fields the user has typed into, so the scan never overwrites them
+        var touched = {};
+        ['description', 'date', 'amount', 'vendorSelect', 'vendorManual'].forEach(function(name) {
+            var el = q('[name="' + name + '"]');
+            if (!el) return;
+            var mark = function() { touched[name] = true; };
+            el.addEventListener('input', mark);
+            el.addEventListener('change', mark);
+        });
+        function setStatus(text, isError) {
+            statusEl.textContent = text;
+            statusEl.style.color = isError ? 'var(--accent)' : 'var(--text2)';
+        }
+        function fillEmpty(name, value) {
+            var el = q('[name="' + name + '"]');
+            if (!el || value === '' || value === null || value === undefined) return false;
+            if (touched[name]) return false;
+            if (name !== 'date' && String(el.value || '').trim() !== '') return false;
+            el.value = value;
+            return true;
+        }
+        function applyExtract(data) {
+            var vendor = (data.vendor || '').toString().trim();
+            var items = Array.isArray(data.line_items) ? data.line_items : [];
+            var itemText = items.map(function(li) { return (li && li.description ? String(li.description).trim() : ''); })
+                .filter(function(s) { return s; }).join(', ');
+            // Vendor: match the list by name, otherwise type it in by hand
+            if (vendor) {
+                var sel = q('[name="vendorSelect"]'), manualGroup = q('#vendorManualGroup');
+                var match = vendors.find(function(v) { return String(v.name || '').trim().toLowerCase() === vendor.toLowerCase(); });
+                if (sel && !touched.vendorSelect && !sel.value) {
+                    if (match) {
+                        sel.value = match.id;
+                        if (manualGroup) manualGroup.style.display = 'none';
+                    } else {
+                        sel.value = '__manual__';
+                        if (manualGroup) manualGroup.style.display = '';
+                        fillEmpty('vendorManual', vendor);
+                    }
+                }
+            }
+            if (typeof data.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.date)) fillEmpty('date', data.date);
+            var amt = Number(data.amount);
+            if (data.amount !== null && data.amount !== undefined && data.amount !== '' && isFinite(amt) && amt > 0) fillEmpty('amount', amt.toFixed(2));
+            fillEmpty('description', itemText || (vendor ? vendor + ' receipt' : ''));
+            if (data.raw_text) {
+                rawText.textContent = String(data.raw_text);
+                rawWrap.style.display = '';
+                rawWrap.open = false;
+            }
+        }
+
+        btn.addEventListener('click', function() { input.click(); });
+        input.addEventListener('change', async function() {
+            var file = input.files && input.files[0];
+            if (!file) return;
+            input.value = '';
+            var restore = UI.btnLoading(btn, 'Working...');
+            rawWrap.style.display = 'none';
+            try {
+                setStatus('Preparing the photo...');
+                var prepared = await self._receiptPrepare(file);
+                thumb.src = prepared.thumbnailB64;
+                thumb.style.display = '';
+                var ts = new Date();
+                var stamp = ts.getFullYear() + String(ts.getMonth() + 1).padStart(2, '0') + String(ts.getDate()).padStart(2, '0') + '-' +
+                            String(ts.getHours()).padStart(2, '0') + String(ts.getMinutes()).padStart(2, '0') + String(ts.getSeconds()).padStart(2, '0');
+                var photoId = AppData.generateId();
+                setStatus('Saving the photo...');
+                var up = await self._receiptApi('/api/photos', {
+                    id: photoId,
+                    projectId: self._projectId,
+                    date: Utils.today(),
+                    filename: (file.name && file.name.trim()) || ('receipt-' + stamp + '.jpg'),
+                    blobB64: prepared.blobB64,
+                    thumbnailB64: prepared.thumbnailB64
+                });
+                if (!up.ok) {
+                    setStatus('Could not save the photo: ' + (up.json.error || ('server replied ' + up.status)) + '. Try again or fill the fields by hand.', true);
+                    return;
+                }
+                state.photoId = up.json.id || photoId;
+                setStatus('Reading receipt...');
+                var ex = await self._receiptApi('/api/photos/' + encodeURIComponent(state.photoId) + '/extract', {});
+                if (ex.status === 503) {
+                    setStatus('Receipt reading is switched off right now. Fill the fields by hand, the photo will still be attached when you save.', true);
+                    return;
+                }
+                if (!ex.ok) {
+                    setStatus('Could not read the receipt: ' + (ex.json.error || ('server replied ' + ex.status)) + '. Fill the fields by hand, the photo will still be attached when you save.', true);
+                    return;
+                }
+                applyExtract(ex.json || {});
+                setStatus(('Check these fields before you save. ' + self._receiptConfidenceWords(ex.json ? ex.json.confidence : null)).trim());
+            } catch (err) {
+                setStatus((err && err.message) || 'Something went wrong with the receipt photo.', true);
+            } finally {
+                restore();
+            }
+        });
+        return state;
+    },
+
+    async _attachReceipt(photoId, expenseId) {
+        try {
+            var r = await this._receiptApi('/api/photos/' + encodeURIComponent(photoId) + '/attach-expense', { expense_id: expenseId });
+            if (!r.ok) throw new Error(r.json.error || ('server replied ' + r.status));
+        } catch (err) {
+            Utils.showToast('Expense saved, but the receipt photo could not be linked: ' + err.message, 'error');
+        }
+    },
+
     _showExpenseForm(type, existing) {
         const self = this;
         const isEdit = !!existing;
@@ -282,6 +452,8 @@ window.AdminExpenses = {
         const workers = AppData.getWorkers().filter(function(w) { return w.status === 'Active'; });
         const subtasks = AppData.getSubtasks(self._projectId);
         const isLabor = type === 'Labor';
+        // Receipt scan: new Material and Equipment expenses only (Labor has no receipt)
+        const canScan = !isLabor && !isEdit;
         const vendors = AppData.getData('vendors') || [];
         const existingVendorId = existing ? (existing.vendorId || '') : '';
         const existingVendorManual = existing ? (existing.vendorName || existing.vendor || '') : '';
@@ -350,7 +522,21 @@ window.AdminExpenses = {
                 </div>
             `;
         } else {
+            const receiptHtml = !canScan ? '' : `
+                <div id="receiptScanBlock" style="margin-bottom:14px;padding:10px;border:1px dashed var(--border-color-strong);border-radius:8px;max-width:100%;box-sizing:border-box">
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <button type="button" class="btn-secondary btn-sm" id="receiptScanBtn">Scan receipt</button>
+                        <input type="file" id="receiptFileInput" accept="image/*" style="display:none">
+                        <img id="receiptThumb" alt="Receipt photo" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border-color)">
+                        <span id="receiptStatus" style="font-size:.85rem;color:var(--text2);flex:1 1 160px;min-width:0;overflow-wrap:anywhere">Take a photo of the receipt and the fields below fill in for you.</span>
+                    </div>
+                    <details id="receiptRawWrap" style="display:none;margin-top:8px">
+                        <summary style="cursor:pointer;font-size:.85rem;color:var(--text2)">Text read from the receipt</summary>
+                        <pre id="receiptRawText" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:.78rem;max-height:160px;overflow:auto;margin:6px 0 0;padding:8px;background:var(--bg-primary);border-radius:6px"></pre>
+                    </details>
+                </div>`;
             formFields = `
+                ${receiptHtml}
                 <div class="form-group" style="margin-bottom:12px">
                     <label>Description *</label>
                     <input class="form-control" name="description" value="${esc(existing ? existing.description : '')}" required>
@@ -470,6 +656,9 @@ window.AdminExpenses = {
             });
         }
 
+        // Receipt scan: photo goes up first, then the reader fills the empty fields
+        var receipt = canScan ? self._wireReceiptScan(modal, vendors) : null;
+
         q('#expenseFormModal').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!Utils.validateForm(this)) return;
@@ -572,6 +761,8 @@ window.AdminExpenses = {
                 Utils.showToast('Save failed: ' + err.message, 'error');
                 return;
             }
+            // Link the scanned receipt photo to the expense just saved
+            if (receipt && receipt.photoId) await self._attachReceipt(receipt.photoId, expenseData.id);
             const username = (window.App.currentUser && window.App.currentUser.name) || 'Admin';
             AppData.addAuditLog(username, isEdit ? 'Expense Updated' : 'Expense Added', type + ': ' + expenseData.description + ' - ' + Utils.formatCurrency(amount));
             Utils.showToast(isEdit ? 'Expense updated' : 'Expense added');
