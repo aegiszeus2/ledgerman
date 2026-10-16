@@ -79,18 +79,21 @@ test.describe('Payroll, pay periods and payments kept apart', () => {
         expect(foot).toContain('760.00');   // net
         expect(foot).toContain('580.00');   // paid
     });
-    test('more than this period\'s net is capped back, and points at the earlier period box', async ({ page }) => {
+    test('more than this period\'s net is not capped: it is an overpayment that comes off their next pay', async ({ page }) => {
         await openNewRun(page, WEEK1, [], '2026-09-14', '2026-09-20');
-        await setPaid(page, 'w1', '999');
-        await expect(page.locator('.toast-error').last()).toContainText('Capped at the $480.00 due this period');
-        await expect(page.locator('.pay-line[data-wid="w1"] .pay-paid')).toHaveValue('480.00');
+        await setPaid(page, 'w1', '580');
+        await expect(page.locator('.pay-line[data-wid="w1"] .pay-paid')).toHaveValue('580.00');
+        await expect(page.locator('.pay-line[data-wid="w1"] .pay-over')).toContainText('$100.00 over, an overpayment; it comes off their next pay');
+        await expect(page.locator('#payOverTotal')).toContainText('$100.00 overpaid on this period, carried to the next');
     });
-    test('Record refuses a short payment with no reason, and nothing is saved', async ({ page }) => {
+    test('a short payment with no note still records; the note is optional', async ({ page }) => {
         await openNewRun(page, WEEK1, [], '2026-09-14', '2026-09-20');
         await setPaid(page, 'w1', '300');
+        await expect(page.locator('.pay-line[data-wid="w1"] .pay-short-reason')).toHaveAttribute('placeholder', 'Why (optional)');
         await record(page, '2026-09-24');
-        await expect(page.locator('.toast-error').last()).toContainText('Say why Kosta S was not paid in full');
-        expect(await page.evaluate(() => window.__posted.length)).toBe(0);
+        await expect.poll(() => page.evaluate(() => window.__posted.length)).toBe(1);
+        const run = await page.evaluate(() => window.__posted[0].body);
+        expect(run.lines.find(l => l.workerId === 'w1')).toMatchObject({ net: 480, ownPaid: 300, paid: 300, shortfall: 180, overpaid: 0, adjustReason: '', shortReason: '' });
     });
     test('a short payment is recorded on the period, and the run detail shows the payment and what is still owed since when', async ({ page }) => {
         await openNewRun(page, WEEK1, [], '2026-09-14', '2026-09-20');
@@ -103,7 +106,7 @@ test.describe('Payroll, pay periods and payments kept apart', () => {
         expect(run.ledger).toBe('periods');
         expect(run.lines.find(l => l.workerId === 'w1')).toMatchObject({ net: 480, ownPaid: 300, paid: 300, shortfall: 180, allocations: [], allocationsTotal: 0, shortReason: 'Short on cash this week, balance next run' });
         expect(run.lines.find(l => l.workerId === 'w2')).toMatchObject({ net: 280, ownPaid: 280, paid: 280, shortfall: 0, allocations: [] });
-        expect(run.totals).toEqual({ hours: 26, gross: 760, deductions: 0, net: 760, paid: 580, shortfall: 180, allocated: 0 });
+        expect(run.totals).toMatchObject({ hours: 26, gross: 760, deductions: 0, net: 760, paid: 580, shortfall: 180, allocated: 0, overpaid: 0, recovered: 0 });
         const kosta = page.locator('.pay-detail-line[data-wid="w1"]');
         await expect(kosta.locator('.pay-detail-payments')).toContainText('Paid on this period: $300.00 on Thu, Sep 24, E-transfer');
         await expect(kosta.locator('.pay-detail-status')).toContainText('$180.00 still owed since Thu, Sep 24 (Short on cash this week, balance next run)');
@@ -113,14 +116,14 @@ test.describe('Payroll, pay periods and payments kept apart', () => {
     test('the next run lists the earlier period under the name with its own box at zero; Due stays this period only', async ({ page }) => {
         await openNewRun(page, WEEK2, [RUN1], '2026-09-21', '2026-09-27');
         const kosta = page.locator('.pay-line[data-wid="w1"]');
-        await expect(kosta.locator('.pay-earlier')).toContainText('Earlier periods still owed');
+        await expect(kosta.locator('.pay-earlier')).toContainText('Carried forward from earlier periods');
         await expect(kosta.locator('.pay-earlier-row[data-run="run1"]')).toContainText('$180.00 from Mon, Sep 14 to Sun, Sep 20, owed since Thu, Sep 24 (Short on cash this week, balance next run)');
         await expect(kosta.locator('.pay-earlier-amt')).toHaveValue('0.00');
         await expect(kosta.locator('td:nth-child(7)')).toContainText('$240.00');
         await expect(kosta.locator('.pay-earlier-due')).toContainText('$180.00 owed on earlier periods');
         await expect(kosta.locator('.pay-paid')).toHaveValue('240.00');
         await expect(page.locator('.pay-line[data-wid="w2"] .pay-earlier')).toHaveCount(0);
-        await expect(page.locator('#payPickNote')).toContainText('1 person is still owed on an earlier period');
+        await expect(page.locator('#payPickNote')).toContainText('1 person has an earlier period not yet settled');
         // Nothing entered toward it: the run pays this period only and the old balance stays where it is.
         const foot = await page.locator('#adminContent tfoot').innerText();
         expect(foot).toContain('380.00');
@@ -136,8 +139,8 @@ test.describe('Payroll, pay periods and payments kept apart', () => {
         await expect.poll(() => page.evaluate(() => window.__posted.length)).toBe(1);
         const run = await page.evaluate(() => window.__posted[0].body);
         expect(run.lines.find(l => l.workerId === 'w1')).toMatchObject({ net: 240, ownPaid: 240, shortfall: 0, allocations: [{ runId: 'run1', periodStart: '2026-09-14', periodEnd: '2026-09-20', amount: 180 }], allocationsTotal: 180, paid: 420 });
-        expect(run.totals).toEqual({ hours: 13, gross: 380, deductions: 0, net: 380, paid: 560, shortfall: 0, allocated: 180 });
-        await expect(page.locator('.pay-detail-line[data-wid="w1"] .pay-detail-alloc')).toContainText('Also paid toward earlier periods: $180.00 on Mon, Sep 14 to Sun, Sep 20');
+        expect(run.totals).toMatchObject({ hours: 13, gross: 380, deductions: 0, net: 380, paid: 560, shortfall: 0, allocated: 180, recovered: 0 });
+        await expect(page.locator('.pay-detail-line[data-wid="w1"] .pay-detail-alloc')).toContainText('Also on this run: $180.00 paid toward Mon, Sep 14 to Sun, Sep 20');
         // Open the EARLIER run: the payment is attached to it, and it now reads paid in full on 1 October.
         await toList(page);
         await page.click('.pay-run-row[data-id="run1"] .pay-view-btn');

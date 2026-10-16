@@ -48,7 +48,9 @@ window.fetch = function(url, opts) {
     if (opts && opts.method === 'POST') {
         var body = JSON.parse(opts.body);
         window.__posted.push({ url: u, body: body });
-        if (u.indexOf('/api/payroll_runs') !== -1) window.__runs = window.__runs.concat([body]);
+        // The real server upserts on id (routes/entities.py: 'ID already exists — treat as upsert').
+        if (u.indexOf('/api/payroll_runs') !== -1) window.__runs = window.__runs.filter(function(r) { return r.id !== body.id; }).concat([body]);
+        if (u.indexOf('/api/payroll_deductions') !== -1) window.__deds = window.__deds.filter(function(d) { return d.id !== body.id; }).concat([body]);
         return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
     }
     if (u.indexOf('/api/payroll_runs') !== -1) return Promise.resolve(new Response(JSON.stringify(window.__runs), { status: 200 }));
